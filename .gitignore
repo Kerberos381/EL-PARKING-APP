@@ -1,0 +1,66 @@
+# ── Secrets ────────────────────────────────────────────────────────────────
+# Firebase config — never commit; distribute out-of-band
+GoogleService-Info.plist
+google-services.json
+
+# Android signing credentials
+*.keystore
+*.jks
+keystore.properties
+signing.properties
+release.keystore
+
+# ── Xcode ──────────────────────────────────────────────────────────────────
+build/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.xccheckout
+*.moved-aside
+DerivedData/
+*.hmap
+*.ipa
+*.xcuserstate
+*.xcscmblueprint
+
+# Swift Package Manager
+.build/
+Packages/
+*.resolved
+# Keep the Xcode package lock for reproducible Firebase resolution.
+!EL PARKING APP.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+
+# CocoaPods
+Pods/
+Podfile.lock
+*.xcworkspace
+!*.xcodeproj/*.xcworkspace
+*.xcworkspace/contents.xcworkspacedata
+!*.xcodeproj/project.xcworkspace/contents.xcworkspacedata
+
+# Carthage
+Carthage/Build/
+
+# ── macOS ──────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+__MACOSX/
+
+# ── Environment & IDE ──────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+.vscode/
+*.swp
+*~

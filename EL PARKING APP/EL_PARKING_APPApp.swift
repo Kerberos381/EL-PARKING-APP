@@ -7,11 +7,6 @@
 
 import SwiftUI
 
-@main
-struct EL_PARKING_APPApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
-    }
-}
+// Legacy Xcode template entry point. The real app entry point is ParkKingApp
+// in ParkKingApp.swift, where Firebase and app-wide managers are configured.
+struct EL_PARKING_APPApp_LegacyPlaceholder { }

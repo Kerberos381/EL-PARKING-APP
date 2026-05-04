@@ -7,6 +7,13 @@ import SwiftUI
 import FirebaseCore
 import UIKit
 
+private enum FirebaseBootstrap {
+    static func configureIfNeeded() {
+        guard FirebaseApp.app() == nil else { return }
+        FirebaseApp.configure()
+    }
+}
+
 // MARK: - AppDelegate (configures Firebase before any StateObjects are created)
 
 class AppDelegate: NSObject, UIApplicationDelegate {
@@ -16,7 +23,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        FirebaseApp.configure()
+        FirebaseBootstrap.configureIfNeeded()
         application.shortcutItems = AppQuickAction.shortcutItems
 
         // iOS 26 deprecates LaunchOptionsKey.shortcutItem in favor of scene connection options.
@@ -170,12 +177,12 @@ extension UIWindow {
 struct ParkKingApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
-    @StateObject private var bookingManager       = BookingManager()
-    @StateObject private var authManager          = AuthManager()
-    @StateObject private var announcementsManager = AnnouncementsManager()
-    @StateObject private var infoManager          = InfoManager()
-    @StateObject private var pushManager          = PushNotificationManager()
-    @StateObject private var deepLinkManager      = DeepLinkManager()
+    @StateObject private var bookingManager: BookingManager
+    @StateObject private var authManager: AuthManager
+    @StateObject private var announcementsManager: AnnouncementsManager
+    @StateObject private var infoManager: InfoManager
+    @StateObject private var pushManager: PushNotificationManager
+    @StateObject private var deepLinkManager: DeepLinkManager
     @AppStorage("appTheme") private var themeRaw: Int = 0
     private let proximityReminderManager = ProximityReminderManager.shared
 
@@ -187,6 +194,16 @@ struct ParkKingApp: App {
 
     private var colorScheme: ColorScheme? {
         (AppTheme(rawValue: themeRaw) ?? .system).colorScheme
+    }
+
+    init() {
+        FirebaseBootstrap.configureIfNeeded()
+        _bookingManager = StateObject(wrappedValue: BookingManager())
+        _authManager = StateObject(wrappedValue: AuthManager())
+        _announcementsManager = StateObject(wrappedValue: AnnouncementsManager())
+        _infoManager = StateObject(wrappedValue: InfoManager())
+        _pushManager = StateObject(wrappedValue: PushNotificationManager())
+        _deepLinkManager = StateObject(wrappedValue: DeepLinkManager())
     }
 
     var body: some Scene {

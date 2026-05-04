@@ -39,6 +39,14 @@ enum Haptics {
         generator.impactOccurred(intensity: 1.0)
     }
 
+    /// Use for confirmed destructive actions (delete/cancel/remove).
+    static func destructive() {
+        guard shouldFire(key: "destructive", debounce: 0.12) else { return }
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.prepare()
+        generator.impactOccurred(intensity: 0.9)
+    }
+
     static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
         guard shouldFire(key: "impact.\(style.rawValue)", debounce: 0.08) else { return }
         let generator = UIImpactFeedbackGenerator(style: style)
@@ -58,6 +66,7 @@ enum Haptics {
 
 enum Haptics {
     static func selection() {}
+    static func destructive() {}
     static func impact(_ style: Int = 0) {}
     static func notify(_ type: Int) {}
 }

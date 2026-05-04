@@ -297,6 +297,7 @@ struct ParkKingApp: App {
                 .alert(L10n.cancelBooking, isPresented: $showNotificationCancelAlert) {
                     Button(L10n.cancelBooking, role: .destructive) {
                         if let booking = notificationCancelBooking {
+                            Haptics.destructive()
                             Task { await bookingManager.cancelBooking(booking) }
                         }
                     }

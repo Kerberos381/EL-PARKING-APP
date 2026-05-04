@@ -75,6 +75,7 @@ struct AdminAnnouncementsView: View {
                 Section {
                     ForEach(active) { item in announcementRow(item) }
                         .onDelete { idx in
+                            Haptics.destructive()
                             for i in idx { Task { await announcementsManager.delete(active[i]) } }
                         }
                 } header: {
@@ -85,6 +86,7 @@ struct AdminAnnouncementsView: View {
                 Section {
                     ForEach(inactive) { item in announcementRow(item) }
                         .onDelete { idx in
+                            Haptics.destructive()
                             for i in idx { Task { await announcementsManager.delete(inactive[i]) } }
                         }
                 } header: {
@@ -574,6 +576,7 @@ struct ComposeAnnouncementSheet: View {
             }
 
             Button {
+                Haptics.destructive()
                 withAnimation { onDelete() }
             } label: {
                 Image(systemName: "minus.circle")

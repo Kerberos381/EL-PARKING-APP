@@ -305,6 +305,7 @@ struct MyBookingsView: View {
             .confirmationDialog(L10n.cancelBooking, isPresented: $showingCancelAlert, titleVisibility: .visible) {
                 Button(L10n.cancelBooking, role: .destructive) {
                     if let b = bookingToCancel {
+                        Haptics.destructive()
                         let info = (spotNumber: b.spotNumber, date: b.naturalDate,
                                     from: b.fromTime, to: b.toTime)
                         Task {
@@ -350,6 +351,7 @@ struct MyBookingsView: View {
             .confirmationDialog(L10n.cancelEntireRange, isPresented: $showingGroupCancelAlert, titleVisibility: .visible) {
                 Button(L10n.cancelAllDays, role: .destructive) {
                     if let group = cancelGroupBookings {
+                        Haptics.destructive()
                         Task { for b in group { await bookingManager.cancelBooking(b) } }
                     }
                 }

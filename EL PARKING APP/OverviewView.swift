@@ -124,6 +124,7 @@ struct OverviewView: View {
             .confirmationDialog(L10n.cancelBooking, isPresented: $showCancelAlert, titleVisibility: .visible) {
                 Button(L10n.cancelBooking, role: .destructive) {
                     if let booking = bookingToCancel {
+                        Haptics.destructive()
                         Task { await performCancellation(of: booking) }
                     }
                 }
@@ -136,6 +137,7 @@ struct OverviewView: View {
             .confirmationDialog(L10n.adminCancelBooking, isPresented: $showAdminCancelAlert, titleVisibility: .visible) {
                 Button(L10n.cancelAndNotify, role: .destructive) {
                     if let booking = adminCancelTarget {
+                        Haptics.destructive()
                         Task { await performAdminCancellation(of: booking) }
                     }
                 }

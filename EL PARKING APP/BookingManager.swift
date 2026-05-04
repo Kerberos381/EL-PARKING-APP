@@ -1079,7 +1079,7 @@ class BookingManager: ObservableObject {
     // MARK: - Widget Data
 
     func updateWidgetData() {
-        let defaults = UserDefaults(suiteName: "group.com.StivMalakjan.EL-PARKING-APP") ?? UserDefaults.standard
+        let defaults = UserDefaults.appGroup
 
         let calendar = Calendar.current
         let today    = calendar.startOfDay(for: Date())

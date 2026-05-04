@@ -133,6 +133,7 @@ struct AdminInfoView: View {
                         .listRowBackground(Color.clear)
                     }
                     .onDelete { indexSet in
+                        Haptics.destructive()
                         for index in indexSet {
                             let item = infoManager.items[index]
                             Task { await infoManager.delete(item) }
@@ -530,6 +531,7 @@ struct InfoItemFormView: View {
 
             // Delete
             Button {
+                Haptics.destructive()
                 withAnimation { onDelete() }
             } label: {
                 Image(systemName: "minus.circle.fill")

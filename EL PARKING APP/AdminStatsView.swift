@@ -115,6 +115,7 @@ struct AdminStatsView: View {
         .task { await loadStats() }
         .alert("Delete old bookings?", isPresented: $showDeleteExpiredConfirmation) {
             Button("Delete", role: .destructive) {
+                Haptics.destructive()
                 Task { await runExpiredCleanup() }
             }
             Button("Cancel", role: .cancel) {}

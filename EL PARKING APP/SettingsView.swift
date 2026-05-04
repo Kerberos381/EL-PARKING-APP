@@ -29,7 +29,11 @@ struct SettingsView: View {
 
     // Advance-notice options shown as pills
     private var reminderOptions: [(label: String, sublabel: String, minutes: Int)] {
-        L10n.reminderOptions
+        let before = L10n.before
+        return [
+            ("30 min", before, 30),
+            (LanguageManager.shared.language == .czech ? "1 hod" : "1 hour", before, 60)
+        ]
     }
 
     // Vehicle save state
@@ -168,7 +172,6 @@ struct SettingsView: View {
                     }
                     .padding(.bottom, 100)
                 }
-                .id(langManager.language)
                 .transition(.opacity)
                 .scrollDismissesKeyboard(.immediately)
             }
@@ -203,6 +206,7 @@ struct SettingsView: View {
             }
             .alert(L10n.clearAllBookings, isPresented: $showingClearAlert) {
                 Button(L10n.clear, role: .destructive) {
+                    Haptics.destructive()
                     withAnimation {
                         bookingManager.bookings.removeAll()
                         UserDefaults.standard.removeObject(forKey: "bookings")
@@ -485,8 +489,8 @@ struct SettingsView: View {
                     settingsIconTile(
                         icon: reminderEnabled ? "bell.badge.fill" : "bell.slash.fill",
                         tint: .red,
-                        size: 32,
-                        iconSize: 15
+                        size: 28,
+                        iconSize: 13
                     )
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -525,8 +529,8 @@ struct SettingsView: View {
                                 .foregroundStyle(AppConfig.darkText)
                         }
 
-                        // 2-column grid of advance-notice pills
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                        // Quick presets
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
                             ForEach(reminderOptions, id: \.minutes) { option in
                                 let selected = reminderMinutesBefore == option.minutes
                                 Button {
@@ -537,34 +541,37 @@ struct SettingsView: View {
                                 } label: {
                                     HStack(spacing: 0) {
                                         Text(option.label)
-                                            .font(.system(size: 13, weight: .bold))
+                                            .font(.system(size: 13, weight: .semibold))
                                             .foregroundStyle(AppConfig.darkText)
                                         Text(" \(option.sublabel)")
-                                            .font(.system(size: 11, weight: .regular))
+                                            .font(.system(size: 11))
                                             .foregroundStyle(AppConfig.subtleGray)
                                     }
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 10)
-                                    .background(selected ? AppConfig.surfaceHigh : AppConfig.surfaceLow)
+                                    .padding(.vertical, 9)
+                                    .background(selected ? AppConfig.surfaceHigh : Color.clear)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 12)
-                                            .stroke(selected ? AppConfig.separatorStrong : Color.clear, lineWidth: 1.5)
+                                            .stroke(selected ? AppConfig.separatorStrong : AppConfig.outlineVariant.opacity(0.35), lineWidth: 1)
                                     )
                                 }
                                 .buttonStyle(ScaleButtonStyle())
                             }
                         }
+                        .padding(4)
+                        .background(AppConfig.surfaceLow)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
 
                         // Custom time picker row
                         Button { showCustomPicker = true } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: "slider.horizontal.3")
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(AppConfig.subtleGray)
                                     .frame(width: 24)
                                 Text(L10n.custom)
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(.system(size: 13, weight: .medium))
                                     .foregroundStyle(AppConfig.darkText)
                                 Spacer()
                                 Text(isCustomValue ? reminderSummary : L10n.setCustomTime)
@@ -575,12 +582,12 @@ struct SettingsView: View {
                                     .foregroundStyle(AppConfig.subtleGray.opacity(0.5))
                             }
                             .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .background(isCustomValue ? AppConfig.surfaceHigh : AppConfig.surfaceLow)
+                            .padding(.vertical, 9)
+                            .background(isCustomValue ? AppConfig.surfaceHigh : Color.clear)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(isCustomValue ? AppConfig.separatorStrong : Color.clear, lineWidth: 1.5)
+                                    .stroke(isCustomValue ? AppConfig.separatorStrong : AppConfig.outlineVariant.opacity(0.35), lineWidth: 1)
                             )
                         }
                         .buttonStyle(ScaleButtonStyle())
@@ -664,18 +671,18 @@ struct SettingsView: View {
                                 } label: {
                                     HStack(spacing: 5) {
                                         Image(systemName: bodyType.icon)
-                                            .font(.system(size: 12, weight: .semibold))
+                                            .font(.system(size: 11, weight: .semibold))
                                         Text(bodyType.label)
-                                            .font(.system(size: 13, weight: .semibold))
+                                            .font(.system(size: 12, weight: .medium))
                                     }
                                     .foregroundStyle(isSelected ? AppConfig.onAccent : AppConfig.subtleGray)
-                                    .padding(.horizontal, 13)
-                                    .padding(.vertical, 8)
-                                    .background(isSelected ? AppConfig.accent : AppConfig.surfaceLow)
+                                    .padding(.horizontal, 11)
+                                    .padding(.vertical, 7)
+                                    .background(isSelected ? AppConfig.accent.opacity(0.9) : AppConfig.surfaceLow)
                                     .clipShape(Capsule())
                                     .overlay(
                                         Capsule().stroke(
-                                            isSelected ? AppConfig.accentFg.opacity(0.3) : AppConfig.outlineVariant.opacity(0.4),
+                                            isSelected ? AppConfig.accentFg.opacity(0.22) : AppConfig.outlineVariant.opacity(0.35),
                                             lineWidth: 1
                                         )
                                     )
@@ -730,14 +737,14 @@ struct SettingsView: View {
                                 withAnimation(.quick) { bookingManager.carColor = color.hex }
                             } label: {
                                 ZStack {
-                                    Circle().fill(Color(hex: color.hex)).frame(width: 34, height: 34)
+                                    Circle().fill(Color(hex: color.hex)).frame(width: 30, height: 30)
                                         .overlay(Circle().stroke(
-                                            isSelected ? AppConfig.accentFg : Color.white.opacity(0.15),
-                                            lineWidth: isSelected ? 2.5 : 1
+                                            isSelected ? AppConfig.accentFg.opacity(0.85) : AppConfig.outlineVariant.opacity(0.4),
+                                            lineWidth: isSelected ? 2 : 1
                                         ))
                                     if isSelected {
                                         Image(systemName: "checkmark")
-                                            .font(.system(size: 10, weight: .bold))
+                                            .font(.system(size: 9, weight: .bold))
                                             .foregroundStyle(
                                                 color.hex == "#FFFFFF" || color.hex == "#F9A825" ? Color.black : Color.white
                                             )
@@ -750,9 +757,9 @@ struct SettingsView: View {
                         VehicleCustomColorButton(
                             selectedHex: $bookingManager.carColor,
                             pickerColor: $pickerColor,
-                            size: 34,
-                            checkmarkSize: 10,
-                            plusSize: 15
+                            size: 30,
+                            checkmarkSize: 9,
+                            plusSize: 13
                         )
                     }
                 }
@@ -1024,7 +1031,7 @@ struct SettingsView: View {
 
     private func settingsValueRow(title: String, value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 12) {
-            settingsIconTile(icon: icon, tint: tint, size: 30, iconSize: 13)
+            settingsIconTile(icon: icon, tint: tint, size: 28, iconSize: 13)
 
             Text(title)
                 .font(.subheadline)
@@ -1192,6 +1199,7 @@ struct SettingsView: View {
                 .textInputAutocapitalization(.characters)
             Button(L10n.deletePermanently, role: .destructive) {
                 guard deleteConfirmText.uppercased() == "DELETE" else { return }
+                Haptics.destructive()
                 Task {
                     let success = await authManager.deleteAccount()
                     if success {
@@ -1229,39 +1237,50 @@ struct SettingsView: View {
         iconTint: Color,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 14) {
-                settingsIconTile(icon: icon, tint: iconTint, size: 40, iconSize: 20)
-                Text(title)
-                    .font(.title3)
-                    .foregroundStyle(AppConfig.darkText)
-                Spacer()
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 16)
+        // Build once and pass through type erasure to avoid repeated generic
+        // closure re-evaluation during SwiftUI diffing.
+        let sectionContent = AnyView(content())
+        return settingsSection(
+            title: title,
+            icon: icon,
+            iconTint: iconTint,
+            content: sectionContent
+        )
+    }
 
-            Divider()
-                .padding(.leading, 72)
-                .overlay(AppConfig.separatorSoft)
+    private func settingsSection(
+        title: String,
+        icon: String,
+        iconTint: Color,
+        content: AnyView
+    ) -> some View {
+        _ = icon
+        _ = iconTint
+        return VStack(alignment: .leading, spacing: 7) {
+            Text(title.uppercased())
+                .font(.caption.weight(.semibold))
+                .tracking(1.0)
+                .foregroundStyle(AppConfig.subtleGray)
+                .padding(.horizontal, 8)
 
             VStack(alignment: .leading, spacing: 0) {
-                content()
+                content
             }
-            .padding(.horizontal, SettingsSpace.lg)
-            .padding(.vertical, SettingsSpace.md)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(uiColor: .secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(AppConfig.separatorSoft.opacity(0.35), lineWidth: 0.5)
+            )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .stroke(AppConfig.separatorSoft.opacity(0.35), lineWidth: 0.5)
-        )
         .padding(.horizontal)
     }
 
-    private func settingsIconTile(icon: String, tint: Color, size: CGFloat = 32, iconSize: CGFloat = 15) -> some View {
+    private func settingsIconTile(icon: String, tint: Color, size: CGFloat = 28, iconSize: CGFloat = 13) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
                 .fill(tint)
@@ -1285,7 +1304,7 @@ struct SettingsView: View {
             : Color.clear
 
         return HStack(spacing: SettingsSpace.md) {
-            settingsIconTile(icon: icon, tint: tint, size: 32, iconSize: 15)
+            settingsIconTile(icon: icon, tint: tint, size: 28, iconSize: 13)
 
             Text(title)
                 .font(SettingsType.rowTitle)
@@ -1297,8 +1316,7 @@ struct SettingsView: View {
                 .font(SettingsType.rowChevron)
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.7))
         }
-        .padding(.horizontal, SettingsSpace.sm)
-        .padding(.vertical, SettingsSpace.sm)
+        .padding(.vertical, 12)
         .background(rowBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
@@ -1312,7 +1330,7 @@ struct SettingsView: View {
         capitalization: TextInputAutocapitalization = .words
     ) -> some View {
         HStack(spacing: SettingsSpace.md) {
-            settingsIconTile(icon: icon, tint: .gray, size: 32, iconSize: 14)
+            settingsIconTile(icon: icon, tint: .gray, size: 28, iconSize: 13)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
@@ -1352,7 +1370,7 @@ struct SettingsView: View {
         value: String
     ) -> some View {
         HStack(spacing: SettingsSpace.md) {
-            settingsIconTile(icon: icon, tint: .gray, size: 30, iconSize: 13)
+            settingsIconTile(icon: icon, tint: .gray, size: 28, iconSize: 13)
 
             Text(label)
                 .font(SettingsType.rowTitle)

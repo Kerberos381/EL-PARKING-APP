@@ -179,6 +179,7 @@ struct HomeView: View {
             .alert(L10n.cancelBooking, isPresented: $showCancelAlert) {
                 Button(L10n.cancelBooking, role: .destructive) {
                     if let booking = bookingToCancel {
+                        Haptics.destructive()
                         let info = (spotNumber: booking.spotNumber, date: booking.naturalDate,
                                     from: booking.fromTime, to: booking.toTime)
                         Task {

@@ -14,7 +14,16 @@ import CryptoKit
 // MARK: - Shared App Group UserDefaults
 extension UserDefaults {
     /// Shared suite used by the main app, widget, and App Intents extension.
-    static let appGroup = UserDefaults(suiteName: "group.com.StivMalakjan.EL-PARKING-APP") ?? .standard
+    /// Falls back to .standard if the container isn't accessible (e.g. missing provisioning).
+    static let appGroup: UserDefaults = {
+        let suiteName = "group.com.StivMalakjan.EL-PARKING-APP"
+        guard let suite = UserDefaults(suiteName: suiteName) else { return .standard }
+        let testKey = "__appGroupAccessTest"
+        suite.set(true, forKey: testKey)
+        let ok = suite.bool(forKey: testKey)
+        suite.removeObject(forKey: testKey)
+        return ok ? suite : .standard
+    }()
 }
 
 struct AppConfig {

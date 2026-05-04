@@ -97,7 +97,7 @@ struct AdminDashboardView: View {
                                          badge: userCounts.pending)
                             }
                             .buttonStyle(ScaleButtonStyle())
-                            Divider().padding(.leading, 78)
+                            Divider().padding(.leading, 56)
                             Button { showCreateUser = true } label: {
                                 rowLabel(icon: "person.badge.plus",
                                          iconColor: .green,
@@ -106,7 +106,7 @@ struct AdminDashboardView: View {
                                          badge: 0)
                             }
                             .buttonStyle(ScaleButtonStyle())
-                            Divider().padding(.leading, 78)
+                            Divider().padding(.leading, 56)
                             Button { showBulkImport = true } label: {
                                 rowLabel(icon: "tray.and.arrow.down.fill",
                                          iconColor: .cyan,
@@ -130,7 +130,7 @@ struct AdminDashboardView: View {
                                          badge: 0)
                             }
                             .buttonStyle(ScaleButtonStyle())
-                            Divider().padding(.leading, 78)
+                            Divider().padding(.leading, 56)
                             NavigationLink {
                                 AdminAnnouncementsView()
                                     .environmentObject(authManager)
@@ -143,7 +143,7 @@ struct AdminDashboardView: View {
                                          badge: 0)
                             }
                             .buttonStyle(ScaleButtonStyle())
-                            Divider().padding(.leading, 78)
+                            Divider().padding(.leading, 56)
                             NavigationLink {
                                 AdminInfoView()
                                     .environmentObject(infoManager)
@@ -497,9 +497,9 @@ struct AdminDashboardView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(Color.orange.opacity(0.16))
-                        .frame(width: 34, height: 34)
+                        .frame(width: 28, height: 28)
                     Image(systemName: "person.badge.clock.fill")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.orange)
                         .symbolEffect(.breathe, options: .repeating, isActive: !reduceMotion)
                 }
@@ -537,27 +537,27 @@ struct AdminDashboardView: View {
     private func groupedSection<Content: View>(header: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(header.uppercased())
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(1.2)
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1.0)
                 .foregroundStyle(AppConfig.subtleGray)
-                .padding(.horizontal, 6)
+                .padding(.horizontal, 8)
             VStack(spacing: 0) {
                 content()
             }
             .background(Color(uiColor: .secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
-            .containerShape(.rect(cornerRadius: 30))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .containerShape(.rect(cornerRadius: 20))
         }
     }
 
     private func rowLabel(icon: String, iconColor: Color, title: String, subtitle: String, badge: Int) -> some View {
         HStack(spacing: 14) {
-            appleSettingsIcon(icon: icon, tint: iconColor, size: 46, iconSize: 23)
+            appleSettingsIcon(icon: icon, tint: iconColor)
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
                     Text(title)
-                        .font(.title3)
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AppConfig.darkText)
                     if badge > 0 {
                         Text(badge > 9 ? "9+" : "\(badge)")
@@ -571,7 +571,7 @@ struct AdminDashboardView: View {
                     }
                 }
                 Text(subtitle)
-                    .font(.body)
+                    .font(.caption)
                     .foregroundStyle(AppConfig.subtleGray)
                     .lineLimit(1)
             }
@@ -582,13 +582,18 @@ struct AdminDashboardView: View {
                 .accessibilityHidden(true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 15)
-        .frame(minHeight: 78)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(minHeight: 56)
         .contentShape(Rectangle())
     }
 
-    private func appleSettingsIcon(icon: String, tint: Color, size: CGFloat, iconSize: CGFloat) -> some View {
+    private func appleSettingsIcon(
+        icon: String,
+        tint: Color,
+        size: CGFloat = 28,
+        iconSize: CGFloat = 13
+    ) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
                 .fill(tint)

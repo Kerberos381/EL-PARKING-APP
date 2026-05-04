@@ -175,6 +175,7 @@ struct AdminUsersView: View {
             .confirmationDialog(L10n.deleteUser, isPresented: $showDeleteAlert, titleVisibility: .visible) {
                 Button(L10n.deleteUser, role: .destructive) {
                     if let user = userToDelete {
+                        Haptics.destructive()
                         Task { await authManager.adminDeleteUser(user) }
                     }
                 }
@@ -457,6 +458,7 @@ struct AdminUsersView: View {
 
                 // Delete button
                 Button {
+                    Haptics.destructive()
                     Task { await bulkDelete() }
                 } label: {
                     HStack(spacing: 8) {
@@ -1391,6 +1393,7 @@ struct AdminUsersView: View {
                                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                     Button(role: .destructive) {
                                         userToStrike = nil
+                                        Haptics.destructive()
                                         Task { await authManager.adminDeleteStrikeEntry(entry, from: user) }
                                     } label: {
                                         Label("Delete", systemImage: "trash")

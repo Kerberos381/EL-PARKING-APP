@@ -134,6 +134,7 @@ struct AppConfig {
         ("Blue",      "#1A73E8"),
         ("Navy",      "#003087"),
         ("Green",     "#188038"),
+        ("Dragon Green", "#2D7D46"),
         ("Yellow",    "#F9A825"),
         ("Orange",    "#E8710A"),
         ("Brown",     "#795548"),

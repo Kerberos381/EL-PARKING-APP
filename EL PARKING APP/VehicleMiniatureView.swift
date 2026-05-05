@@ -10,6 +10,132 @@ import SwiftUI
 import UIKit
 #endif
 
+struct VehicleMiniaturePreset: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let searchDescription: String
+    let matchTokens: [String]
+
+    static let all: [VehicleMiniaturePreset] = [
+        .init(id: "volvo_ex30_yellow", title: "Volvo EX30 · Moss Yellow", searchDescription: "Volvo EX30 Moss Yellow", matchTokens: ["volvo ex30 moss yellow"]),
+        .init(id: "volvo_ex30_black", title: "Volvo EX30 · Black", searchDescription: "Volvo EX30 Black", matchTokens: ["volvo ex30 black"]),
+        .init(id: "volvo_ex30_white", title: "Volvo EX30 · White", searchDescription: "Volvo EX30 White", matchTokens: ["volvo ex30 white"]),
+        .init(id: "volvo_ex30_gray", title: "Volvo EX30 · Gray", searchDescription: "Volvo EX30 Gray", matchTokens: ["volvo ex30 gray", "volvo ex30 grey"]),
+        .init(id: "volvo_ex30_blue", title: "Volvo EX30 · Blue", searchDescription: "Volvo EX30 Blue", matchTokens: ["volvo ex30 blue"]),
+
+        .init(id: "tesla_model3_white", title: "Tesla Model 3 · White", searchDescription: "Tesla Model 3 White", matchTokens: ["tesla model 3 white", "model 3 white"]),
+        .init(id: "tesla_model3_red", title: "Tesla Model 3 · Red", searchDescription: "Tesla Model 3 Red", matchTokens: ["tesla model 3 red", "model 3 red"]),
+        .init(id: "tesla_model3_black", title: "Tesla Model 3 · Black", searchDescription: "Tesla Model 3 Black", matchTokens: ["tesla model 3 black", "model 3 black"]),
+        .init(id: "tesla_model3_blue", title: "Tesla Model 3 · Blue", searchDescription: "Tesla Model 3 Blue", matchTokens: ["tesla model 3 blue", "model 3 blue"]),
+        .init(id: "tesla_model3_gray", title: "Tesla Model 3 · Gray", searchDescription: "Tesla Model 3 Gray", matchTokens: ["tesla model 3 gray", "tesla model 3 grey", "model 3 gray", "model 3 grey"]),
+
+        .init(id: "octavia_rs_dragon", title: "Škoda Octavia RS · Dragon Green", searchDescription: "Skoda Octavia RS Dragon Green", matchTokens: ["octavia rs dragon", "octavia rs dragon green", "octavia rs dragon skin"]),
+        .init(id: "octavia_rs_white", title: "Škoda Octavia RS · White", searchDescription: "Skoda Octavia RS White", matchTokens: ["octavia rs white"]),
+        .init(id: "octavia_rs_gray", title: "Škoda Octavia RS · Gray", searchDescription: "Skoda Octavia RS Gray", matchTokens: ["octavia rs gray", "octavia rs grey"]),
+
+        .init(id: "octavia_combi_mamba", title: "Škoda Octavia Combi RS · Mamba", searchDescription: "Skoda Octavia Combi RS Mamba Green", matchTokens: ["octavia combi rs mamba", "octavia combi rs dragon"]),
+        .init(id: "octavia_combi_white", title: "Škoda Octavia Combi · White", searchDescription: "Skoda Octavia Combi White", matchTokens: ["octavia combi white"]),
+        .init(id: "octavia_combi_gray", title: "Škoda Octavia Combi · Gray", searchDescription: "Skoda Octavia Combi Gray", matchTokens: ["octavia combi gray", "octavia combi grey"]),
+
+        .init(id: "skoda_superb_white", title: "Škoda Superb · White", searchDescription: "Skoda Superb White", matchTokens: ["superb white"]),
+        .init(id: "skoda_superb_gray", title: "Škoda Superb · Gray", searchDescription: "Skoda Superb Gray", matchTokens: ["superb gray", "superb grey"]),
+        .init(id: "skoda_superb_green", title: "Škoda Superb · Green", searchDescription: "Skoda Superb Green", matchTokens: ["superb green"]),
+
+        .init(id: "skoda_kodiaq", title: "Škoda Kodiaq", searchDescription: "Skoda Kodiaq", matchTokens: ["kodiaq"]),
+        .init(id: "skoda_kodiaq_white", title: "Škoda Kodiaq · White", searchDescription: "Skoda Kodiaq White", matchTokens: ["kodiaq white", "skoda kodiaq white"]),
+        .init(id: "skoda_kodiaq_gray", title: "Škoda Kodiaq · Gray", searchDescription: "Skoda Kodiaq Gray", matchTokens: ["kodiaq gray", "kodiaq grey", "skoda kodiaq gray", "skoda kodiaq grey"]),
+        .init(id: "skoda_kodiaq_black", title: "Škoda Kodiaq · Black", searchDescription: "Skoda Kodiaq Black", matchTokens: ["kodiaq black", "skoda kodiaq black"]),
+        .init(id: "tesla_model_y", title: "Tesla Model Y", searchDescription: "Tesla Model Y", matchTokens: ["model y", "tesla model y"]),
+        .init(id: "tesla_model_y_white", title: "Tesla Model Y · White", searchDescription: "Tesla Model Y White", matchTokens: ["model y white", "tesla model y white"]),
+        .init(id: "tesla_model_y_black", title: "Tesla Model Y · Black", searchDescription: "Tesla Model Y Black", matchTokens: ["model y black", "tesla model y black"]),
+        .init(id: "tesla_model_y_gray", title: "Tesla Model Y · Gray", searchDescription: "Tesla Model Y Gray", matchTokens: ["model y gray", "model y grey", "tesla model y gray", "tesla model y grey"]),
+        .init(id: "bmw_3", title: "BMW 3 Series", searchDescription: "BMW 3 Series", matchTokens: ["bmw 3", "3 series", "320", "330", "m340"]),
+        .init(id: "mini_countryman", title: "MINI Countryman", searchDescription: "MINI Countryman", matchTokens: ["countryman", "mini countryman"]),
+        .init(id: "mini_countryman_green_electric", title: "MINI Countryman Electric · Green", searchDescription: "MINI Countryman Electric Green", matchTokens: ["mini countryman electric green", "countryman electric green", "countryman ev green", "mini countryman green electric"]),
+        .init(id: "mini_countryman_white", title: "MINI Countryman · White", searchDescription: "MINI Countryman White", matchTokens: ["countryman white", "mini countryman white"]),
+        .init(id: "mini_countryman_black", title: "MINI Countryman · Black", searchDescription: "MINI Countryman Black", matchTokens: ["countryman black", "mini countryman black"]),
+        .init(id: "subaru_outback", title: "Subaru Outback", searchDescription: "Subaru Outback", matchTokens: ["subaru outback", "outback"]),
+        .init(id: "ford_focus", title: "Ford Focus", searchDescription: "Ford Focus", matchTokens: ["ford focus", "focus"]),
+        .init(id: "hyundai_bayon", title: "Hyundai Bayon", searchDescription: "Hyundai Bayon", matchTokens: ["hyundai bayon", "bayon"])
+    ]
+
+    static var pickerOptions: [VehicleMiniaturePreset] {
+        var seenAssets = Set<String>()
+        return all.filter { preset in
+            guard let assetName = VehicleMiniatureAsset.assetName(forPresetID: preset.id) else {
+                return true
+            }
+            guard VehicleMiniatureAsset.imageExists(assetName) else {
+                return false
+            }
+            guard !seenAssets.contains(assetName) else {
+                return false
+            }
+            seenAssets.insert(assetName)
+            return true
+        }
+    }
+
+    static func matching(description: String, carType: String = "") -> VehicleMiniaturePreset? {
+        let text = "\(carType) \(description)".vehicleSearchText
+        if let exact = all.first(where: { $0.searchDescription.vehicleSearchText == text }) {
+            return exact
+        }
+        return all.first { preset in
+            preset.matchTokens.contains { text.contains($0.vehicleSearchText) }
+        }
+    }
+}
+
+struct VehicleMiniaturePresetPickerSheet: View {
+    let title: String
+    let selectedColorHex: String
+    let selectedPresetID: String?
+    let onSelect: (VehicleMiniaturePreset) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(VehicleMiniaturePreset.pickerOptions) { preset in
+                    Button {
+                        Haptics.selection()
+                        onSelect(preset)
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 12) {
+                            VehicleMiniatureView(
+                                carType: "",
+                                colorHex: selectedColorHex,
+                                description: preset.searchDescription
+                            )
+                            .frame(width: 70, height: 38)
+
+                            Text(preset.title)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(AppConfig.darkText)
+
+                            Spacer()
+
+                            if selectedPresetID == preset.id {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(AppConfig.accentFg)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
 struct VehicleMiniatureView: View {
     let carType: String
     let colorHex: String
@@ -19,24 +145,12 @@ struct VehicleMiniatureView: View {
         VehicleMiniatureKind.resolve(carType: carType, description: description)
     }
 
-    private var paintColor: Color {
-        guard let normalizedPaintHex else { return AppConfig.subtleGray }
-        return Color(hex: normalizedPaintHex)
-    }
-
-    private var normalizedPaintHex: String? {
-        let trimmed = colorHex.trimmingCharacters(in: .whitespacesAndNewlines)
-        let raw = trimmed.hasPrefix("#") ? String(trimmed.dropFirst()) : trimmed
-        guard raw.count == 6, raw.allSatisfy(\.isHexDigit) else { return nil }
-        return "#\(raw.uppercased())"
-    }
-
     var body: some View {
         Group {
             if let assetName = VehicleMiniatureAsset.resolve(
                 carType: carType,
                 description: description
-            ), let imageName = VehicleMiniatureAsset.availableImageName(for: assetName, colorHex: normalizedPaintHex) {
+            ), let imageName = VehicleMiniatureAsset.availableImageName(for: assetName) {
                 Image(imageName)
                     .resizable()
                     .scaledToFit()
@@ -60,55 +174,72 @@ struct VehicleMiniatureView: View {
 
 private enum VehicleMiniatureAsset {
     static func resolve(carType: String, description: String) -> String? {
+        if let preset = VehicleMiniaturePreset.matching(description: description, carType: carType),
+           let presetAssetName = assetName(forPresetID: preset.id) {
+            return presetAssetName
+        }
+
         let text = "\(carType) \(description)".vehicleSearchText
 
+        if text.contains("octavia") &&
+            text.containsAny(["combi", "kombi", "estate", "wagon"]) &&
+            text.containsAny(["rs", "vrs", "r s"]) {
+            if text.containsAny(["mamba", "dragon green", "dragon-green", "dragon skin", "dragonskin", "dragon"]) {
+                return "vehicle_mini_octavia_combi_green"
+            }
+            return explicitColorAsset(base: "vehicle_mini_octavia_combi", text: text, defaultSuffix: "white")
+        }
+
         if text.contains("octavia") && text.containsAny(["rs", "vrs", "r s"]) {
-            if text.containsAny(["dragon green", "dragon-green", "dragon"]) {
+            if text.containsAny(["mamba", "dragon green", "dragon-green", "dragon skin", "dragonskin", "dragon"]) {
                 return "vehicle_mini_skoda_octavia_rs_dragon_green"
             }
-            return "vehicle_mini_skoda_octavia_rs"
+            return explicitColorAsset(base: "vehicle_mini_skoda_octavia_rs", text: text, defaultSuffix: "white")
         }
         if text.containsAny(["countryman", "mini countryman"]) {
-            return "vehicle_mini_mini_countryman"
+            if text.containsAny(["electric", "ev"]) {
+                return "vehicle_mini_mini_countryman_green"
+            }
+            return explicitColorAsset(base: "vehicle_mini_mini_countryman", text: text, defaultSuffix: "white")
         }
         if text.containsAny(["bmw 3", "3 series", "320", "330", "m340"]) {
-            return "vehicle_mini_bmw_3"
+            return explicitColorAsset(base: "vehicle_mini_bmw_3", text: text, defaultSuffix: "white")
         }
         if text.containsAny(["volvo ex30", "volvo ex 30", "ex30", "ex 30"]) {
-            return "vehicle_mini_volvo_ex30_moss_yellow"
+            return explicitColorAsset(base: "vehicle_mini_volvo_ex30_moss_yellow", text: text, defaultSuffix: "yellow")
         }
         if text.containsAny(["tesla model y", "model y", "modely"]) {
-            return "vehicle_mini_tesla_model_y"
+            return explicitColorAsset(base: "vehicle_mini_tesla_model_y", text: text, defaultSuffix: "white")
         }
         if text.containsAny(["tesla model 3", "tesla 3", "model 3", "model3", "tesla"]) {
-            return "vehicle_mini_tesla_model3"
+            return explicitColorAsset(base: "vehicle_mini_tesla_model3", text: text, defaultSuffix: "white")
         }
         if text.containsAny(["ford focus", "focus"]) {
-            return "vehicle_mini_ford_focus"
+            return explicitColorAsset(base: "vehicle_mini_ford_focus", text: text, defaultSuffix: "white")
         }
         if text.containsAny(["subaru outback", "outback"]) {
-            return "vehicle_mini_subaru_outback"
+            return explicitColorAsset(base: "vehicle_mini_subaru_outback", text: text, defaultSuffix: "white")
         }
         if text.containsAny(["kia ev9", "ev9", "ev 9"]) {
-            return "vehicle_mini_kia_ev9"
+            return explicitColorAsset(base: "vehicle_mini_kia_ev9", text: text, defaultSuffix: "white")
         }
         if text.containsAny(["skoda kodiaq", "kodiaq"]) {
-            return "vehicle_mini_skoda_kodiaq"
+            return explicitColorAsset(base: "vehicle_mini_skoda_kodiaq", text: text, defaultSuffix: "white")
         }
         if text.containsAny(["hyundai bayon", "bayon"]) {
-            return "vehicle_mini_hyundai_bayon"
+            return explicitColorAsset(base: "vehicle_mini_hyundai_bayon", text: text, defaultSuffix: "white")
         }
         if text.containsAny(["hyundai kona", "kona electric", "kona", "kia niro", "niro ev", "niro"]) {
-            return "vehicle_mini_hyundai_kona_electric"
+            return explicitColorAsset(base: "vehicle_mini_hyundai_kona_electric", text: text, defaultSuffix: "white")
         }
         if text.contains("superb") {
-            return "vehicle_mini_superb"
+            return explicitColorAsset(base: "vehicle_mini_superb", text: text, defaultSuffix: "white")
         }
         if text.contains("octavia") && text.containsAny(["combi", "kombi", "estate", "wagon"]) {
-            return "vehicle_mini_octavia_combi"
+            return explicitColorAsset(base: "vehicle_mini_octavia_combi", text: text, defaultSuffix: "white")
         }
         if text.contains("octavia") {
-            return "vehicle_mini_superb_sedan"
+            return explicitColorAsset(base: "vehicle_mini_skoda_octavia_rs", text: text, defaultSuffix: "white")
         }
         if text.contains("fabia") {
             return "vehicle_mini_fabia_hatch"
@@ -131,22 +262,34 @@ private enum VehicleMiniatureAsset {
         return nil
     }
 
-    static func variantName(for assetName: String, colorHex: String?) -> String {
-        guard supportsPaletteVariants(assetName) else { return assetName }
-        guard let suffix = colorVariantSuffix(for: colorHex) else { return assetName }
-        return "\(assetName)_\(suffix)"
-    }
+    static func availableImageName(for assetName: String) -> String? {
+        if imageExists(assetName) {
+            return assetName
+        }
 
-    static func availableImageName(for assetName: String, colorHex: String?) -> String? {
-        let variant = variantName(for: assetName, colorHex: colorHex)
-        if imageExists(variant) { return variant }
-        if imageExists(assetName) { return assetName }
+        if let baseName = baseAssetName(removingColorSuffixFrom: assetName),
+           imageExists(baseName) {
+            return baseName
+        }
+
         return nil
     }
 
     static func imageExists(_ name: String) -> Bool {
         #if canImport(UIKit)
-        UIImage(named: name) != nil
+        imageCacheLock.lock()
+        if let cached = imageExistsCache[name] {
+            imageCacheLock.unlock()
+            return cached
+        }
+        imageCacheLock.unlock()
+
+        let exists = UIImage(named: name) != nil
+
+        imageCacheLock.lock()
+        imageExistsCache[name] = exists
+        imageCacheLock.unlock()
+        return exists
         #else
         true
         #endif
@@ -181,59 +324,102 @@ private enum VehicleMiniatureAsset {
         }
     }
 
-    private static func supportsPaletteVariants(_ assetName: String) -> Bool {
-        !assetName.hasPrefix("vehicle_mini_generic_") &&
-        assetName != "vehicle_mini_skoda_octavia_rs_dragon_green"
-    }
+    static func assetName(forPresetID id: String) -> String? {
+        switch id {
+        case "volvo_ex30_yellow": return "vehicle_mini_volvo_ex30_moss_yellow_yellow"
+        case "volvo_ex30_black": return "vehicle_mini_volvo_ex30_moss_yellow_black"
+        case "volvo_ex30_white": return "vehicle_mini_volvo_ex30_moss_yellow_white"
+        case "volvo_ex30_gray": return "vehicle_mini_volvo_ex30_moss_yellow_gray"
+        case "volvo_ex30_blue": return "vehicle_mini_volvo_ex30_moss_yellow_blue"
 
-    private static func colorVariantSuffix(for colorHex: String?) -> String? {
-        guard
-            let rawColorHex = colorHex,
-            let rgb = rgbComponents(from: rawColorHex)
-        else {
-            return nil
+        case "tesla_model3_white": return "vehicle_mini_tesla_model3_white"
+        case "tesla_model3_red": return "vehicle_mini_tesla_model3_red"
+        case "tesla_model3_black": return "vehicle_mini_tesla_model3_black"
+        case "tesla_model3_blue": return "vehicle_mini_tesla_model3_blue"
+        case "tesla_model3_gray": return "vehicle_mini_tesla_model3_gray"
+
+        case "octavia_rs_dragon": return "vehicle_mini_skoda_octavia_rs_dragon_green"
+        case "octavia_rs_white": return "vehicle_mini_skoda_octavia_rs_white"
+        case "octavia_rs_gray": return "vehicle_mini_skoda_octavia_rs_gray"
+
+        case "octavia_combi_mamba": return "vehicle_mini_octavia_combi_green"
+        case "octavia_combi_white": return "vehicle_mini_octavia_combi_white"
+        case "octavia_combi_gray": return "vehicle_mini_octavia_combi_gray"
+
+        case "skoda_superb_white": return "vehicle_mini_superb_white"
+        case "skoda_superb_gray": return "vehicle_mini_superb_gray"
+        case "skoda_superb_green": return "vehicle_mini_superb_green"
+
+        case "skoda_kodiaq": return "vehicle_mini_skoda_kodiaq"
+        case "skoda_kodiaq_white": return "vehicle_mini_skoda_kodiaq_white"
+        case "skoda_kodiaq_gray": return "vehicle_mini_skoda_kodiaq_gray"
+        case "skoda_kodiaq_black": return "vehicle_mini_skoda_kodiaq_black"
+
+        case "tesla_model_y": return "vehicle_mini_tesla_model_y"
+        case "tesla_model_y_white": return "vehicle_mini_tesla_model_y_white"
+        case "tesla_model_y_black": return "vehicle_mini_tesla_model_y_black"
+        case "tesla_model_y_gray": return "vehicle_mini_tesla_model_y_gray"
+
+        case "bmw_3": return "vehicle_mini_bmw_3"
+        case "bmw_3_white": return "vehicle_mini_bmw_3_white"
+        case "bmw_3_black": return "vehicle_mini_bmw_3_black"
+
+        case "mini_countryman": return "vehicle_mini_mini_countryman"
+        case "mini_countryman_white": return "vehicle_mini_mini_countryman_white"
+        case "mini_countryman_black": return "vehicle_mini_mini_countryman_black"
+        case "mini_countryman_green_electric": return "vehicle_mini_mini_countryman_green"
+
+        case "subaru_outback": return "vehicle_mini_subaru_outback"
+        case "subaru_outback_white": return "vehicle_mini_subaru_outback_white"
+        case "ford_focus": return "vehicle_mini_ford_focus"
+        case "ford_focus_white": return "vehicle_mini_ford_focus_white"
+        case "hyundai_bayon": return "vehicle_mini_hyundai_bayon"
+        default: return nil
         }
-
-        return colorVariants.min { lhs, rhs in
-            lhs.distanceSquared(to: rgb) < rhs.distanceSquared(to: rgb)
-        }?.suffix
     }
 
-    private static func rgbComponents(from colorHex: String) -> (red: Int, green: Int, blue: Int)? {
-        let trimmed = colorHex.trimmingCharacters(in: .whitespacesAndNewlines)
-        let raw = trimmed.hasPrefix("#") ? String(trimmed.dropFirst()) : trimmed
-        guard raw.count == 6, let value = Int(raw, radix: 16) else { return nil }
-        return ((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF)
+    private static func explicitColorAsset(base: String, text: String, defaultSuffix: String) -> String {
+        if let suffix = preferredColorSuffix(in: text) {
+            return "\(base)_\(suffix)"
+        }
+        if imageExists(base) {
+            return base
+        }
+        return "\(base)_\(defaultSuffix)"
     }
 
-    private static let colorVariants: [ColorVariant] = [
-        ColorVariant(suffix: "white", red: 255, green: 255, blue: 255),
-        ColorVariant(suffix: "silver", red: 192, green: 192, blue: 192),
-        ColorVariant(suffix: "gray", red: 128, green: 128, blue: 128),
-        ColorVariant(suffix: "black", red: 17, green: 17, blue: 17),
-        ColorVariant(suffix: "red", red: 204, green: 51, blue: 51),
-        ColorVariant(suffix: "bordeaux", red: 125, green: 17, blue: 40),
-        ColorVariant(suffix: "blue", red: 26, green: 115, blue: 232),
-        ColorVariant(suffix: "navy", red: 0, green: 48, blue: 135),
-        ColorVariant(suffix: "green", red: 24, green: 128, blue: 56),
-        ColorVariant(suffix: "yellow", red: 249, green: 168, blue: 37),
-        ColorVariant(suffix: "orange", red: 232, green: 113, blue: 10),
-        ColorVariant(suffix: "brown", red: 121, green: 85, blue: 72)
+    private static func preferredColorSuffix(in text: String) -> String? {
+        if text.containsAny(["dragon skin", "dragon-green", "dragon green", "mamba"]) {
+            return "green"
+        }
+        if text.contains("white") { return "white" }
+        if text.containsAny(["grey", "gray"]) { return "gray" }
+        if text.contains("black") { return "black" }
+        if text.contains("red") { return "red" }
+        if text.containsAny(["navy", "dark blue"]) { return "navy" }
+        if text.contains("blue") { return "blue" }
+        if text.contains("green") { return "green" }
+        if text.contains("yellow") { return "yellow" }
+        if text.contains("orange") { return "orange" }
+        if text.containsAny(["brown", "beige"]) { return "brown" }
+        if text.containsAny(["silver", "metallic"]) { return "silver" }
+        return nil
+    }
+
+    private static func baseAssetName(removingColorSuffixFrom assetName: String) -> String? {
+        for suffix in colorSuffixes where assetName.hasSuffix(suffix) {
+            return String(assetName.dropLast(suffix.count))
+        }
+        return nil
+    }
+
+    private static let colorSuffixes = [
+        "_white", "_silver", "_gray", "_black", "_red", "_bordeaux",
+        "_blue", "_navy", "_green", "_yellow", "_orange", "_brown"
     ]
 
-    private struct ColorVariant {
-        let suffix: String
-        let red: Int
-        let green: Int
-        let blue: Int
-
-        func distanceSquared(to rgb: (red: Int, green: Int, blue: Int)) -> Int {
-            let redDelta = red - rgb.red
-            let greenDelta = green - rgb.green
-            let blueDelta = blue - rgb.blue
-            return redDelta * redDelta + greenDelta * greenDelta + blueDelta * blueDelta
-        }
-    }
+    private static let imageCacheLock = NSLock()
+    private static var imageExistsCache: [String: Bool] = [:]
 }
 
 private enum VehicleMiniatureKind {

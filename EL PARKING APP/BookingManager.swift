@@ -66,6 +66,8 @@ class BookingManager: ObservableObject {
     private var bookingsListener: ListenerRegistration?
     private var spotsListener: ListenerRegistration?
     private var lastReminderHash: String = ""
+    private var lastBookingsSignature: Int?
+    private var lastSpotsSignature: Int?
 
     init() {
         loadSpotsCache()      // Cached spot list for offline use
@@ -124,6 +126,8 @@ class BookingManager: ObservableObject {
         bookings = []
         AppConfig.blockedSpotIDs = []
         parkingSpots      = AppConfig.allParkingSpots   // reset to base (no live accessibility)
+        lastBookingsSignature = nil
+        lastSpotsSignature = nil
         currentUserEmail  = ""
         currentUserName   = ""
         currentUserUID    = ""
@@ -147,10 +151,7 @@ class BookingManager: ObservableObject {
                     .compactMap { Booking.fromFirestore($0.data(), documentID: $0.documentID) }
                     .filter { self.shouldKeepBookingLocally($0) }
                 Task { @MainActor in
-                    self.bookings = loaded.sorted { $0.date < $1.date }
-                    self.saveLocalCache()
-                    self.updateWidgetData()
-                    self.scheduleDailyReminders()
+                    self.applyBookingsSnapshot(loaded)
                 }
             }
     }
@@ -198,11 +199,7 @@ class BookingManager: ObservableObject {
                 }
 
                 Task { @MainActor in
-                    AppConfig.blockedSpotIDs  = blocked
-                    AppConfig.allParkingSpots = spots
-                    self.parkingSpots         = spots
-                    self.saveSpotsCache()
-                    self.updateWidgetData()
+                    self.applySpotsSnapshot(spots: spots, blocked: blocked)
                 }
             }
     }
@@ -216,13 +213,10 @@ class BookingManager: ObservableObject {
         do {
             let snapshot = try await recentBookingsQuery().getDocuments()
 
-            bookings = snapshot.documents
+            let loaded = snapshot.documents
                 .compactMap { Booking.fromFirestore($0.data(), documentID: $0.documentID) }
                 .filter { shouldKeepBookingLocally($0) }
-                .sorted { $0.date < $1.date }
-            saveLocalCache()
-            updateWidgetData()
-            scheduleDailyReminders()
+            applyBookingsSnapshot(loaded)
         } catch {
             print("BookingManager refreshBookings error: \(error.localizedDescription)")
         }
@@ -260,11 +254,7 @@ class BookingManager: ObservableObject {
                 return (Int(a.id) ?? 999) < (Int(b.id) ?? 999)
             }
 
-            AppConfig.blockedSpotIDs  = blocked
-            AppConfig.allParkingSpots = spots
-            parkingSpots              = spots
-            saveSpotsCache()
-            updateWidgetData()
+            applySpotsSnapshot(spots: spots, blocked: blocked)
         } catch {
             print("BookingManager refreshSpots error: \(error.localizedDescription)")
         }
@@ -314,6 +304,7 @@ class BookingManager: ObservableObject {
         if let blocked = UserDefaults.standard.array(forKey: "cachedBlockedSpotIDs") as? [String] {
             AppConfig.blockedSpotIDs = Set(blocked)
         }
+        lastSpotsSignature = spotsSignature(spots: parkingSpots, blocked: AppConfig.blockedSpotIDs)
     }
 
     // MARK: - Notification Permission
@@ -1071,6 +1062,7 @@ class BookingManager: ObservableObject {
     // MARK: - Post-Change Helpers
 
     private func afterBookingChange() {
+        lastBookingsSignature = bookingsSignature(bookings)
         saveLocalCache()
         scheduleDailyReminders()
         updateWidgetData()
@@ -1177,6 +1169,7 @@ class BookingManager: ObservableObject {
         if let data    = UserDefaults.standard.data(forKey: "bookings"),
            let decoded = try? JSONDecoder().decode([Booking].self, from: data) {
             bookings = decoded
+            lastBookingsSignature = bookingsSignature(decoded)
         }
     }
 
@@ -1391,6 +1384,58 @@ class BookingManager: ObservableObject {
                 isGreaterThanOrEqualTo: Timestamp(date: BookingPolicy.listenerQueryStartDate())
             )
             .order(by: "bookingDate")
+    }
+
+    private func applyBookingsSnapshot(_ loaded: [Booking]) {
+        let sorted = loaded.sorted { $0.date < $1.date }
+        let signature = bookingsSignature(sorted)
+        guard signature != lastBookingsSignature else { return }
+        lastBookingsSignature = signature
+        bookings = sorted
+        saveLocalCache()
+        updateWidgetData()
+        scheduleDailyReminders()
+    }
+
+    private func applySpotsSnapshot(spots: [ParkingSpot], blocked: Set<String>) {
+        let signature = spotsSignature(spots: spots, blocked: blocked)
+        guard signature != lastSpotsSignature else { return }
+        lastSpotsSignature = signature
+        AppConfig.blockedSpotIDs = blocked
+        AppConfig.allParkingSpots = spots
+        parkingSpots = spots
+        saveSpotsCache()
+        updateWidgetData()
+    }
+
+    private func bookingsSignature(_ items: [Booking]) -> Int {
+        var hasher = Hasher()
+        hasher.combine(items.count)
+        for booking in items {
+            hasher.combine(booking.id)
+            hasher.combine(booking.spot)
+            hasher.combine(booking.email)
+            hasher.combine(booking.date.timeIntervalSinceReferenceDate)
+            hasher.combine(booking.fromTime)
+            hasher.combine(booking.toTime)
+            hasher.combine(booking.createdBy)
+            hasher.combine(booking.groupID)
+        }
+        return hasher.finalize()
+    }
+
+    private func spotsSignature(spots: [ParkingSpot], blocked: Set<String>) -> Int {
+        var hasher = Hasher()
+        hasher.combine(spots.count)
+        for spot in spots {
+            hasher.combine(spot.id)
+            hasher.combine(spot.label)
+            hasher.combine(spot.isAccessible)
+        }
+        for id in blocked.sorted() {
+            hasher.combine(id)
+        }
+        return hasher.finalize()
     }
 }
 

@@ -27,8 +27,10 @@ struct AdminUsersView: View {
     @State private var editCar          = ""
     @State private var editCarType      = ""
     @State private var editColor        = AppConfig.carColors.first?.hex ?? ""
-    @State private var editPickerColor  = Color.red
-    @State private var editCarSuggestions: [String] = []
+    @State private var editSelectedMake = ""
+    @State private var editSelectedModel = ""
+    @State private var showEditVehiclePresetSheet = false
+    @State private var showEditVehicleColorPicker = false
     @State private var userToSuspend: AppUser?
     @State private var showSuspendAlert  = false
     @State private var selectedRole: UserRole = .user
@@ -701,7 +703,6 @@ struct AdminUsersView: View {
                         editCar         = user.carDescription
                         editCarType     = user.carType
                         editColor       = normalizedCarColor(for: user)
-                        editPickerColor = AppConfig.carColors.map(\.hex).contains(user.carColor) ? .red : Color(hex: user.carColor)
                         userToEditVehicle = user
                     } label: { neutralMenuLabel(L10n.editVehicle, systemImage: "car.side.fill") }
                 }
@@ -760,7 +761,6 @@ struct AdminUsersView: View {
                     editCar         = user.carDescription
                     editCarType     = user.carType
                     editColor       = normalizedCarColor(for: user)
-                    editPickerColor = AppConfig.carColors.map(\.hex).contains(user.carColor) ? .red : Color(hex: user.carColor)
                     userToEditVehicle = user
                 } label: { neutralMenuLabel(L10n.editVehicle, systemImage: "car.side.fill") }
                 Button(role: .destructive) {
@@ -882,7 +882,6 @@ struct AdminUsersView: View {
                                     editCar = user.carDescription
                                     editCarType = user.carType
                                     editColor = normalizedCarColor(for: user)
-                                    editPickerColor = AppConfig.carColors.map(\.hex).contains(user.carColor) ? .red : Color(hex: user.carColor)
                                     userToEditVehicle = user
                                 }
                             }
@@ -1543,50 +1542,52 @@ struct AdminUsersView: View {
                     .background(AppConfig.cardBg)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
 
-                    // Car make + model with suggestions
+                    // Car make + model
                     VStack(alignment: .leading, spacing: 8) {
                         Text(L10n.carModel)
                             .font(.caption).fontWeight(.semibold).tracking(1.2)
                             .foregroundStyle(AppConfig.subtleGray)
-                        VStack(alignment: .leading, spacing: 0) {
-                            TextField("e.g. Škoda Octavia", text: $editCar)
-                                .autocorrectionDisabled()
-                                .padding(14)
-                                .background(AppConfig.cardBg)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .onChange(of: editCar) { _, val in
-                                    withAnimation(.quick) {
-                                        editCarSuggestions = CarData.filter(val)
+                        VStack(spacing: 8) {
+                            Menu {
+                                ForEach(CarData.makes, id: \.self) { make in
+                                    Button(make) {
+                                        editSelectedMake = make
+                                        editSelectedModel = ""
+                                        editCar = make
                                     }
                                 }
-                            if !editCarSuggestions.isEmpty {
-                                VStack(spacing: 0) {
-                                    ForEach(Array(editCarSuggestions.enumerated()), id: \.offset) { idx, suggestion in
-                                        Button {
-                                            withAnimation(.quick) {
-                                                editCar = suggestion
-                                                editCarSuggestions = []
-                                            }
-                                        } label: {
-                                            HStack(spacing: 10) {
-                                                Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(AppConfig.subtleGray)
-                                                Text(suggestion).font(.subheadline).foregroundStyle(AppConfig.darkText)
-                                                Spacer()
-                                            }
-                                            .padding(.horizontal, 14).padding(.vertical, 10)
-                                        }
-                                        .buttonStyle(ScaleButtonStyle())
-                                        if idx < editCarSuggestions.count - 1 { Divider().padding(.horizontal, 14) }
-                                    }
-                                }
-                                .background(AppConfig.surfaceLow)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .shadow(color: .black.opacity(0.06), radius: 6, y: 3)
-                                .padding(.top, 4)
-                                .transition(.opacity.combined(with: .move(edge: .top)))
+                            } label: {
+                                makeModelPickerRow(
+                                    icon: "building.2.crop.circle",
+                                    title: lang.language == .czech ? "Značka" : "Make",
+                                    value: editSelectedMake.isEmpty ? (lang.language == .czech ? "Vyberte značku" : "Choose make") : editSelectedMake,
+                                    isPlaceholder: editSelectedMake.isEmpty
+                                )
                             }
+                            .buttonStyle(ScaleButtonStyle())
+
+                            Menu {
+                                if editSelectedMake.isEmpty {
+                                    Button(lang.language == .czech ? "Nejprve vyberte značku" : "Select make first") {}
+                                        .disabled(true)
+                                } else {
+                                    ForEach(CarData.models(for: editSelectedMake), id: \.self) { model in
+                                        Button(model) {
+                                            editSelectedModel = model
+                                            editCar = CarData.compose(make: editSelectedMake, model: model)
+                                        }
+                                    }
+                                }
+                            } label: {
+                                makeModelPickerRow(
+                                    icon: "car.side",
+                                    title: lang.language == .czech ? "Model" : "Model",
+                                    value: editSelectedModel.isEmpty ? (lang.language == .czech ? "Vyberte model" : "Choose model") : editSelectedModel,
+                                    isPlaceholder: editSelectedModel.isEmpty
+                                )
+                            }
+                            .buttonStyle(ScaleButtonStyle())
                         }
-                        .animation(.quick, value: editCarSuggestions.isEmpty)
                     }
 
                     // Registration plate
@@ -1603,38 +1604,32 @@ struct AdminUsersView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
 
-                    // Body type chips
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(L10n.carBodyType)
+                        Text("VEHICLE ICON")
                             .font(.caption).fontWeight(.semibold).tracking(1.2)
                             .foregroundStyle(AppConfig.subtleGray)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(CarBodyType.allCases) { bodyType in
-                                    let isSelected = editCarType == bodyType.rawValue
-                                    Button {
-                                        withAnimation(.quick) {
-                                            editCarType = isSelected ? "" : bodyType.rawValue
-                                        }
-                                    } label: {
-                                        HStack(spacing: 5) {
-                                            Image(systemName: bodyType.icon).font(.system(size: 12, weight: .semibold))
-                                            Text(bodyType.label).font(.system(size: 13, weight: .semibold))
-                                        }
-                                        .foregroundStyle(isSelected ? AppConfig.onAccent : AppConfig.subtleGray)
-                                        .padding(.horizontal, 13).padding(.vertical, 8)
-                                        .background(isSelected ? AppConfig.accent : AppConfig.surfaceLow)
-                                        .clipShape(Capsule())
-                                        .overlay(Capsule().stroke(
-                                            isSelected ? AppConfig.accentFg.opacity(0.3) : AppConfig.outlineVariant.opacity(0.4),
-                                            lineWidth: 1
-                                        ))
-                                    }
-                                    .buttonStyle(ScaleButtonStyle())
-                                }
+                        Button {
+                            Haptics.selection()
+                            showEditVehiclePresetSheet = true
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(AppConfig.subtleGray)
+                                Text(VehicleMiniaturePreset.matching(description: editCar, carType: editCarType)?.title ?? "Choose Icon")
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(AppConfig.darkText)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(AppConfig.subtleGray)
                             }
-                            .padding(.vertical, 2)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(AppConfig.surfaceLow)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }
+                        .buttonStyle(ScaleButtonStyle())
                     }
 
                     VehicleMiniatureView(
@@ -1642,32 +1637,14 @@ struct AdminUsersView: View {
                         colorHex: editColor,
                         description: editCar
                     )
-                    .frame(width: 82, height: 46)
+                    .frame(width: 118, height: 64)
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 2)
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 12)
+                    .background(AppConfig.surfaceLow)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-                    // Color picker
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text(L10n.carColor)
-                                .font(.caption).fontWeight(.semibold).tracking(1.2)
-                                .foregroundStyle(AppConfig.subtleGray)
-                            Spacer()
-                            if let color = AppConfig.carColors.first(where: { $0.hex == editColor }) {
-                                HStack(spacing: 6) {
-                                    Circle().fill(Color(hex: color.hex)).frame(width: 14, height: 14)
-                                        .overlay(Circle().stroke(AppConfig.outlineVariant.opacity(0.5), lineWidth: 1))
-                                    Text(color.name).font(.caption.weight(.semibold)).foregroundStyle(AppConfig.darkText)
-                                }
-                            } else if !editColor.isEmpty {
-                                HStack(spacing: 6) {
-                                    Circle().fill(Color(hex: editColor)).frame(width: 14, height: 14)
-                                        .overlay(Circle().stroke(AppConfig.outlineVariant.opacity(0.5), lineWidth: 1))
-                                    Text(L10n.carColorCustom).font(.caption.weight(.semibold)).foregroundStyle(AppConfig.darkText)
-                                }
-                            }
-                        }
-
+                    DisclosureGroup(isExpanded: $showEditVehicleColorPicker) {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 36))], spacing: 10) {
                             ForEach(AppConfig.carColors, id: \.hex) { color in
                                 let isSelected = editColor == color.hex
@@ -1686,20 +1663,24 @@ struct AdminUsersView: View {
                                 .buttonStyle(ScaleButtonStyle())
                             }
 
-                            VehicleCustomColorButton(
-                                selectedHex: $editColor,
-                                pickerColor: $editPickerColor,
-                                size: 28,
-                                selectedStrokeWidth: 3,
-                                checkmarkSize: 10,
-                                plusSize: 13,
-                                unselectedStroke: AppConfig.outlineVariant.opacity(0.5)
-                            )
                         }
-                        .padding(14)
-                        .background(AppConfig.cardBg)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.top, 8)
+                    } label: {
+                        HStack {
+                            Text(L10n.carColor)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(AppConfig.darkText)
+                            Spacer()
+                            if let color = AppConfig.carColors.first(where: { $0.hex == editColor }) {
+                                Text(color.name).font(.caption).foregroundStyle(AppConfig.subtleGray)
+                            }
+                        }
                     }
+                    .tint(AppConfig.darkText)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(AppConfig.surfaceLow)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 }
                 .padding(20)
@@ -1721,7 +1702,6 @@ struct AdminUsersView: View {
                         let color   = editColor
                         let carType = editCarType
                         userToEditVehicle = nil
-                        editCarSuggestions = []
                         Task { await authManager.adminUpdateUserVehicle(user, plate: plate, car: car, color: color, carType: carType) }
                     }
                     .fontWeight(.semibold)
@@ -1730,6 +1710,18 @@ struct AdminUsersView: View {
             }
             .onAppear {
                 editColor = normalizedCarColor(for: user)
+                syncEditVehicleMakeModelFromDescription()
+                showEditVehicleColorPicker = false
+            }
+            .sheet(isPresented: $showEditVehiclePresetSheet) {
+                VehicleMiniaturePresetPickerSheet(
+                    title: "Choose Vehicle Icon",
+                    selectedColorHex: editColor,
+                    selectedPresetID: VehicleMiniaturePreset.matching(description: editCar, carType: editCarType)?.id
+                ) { preset in
+                    editCar = preset.searchDescription
+                    editCarType = ""
+                }
             }
         }
         .presentationDetents([.medium, .large])
@@ -1741,6 +1733,37 @@ struct AdminUsersView: View {
             return user.carColor
         }
         return AppConfig.carColors.first?.hex ?? ""
+    }
+
+    private func makeModelPickerRow(icon: String, title: String, value: String, isPlaceholder: Bool) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AppConfig.subtleGray)
+                .frame(width: 18)
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(AppConfig.darkText)
+            Spacer()
+            Text(value)
+                .font(.subheadline)
+                .foregroundStyle(isPlaceholder ? AppConfig.subtleGray : AppConfig.darkText)
+                .lineLimit(1)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(AppConfig.surfaceLow)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppConfig.outlineVariant.opacity(0.35), lineWidth: 1))
+    }
+
+    private func syncEditVehicleMakeModelFromDescription() {
+        let parsed = CarData.splitMakeModel(editCar)
+        editSelectedMake = parsed.make
+        editSelectedModel = parsed.model
     }
 
     private func vehicleSummary(for user: AppUser) -> String {

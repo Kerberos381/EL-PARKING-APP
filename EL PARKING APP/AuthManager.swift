@@ -44,6 +44,7 @@ class AuthManager: ObservableObject {
     private var stateListener: AuthStateDidChangeListenerHandle?
     private var usersListener: ListenerRegistration?
     private lazy var db = Firestore.firestore()
+    private var lastAllUsersSignature: Int?
 
     // MARK: - Init
 
@@ -122,14 +123,16 @@ class AuthManager: ObservableObject {
             updated.status = .active
             try? await db.collection("users").document(user.uid).updateData([
                 "role":   UserRole.admin.rawValue,
-                "status": UserStatus.active.rawValue
+                "status": UserStatus.active.rawValue,
+                "inviteAccepted": true
             ])
         } else if AppConfig.seedPrivilegedEmails.contains(email) && user.role == .user {
             updated.role = .privileged
             updated.status = .active
             try? await db.collection("users").document(user.uid).updateData([
                 "role":   UserRole.privileged.rawValue,
-                "status": UserStatus.active.rawValue
+                "status": UserStatus.active.rawValue,
+                "inviteAccepted": true
             ])
         }
 
@@ -143,9 +146,14 @@ class AuthManager: ObservableObject {
         usersListener = db.collection("users")
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self, let snapshot, error == nil else { return }
-                let users = snapshot.documents.compactMap { AppUser.fromFirestore($0.data()) }
+                let users = snapshot.documents
+                    .compactMap { AppUser.fromFirestore($0.data()) }
+                    .sorted { $0.displayName < $1.displayName }
                 Task { @MainActor in
-                    self.allUsers = users.sorted { $0.displayName < $1.displayName }
+                    let signature = self.usersSignature(users)
+                    guard signature != self.lastAllUsersSignature else { return }
+                    self.lastAllUsersSignature = signature
+                    self.allUsers = users
                 }
             }
     }
@@ -181,6 +189,7 @@ class AuthManager: ObservableObject {
                 carType:                 "",
                 createdAt:               Date(),
                 rejectionReason:         nil,
+                inviteAccepted:          false,
                 needsFinishRegistration: false,
                 activatedAt:             nil
             )
@@ -255,11 +264,33 @@ class AuthManager: ObservableObject {
         try? Auth.auth().signOut()
         usersListener?.remove()
         usersListener = nil
+        lastAllUsersSignature = nil
         currentUser   = nil
         allUsers      = []
         // pendingCount is computed from allUsers — no explicit reset needed
         authState     = .unauthenticated
         // Note: we keep Keychain credentials so Face ID sign-in still works next time
+    }
+
+    private func usersSignature(_ users: [AppUser]) -> Int {
+        var hasher = Hasher()
+        hasher.combine(users.count)
+        for user in users {
+            hasher.combine(user.uid)
+            hasher.combine(user.email)
+            hasher.combine(user.displayName)
+            hasher.combine(user.role.rawValue)
+            hasher.combine(user.status.rawValue)
+            hasher.combine(user.registrationPlate)
+            hasher.combine(user.carDescription)
+            hasher.combine(user.carColor)
+            hasher.combine(user.carType)
+            hasher.combine(user.strikes)
+            hasher.combine(user.suspensionCount)
+            hasher.combine(user.suspendedAt?.timeIntervalSinceReferenceDate)
+            hasher.combine(user.lastStrikeAt?.timeIntervalSinceReferenceDate)
+        }
+        return hasher.finalize()
     }
 
     // MARK: - Update Profile
@@ -309,6 +340,7 @@ class AuthManager: ObservableObject {
                 "carDescription":          car.trimmingCharacters(in: .whitespaces),
                 "carColor":                color,
                 "carType":                 carType,
+                "inviteAccepted":          true,
                 "needsFinishRegistration": false,
                 "activatedAt":             Timestamp(date: Date())
             ])
@@ -402,6 +434,7 @@ class AuthManager: ObservableObject {
                 carType:                 "",
                 createdAt:               Date(),
                 rejectionReason:         nil,
+                inviteAccepted:          true,
                 needsFinishRegistration: true,
                 activatedAt:             nil
             )
@@ -480,7 +513,8 @@ class AuthManager: ObservableObject {
         do {
             try await db.collection("users").document(user.uid).updateData([
                 "status": UserStatus.active.rawValue,
-                "role":   role.rawValue
+                "role":   role.rawValue,
+                "inviteAccepted": true
             ])
             AuditLogger.log(
                 action: "activate_user",
@@ -524,7 +558,8 @@ class AuthManager: ObservableObject {
         do {
             try await db.collection("users").document(user.uid).updateData([
                 "status":  UserStatus.active.rawValue,
-                "strikes": 0
+                "strikes": 0,
+                "inviteAccepted": true
             ])
             PushNotificationManager.sendToUser(
                 email: user.email,
@@ -611,7 +646,8 @@ class AuthManager: ObservableObject {
         do {
             try await db.collection("users").document(user.uid).updateData([
                 "status":  UserStatus.active.rawValue,
-                "strikes": 0
+                "strikes": 0,
+                "inviteAccepted": true
             ])
             PushNotificationManager.sendToUser(
                 email: user.email,

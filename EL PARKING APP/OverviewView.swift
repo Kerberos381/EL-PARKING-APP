@@ -47,8 +47,53 @@ struct OverviewView: View {
         if isAdmin {
             return allBookingsForDate
         } else {
-            return bookingManager.getUserBookingsOnDate(selectedDate, email: bookingManager.currentUserEmail)
+            return allBookingsForDate.filter { $0.email == bookingManager.currentUserEmail }
         }
+    }
+
+    /// Bookings grouped by spot label for selected day, sorted by time.
+    private var dayBookingsBySpot: [String: [Booking]] {
+        Dictionary(grouping: allBookingsForDate, by: \.spot).mapValues { items in
+            items.sorted {
+                if $0.fromTime == $1.fromTime { return $0.toTime < $1.toTime }
+                return $0.fromTime < $1.fromTime
+            }
+        }
+    }
+
+    /// Fast lookup map to avoid repeated user searches in booking rows/cells.
+    private var usersByEmailLowercased: [String: AppUser] {
+        Dictionary(uniqueKeysWithValues: authManager.allUsers.map { ($0.email.lowercased(), $0) })
+    }
+
+    /// Spot status computed once per render pass.
+    private var spotStatusByID: [String: SpotStatus] {
+        var result: [String: SpotStatus] = [:]
+        let mineEmail = bookingManager.currentUserEmail
+
+        for spot in bookingManager.parkingSpots {
+            if AppConfig.blockedSpotIDs.contains(spot.id) {
+                result[spot.id] = .blocked
+                continue
+            }
+
+            let dayBookings = dayBookingsBySpot[spot.label] ?? []
+            guard !dayBookings.isEmpty else {
+                result[spot.id] = .available
+                continue
+            }
+
+            let hasMine = dayBookings.contains { $0.email == mineEmail }
+            let hasOthers = dayBookings.contains { $0.email != mineEmail }
+
+            if hasMine && !hasOthers {
+                result[spot.id] = .mine
+            } else {
+                result[spot.id] = isFullyOccupied(dayBookings) ? .occupied : .partial
+            }
+        }
+
+        return result
     }
 
     /// Spots filtered by active filter, with favourites sorted to top
@@ -56,7 +101,7 @@ struct OverviewView: View {
         let base: [ParkingSpot]
         if let filter = activeFilter {
             base = bookingManager.parkingSpots.filter { spot in
-                let status = spotStatus(for: spot)
+                let status = spotStatusByID[spot.id] ?? .available
                 if filter == .occupied {
                     return status == .occupied || status == .mine || status == .partial
                 }
@@ -293,7 +338,7 @@ struct OverviewView: View {
                     isFavourite: favouriteSpotIDs.contains(spot.id),
                     onFavouriteTap: { toggleFavourite(spot.id) }
                 ) {
-                    handleSpotTap(spot, status: spotStatus(for: spot))
+                    handleSpotTap(spot, status: spotStatusByID[spot.id] ?? .available)
                 }
             }
         }
@@ -304,7 +349,7 @@ struct OverviewView: View {
     /// Convert SpotStatus + admin context into SpotCellStatus
     private func cellStatusForSpot(_ spot: ParkingSpot) -> SpotCellStatus {
         let status = spotStatus(for: spot)
-        let dayBookings = bookingManager.getBookingsForSpotOnDate(spotLabel: spot.label, date: selectedDate)
+        let dayBookings = dayBookingsBySpot[spot.label] ?? []
         let booking = dayBookings.first
         switch status {
         case .available: return .available
@@ -314,9 +359,7 @@ struct OverviewView: View {
             let name = booking?.user
             let plate: String?
             if isAdmin, let b = booking {
-                let appUser = authManager.allUsers.first {
-                    $0.email.lowercased() == b.email.lowercased()
-                }
+                let appUser = usersByEmailLowercased[b.email.lowercased()]
                 let p = appUser?.registrationPlate ?? ""
                 plate = p.isEmpty ? nil : p
             } else {
@@ -325,7 +368,7 @@ struct OverviewView: View {
             return .partial(
                 name: name,
                 plate: plate,
-                ranges: bookingManager.occupiedTimeRangesText(spotLabel: spot.label, on: selectedDate)
+                ranges: occupiedRangesText(for: dayBookings)
             )
         case .occupied:
             let name: String?
@@ -338,9 +381,7 @@ struct OverviewView: View {
                     name = b.user                  // full name of whoever has this spot
                 }
                 if isAdmin {
-                    let appUser = authManager.allUsers.first {
-                        $0.email.lowercased() == b.email.lowercased()
-                    }
+                    let appUser = usersByEmailLowercased[b.email.lowercased()]
                     let p = appUser?.registrationPlate ?? ""
                     plate = p.isEmpty ? nil : p
                 } else {
@@ -454,9 +495,7 @@ struct OverviewView: View {
                 }
 
                 if isAdmin {
-                    let appUser = authManager.allUsers.first {
-                        $0.email.lowercased() == booking.email.lowercased()
-                    }
+                    let appUser = usersByEmailLowercased[booking.email.lowercased()]
                     let vehicleParts = [
                         appUser?.registrationPlate ?? "",
                         appUser?.carDescription ?? "",
@@ -548,9 +587,7 @@ struct OverviewView: View {
             return false
         }
 
-        return authManager.allUsers.first {
-            $0.email.caseInsensitiveCompare(booking.email) == .orderedSame
-        }?.isAdmin == true
+        return usersByEmailLowercased[booking.email.lowercased()]?.isAdmin == true
     }
 
     private func performAdminCancellation(of booking: Booking) async {
@@ -584,20 +621,7 @@ struct OverviewView: View {
     }
 
     private func spotStatus(for spot: ParkingSpot) -> SpotStatus {
-        if AppConfig.blockedSpotIDs.contains(spot.id) { return .blocked }
-        let dayBookings = bookingManager.getBookingsForSpotOnDate(spotLabel: spot.label, date: selectedDate)
-        guard !dayBookings.isEmpty else { return .available }
-
-        let mine = dayBookings.filter { $0.email == bookingManager.currentUserEmail }
-        let others = dayBookings.filter { $0.email != bookingManager.currentUserEmail }
-
-        if !mine.isEmpty && others.isEmpty {
-            return .mine
-        }
-
-        return bookingManager.isSpotFullyOccupied(spotLabel: spot.label, on: selectedDate)
-            ? .occupied
-            : .partial
+        spotStatusByID[spot.id] ?? .available
     }
 
     private func handleSpotTap(_ spot: ParkingSpot, status: SpotStatus) {
@@ -614,11 +638,46 @@ struct OverviewView: View {
         // Always do a live lookup at tap time — overrides the displayed cell status.
         // This fixes the race where the grid rendered before Firestore loaded,
         // so a booked spot briefly appeared free and would wrongly open BookingSheet.
-        if let existingBooking = bookingManager.getBookingsForSpotOnDate(spotLabel: spot.label, date: selectedDate).first {
+        if let existingBooking = (dayBookingsBySpot[spot.label] ?? []).first {
             spotBookingDetail = existingBooking
         } else {
             preselectedSpot = spot
         }
+    }
+
+    private func occupiedRangesText(for dayBookings: [Booking]) -> String? {
+        guard !dayBookings.isEmpty else { return nil }
+        let merged = mergedIntervals(from: dayBookings.map { (from: $0.fromTime, to: $0.toTime) })
+        return merged.map { "\($0.from)-\($0.to)" }.joined(separator: ", ")
+    }
+
+    private func isFullyOccupied(_ dayBookings: [Booking]) -> Bool {
+        guard !dayBookings.isEmpty else { return false }
+        let merged = mergedIntervals(from: dayBookings.map { (from: $0.fromTime, to: $0.toTime) })
+        guard let first = merged.first else { return false }
+        return first.from <= AppConfig.defaultTimeFrom &&
+            first.to >= AppConfig.fullDayOccupiedCutoffTime &&
+            merged.count == 1
+    }
+
+    private func mergedIntervals(from ranges: [(from: String, to: String)]) -> [(from: String, to: String)] {
+        let sorted = ranges.sorted {
+            if $0.from == $1.from { return $0.to < $1.to }
+            return $0.from < $1.from
+        }
+        guard var current = sorted.first else { return [] }
+        var merged: [(from: String, to: String)] = []
+
+        for next in sorted.dropFirst() {
+            if next.from <= current.to {
+                if next.to > current.to { current.to = next.to }
+            } else {
+                merged.append(current)
+                current = next
+            }
+        }
+        merged.append(current)
+        return merged
     }
 
     private func userInitials(_ name: String) -> String {

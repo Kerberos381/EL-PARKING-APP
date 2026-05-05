@@ -24,8 +24,22 @@ service cloud.firestore {
       return userExists() && userData().status == 'active';
     }
 
+    // Invite gate:
+    // - New accounts should explicitly carry inviteAccepted.
+    // - Legacy active accounts may not have this field yet, so default=true keeps rollout safe.
+    function hasAcceptedInvite() {
+      return userExists() && userData().get('inviteAccepted', true) == true;
+    }
+
+    // App access gate for non-/users data collections.
+    function hasAppAccess() {
+      return isActiveUser()
+          && hasAcceptedInvite()
+          && userData().get('needsFinishRegistration', false) == false;
+    }
+
     function isAdmin() {
-      return isActiveUser() && userData().role == 'admin';
+      return hasAppAccess() && userData().role == 'admin';
     }
 
     function myEmail() {
@@ -37,7 +51,7 @@ service cloud.firestore {
     }
 
     function isPrivileged() {
-      return isActiveUser() && userData().role == 'privileged';
+      return hasAppAccess() && userData().role == 'privileged';
     }
 
     // Returns true if the server clock has passed 18:00 Prague local time.
@@ -94,7 +108,8 @@ service cloud.firestore {
         // Normal self-registration: locked to role=user + status=pending
         (request.auth.uid == uid
           && request.resource.data.role    == 'user'
-          && request.resource.data.status  == 'pending')
+          && request.resource.data.status  == 'pending'
+          && request.resource.data.get('inviteAccepted', false) == false)
 
         // Admin creates an account for another user (typical path)
         || isAdmin()
@@ -110,6 +125,7 @@ service cloud.firestore {
         || (request.auth.uid == uid
           && request.resource.data.get('needsFinishRegistration', false) == true
           && request.resource.data.status        == 'active'
+          && request.resource.data.get('inviteAccepted', false) == true
           && request.resource.data.emailVerified == true
           && request.resource.data.email         == request.auth.token.email)
       );
@@ -128,6 +144,7 @@ service cloud.firestore {
         (request.auth.uid == uid
           && resource.data.get('needsFinishRegistration', false)         == true
           && request.resource.data.get('needsFinishRegistration', false) == false
+          && request.resource.data.get('inviteAccepted', false)          == true
           && !request.resource.data.diff(resource.data).affectedKeys()
               .hasAny(['role', 'status', 'email', 'uid', 'createdAt',
                        'strikes', 'suspendedAt', 'suspensionCount', 'strikeHistory']))
@@ -136,7 +153,8 @@ service cloud.firestore {
         || (request.auth.uid == uid
           && !request.resource.data.diff(resource.data).affectedKeys()
               .hasAny(['role', 'status', 'email',
-                       'strikes', 'suspendedAt', 'suspensionCount', 'strikeHistory']))
+                       'strikes', 'suspendedAt', 'suspensionCount', 'strikeHistory',
+                       'inviteAccepted']))
 
         // Auto-lift: user can flip own suspension → active after the 14-day window.
         // Firestore enforces the time gate server-side; client logic is just an optimisation.
@@ -145,10 +163,11 @@ service cloud.firestore {
           && resource.data.suspendedAt is timestamp
           && request.time >= resource.data.suspendedAt + duration.value(14, 'd')
           && request.resource.data.status  == 'active'
+          && request.resource.data.get('inviteAccepted', true) == resource.data.get('inviteAccepted', true)
           && request.resource.data.strikes == 0
           && !request.resource.data.diff(resource.data).affectedKeys()
               .hasAny(['role', 'email', 'uid', 'createdAt',
-                       'strikeHistory', 'suspensionCount', 'suspendedAt']))
+                       'strikeHistory', 'suspensionCount', 'suspendedAt', 'inviteAccepted']))
 
         // Strike decay: user can self-reduce strike count once 30+ days have passed
         // since their last warning. Only strikes and lastStrikeAt may change.
@@ -159,9 +178,10 @@ service cloud.firestore {
           && request.time >= resource.data.lastStrikeAt + duration.value(30, 'd')
           && request.resource.data.strikes < resource.data.strikes
           && request.resource.data.strikes >= 0
+          && request.resource.data.get('inviteAccepted', true) == resource.data.get('inviteAccepted', true)
           && !request.resource.data.diff(resource.data).affectedKeys()
               .hasAny(['role', 'status', 'email', 'uid', 'createdAt',
-                       'strikeHistory', 'suspensionCount', 'suspendedAt']))
+                       'strikeHistory', 'suspensionCount', 'suspendedAt', 'inviteAccepted']))
 
         // Admin can update any field
         || isAdmin()
@@ -174,7 +194,7 @@ service cloud.firestore {
 
     match /bookings/{bookingId} {
       // All active users read all bookings — needed to display the parking grid
-      allow read: if isActiveUser();
+      allow read: if hasAppAccess();
 
       // Only admin-approved active users can create bookings.
       // Time strings must be valid HH:mm and in order.
@@ -182,7 +202,7 @@ service cloud.firestore {
       //   admin      → any date
       //   privileged → today through today+3
       //   user       → today (any time) OR tomorrow (only after 18:00 local)
-      allow create: if isActiveUser()
+      allow create: if hasAppAccess()
                     && validTimeString(request.resource.data.fromTime)
                     && validTimeString(request.resource.data.toTime)
                     && request.resource.data.fromTime < request.resource.data.toTime
@@ -191,13 +211,13 @@ service cloud.firestore {
                         || (bookingDateIsToday()
                             || (bookingDateIsTomorrow() && isAfter18LocalTime())));
 
-      allow update: if isActiveUser() && (
+      allow update: if hasAppAccess() && (
         resource.data.email == myEmail() ||
         resource.data.createdBy == myEmail() ||
         isAdmin()
       );
 
-      allow delete: if isActiveUser() && (
+      allow delete: if hasAppAccess() && (
         resource.data.email == myEmail() ||
         resource.data.createdBy == myEmail() ||
         isAdmin()
@@ -208,29 +228,29 @@ service cloud.firestore {
     // Atomic conflict prevention — validated structurally
 
     match /spot_locks/{lockId} {
-      allow read:            if isActiveUser();
-      allow create, update:  if isActiveUser();
+      allow read:            if hasAppAccess();
+      allow create, update:  if hasAppAccess();
       allow delete:          if isAdmin();
     }
 
     // ── /parkingSpots/{spotId} ────────────────────────────────────────────────
 
     match /parkingSpots/{spotId} {
-      allow read:                    if isActiveUser();
+      allow read:                    if hasAppAccess();
       allow create, update, delete:  if isAdmin();
     }
 
     // ── /announcements/{announcementId} ───────────────────────────────────────
 
     match /announcements/{announcementId} {
-      allow read:                    if isActiveUser();
+      allow read:                    if hasAppAccess();
       allow create, update, delete:  if isAdmin();
     }
 
     // ── /info_items/{infoId} ─────────────────────────────────────────────────
 
     match /info_items/{infoId} {
-      allow read:                    if isActiveUser();
+      allow read:                    if hasAppAccess();
       allow create, update, delete:  if isAdmin();
     }
 
@@ -247,7 +267,7 @@ service cloud.firestore {
     // ── /broadcast_notifications/{notificationId} ─────────────────────────────
 
     match /broadcast_notifications/{notificationId} {
-      allow read:                    if isActiveUser();
+      allow read:                    if hasAppAccess();
       allow create, update, delete:  if isAdmin();
     }
 
@@ -265,7 +285,7 @@ service cloud.firestore {
     // ── /appConfig/{configId} ─────────────────────────────────────────────────
 
     match /appConfig/{configId} {
-      allow read:                    if isActiveUser();
+      allow read:                    if hasAppAccess();
       allow create, update, delete:  if isAdmin();
     }
 

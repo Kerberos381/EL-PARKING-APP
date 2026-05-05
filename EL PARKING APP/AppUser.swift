@@ -88,6 +88,8 @@ struct AppUser: Identifiable, Codable, Equatable {
     var carType:  String          // CarBodyType rawValue, empty = unset
     var createdAt: Date
     var rejectionReason: String?
+    /// True when the user has passed the invite/access gate for app data.
+    var inviteAccepted: Bool = true
     /// True when the account was admin-created but the user hasn't yet completed their profile.
     var needsFinishRegistration: Bool
     /// Set to the date when the user completed their finish-registration flow.
@@ -136,6 +138,7 @@ struct AppUser: Identifiable, Codable, Equatable {
             "carColor":                 carColor,
             "carType":                  carType,
             "createdAt":                Timestamp(date: createdAt),
+            "inviteAccepted":           inviteAccepted,
             "needsFinishRegistration":  needsFinishRegistration
         ]
         if let reason = rejectionReason { dict["rejectionReason"] = reason }
@@ -183,6 +186,7 @@ struct AppUser: Identifiable, Codable, Equatable {
             carType:                 data["carType"]           as? String ?? "",
             createdAt:               createdAt,
             rejectionReason:         rejectionReason,
+            inviteAccepted:          data["inviteAccepted"] as? Bool ?? true,
             needsFinishRegistration: data["needsFinishRegistration"] as? Bool ?? false,
             activatedAt:             activatedAt,
             strikes:                 strikes,

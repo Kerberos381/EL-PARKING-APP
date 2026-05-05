@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EL Parking — Privacy Policy</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #0f1012;
+            color: #d1d1d6;
+            line-height: 1.7;
+            padding: 40px 20px;
+        }
+        .container { max-width: 720px; margin: 0 auto; }
+        h1 {
+            font-size: 28px;
+            color: #ffffff;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            color: #8e8e93;
+            font-size: 14px;
+            margin-bottom: 40px;
+        }
+        h2 {
+            font-size: 18px;
+            color: #b1f800;
+            margin-top: 32px;
+            margin-bottom: 12px;
+        }
+        p, li {
+            font-size: 15px;
+            margin-bottom: 12px;
+        }
+        ul {
+            padding-left: 24px;
+            margin-bottom: 12px;
+        }
+        li { margin-bottom: 6px; }
+        .highlight {
+            background: rgba(177, 248, 0, 0.08);
+            border-left: 3px solid #b1f800;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .footer {
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 1px solid #2c2c2e;
+            color: #636366;
+            font-size: 13px;
+        }
+        a { color: #b1f800; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>EL Parking — Privacy Policy</h1>
+        <p class="subtitle">Last updated: March 29, 2026</p>
+
+        <div class="highlight">
+            <strong>Summary:</strong> EL Parking collects only the minimum data required to operate a corporate parking reservation system. We do not sell, share, or monetize your personal data. We do not use analytics, advertising, or tracking frameworks. Your data stays within your organization's Firebase project.
+        </div>
+
+        <h2>1. Data Controller</h2>
+        <p>EL Parking is an internal corporate application operated by EssilorLuxottica for employee parking management. The data controller is EssilorLuxottica. For questions regarding this policy, contact the app administrator at the email address provided within the application.</p>
+
+        <h2>2. Data We Collect</h2>
+        <p>We collect only data that is strictly necessary to provide the parking reservation service:</p>
+        <ul>
+            <li><strong>Account information:</strong> Name, corporate email address, and a securely hashed password (managed by Firebase Authentication — we never see or store your plaintext password).</li>
+            <li><strong>Vehicle information:</strong> License plate number and car description, provided voluntarily by you for parking identification purposes.</li>
+            <li><strong>Booking data:</strong> Parking spot selection, date, and time range for reservations you create.</li>
+            <li><strong>Device preferences:</strong> Theme preference (light/dark), notification reminder settings, and biometric lock preference — stored locally on your device only.</li>
+        </ul>
+
+        <h2>3. Data We Do NOT Collect</h2>
+        <p>We explicitly do not collect, process, or store:</p>
+        <ul>
+            <li>Location data or GPS coordinates</li>
+            <li>Contacts, calendar, or photo library data</li>
+            <li>Device identifiers for tracking (IDFA, IDFV)</li>
+            <li>Browsing history or app usage analytics</li>
+            <li>Biometric data (Face ID / Touch ID / Android Biometric authentication is processed entirely on-device by the platform security hardware — no biometric data leaves your device)</li>
+            <li>Health, financial, or any other sensitive personal data</li>
+        </ul>
+
+        <h2>4. How We Use Your Data</h2>
+        <p>Your data is used exclusively for:</p>
+        <ul>
+            <li>Authenticating your identity and managing your account</li>
+            <li>Creating, displaying, modifying, and canceling parking reservations</li>
+            <li>Sending booking reminders via local on-device notifications</li>
+            <li>Delivering administrative announcements within the app</li>
+            <li>Providing administrators with aggregated, non-identifying booking statistics</li>
+        </ul>
+
+        <h2>5. Data Storage and Security</h2>
+        <ul>
+            <li><strong>Cloud storage:</strong> Account and booking data is stored in Google Firebase (Firestore and Firebase Authentication), hosted within Google Cloud infrastructure. Data is encrypted in transit (TLS 1.2+) and at rest (AES-256).</li>
+            <li><strong>Local storage:</strong> Notification preferences and UI settings are stored on-device using platform storage (iOS UserDefaults/Keychain and Android SharedPreferences/Keystore-backed secure storage where applicable).</li>
+            <li><strong>Access control:</strong> Firestore Security Rules enforce strict role-based access. Users can only read and modify their own data. Administrative actions are logged in an append-only audit trail.</li>
+            <li><strong>No third-party access:</strong> We do not use third-party analytics, advertising networks, crash reporters, or data brokers. No data is shared with any third party beyond the Firebase infrastructure required to operate the service.</li>
+        </ul>
+
+        <h2>6. Data Retention</h2>
+        <ul>
+            <li><strong>Active accounts:</strong> Your data is retained for the duration of your active account.</li>
+            <li><strong>Booking history:</strong> Past booking records are retained for administrative reporting purposes.</li>
+            <li><strong>Account deletion:</strong> You may delete your account at any time from the app (Settings → Delete Account). Upon deletion, your user profile, all associated bookings, and authentication credentials are permanently and irrevocably removed. Audit log entries (which record administrative actions) are retained as required for security compliance.</li>
+        </ul>
+
+        <h2>7. Data Sharing</h2>
+        <div class="highlight">
+            <strong>We do not sell, rent, lease, trade, or otherwise share your personal data with any third party for any purpose.</strong>
+        </div>
+        <p>Your data is accessible only to:</p>
+        <ul>
+            <li><strong>You:</strong> Your own account information, bookings, and preferences.</li>
+            <li><strong>Designated administrators:</strong> User management (account activation/suspension), booking oversight, and parking spot configuration — all actions are recorded in an audit log.</li>
+            <li><strong>Google Firebase:</strong> As the infrastructure provider, Google processes data in accordance with Google Cloud's data processing terms and GDPR compliance framework.</li>
+        </ul>
+
+        <h2>8. Your Rights</h2>
+        <p>In accordance with applicable data protection regulations (including GDPR where applicable), you have the right to:</p>
+        <ul>
+            <li><strong>Access</strong> your personal data — visible in the app at all times (Settings).</li>
+            <li><strong>Rectify</strong> inaccurate data — editable in the app (Settings → Profile).</li>
+            <li><strong>Delete</strong> your account and all associated data — available in the app (Settings → Delete Account).</li>
+            <li><strong>Object</strong> to processing — contact the app administrator.</li>
+            <li><strong>Data portability</strong> — contact the app administrator to request an export of your data.</li>
+        </ul>
+
+        <h2>9. Children's Privacy</h2>
+        <p>EL Parking is a corporate workplace application. It is not intended for use by individuals under the age of 18. We do not knowingly collect data from minors.</p>
+
+        <h2>10. Notification Permissions</h2>
+        <p>The app requests permission to send local notifications for booking reminders only. You may revoke this permission at any time via device settings (iOS/Android). Notifications are scheduled on-device. No advertising identifiers are collected or transmitted for notification delivery.</p>
+
+        <h2>11. Changes to This Policy</h2>
+        <p>We may update this privacy policy to reflect changes in the application or applicable regulations. Material changes will be communicated via an in-app announcement. The "Last updated" date at the top of this page indicates the most recent revision.</p>
+
+        <h2>12. Contact</h2>
+        <p>For privacy-related inquiries, data access requests, or concerns about this policy, contact the application administrator at the email address provided in the app (Settings → Need Help?).</p>
+
+        <div class="footer">
+            <p>EL Parking — Internal Corporate Parking Application</p>
+            <p>&copy; 2026 EssilorLuxottica. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -27,20 +27,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate Firebase config secret
+      - name: Inject Firebase web config
         env:
           FIREBASE_WEB_CONFIG_JSON: ${{ secrets.FIREBASE_WEB_CONFIG_JSON }}
         run: |
-          if [ -z "$FIREBASE_WEB_CONFIG_JSON" ]; then
-            echo "Missing repository secret FIREBASE_WEB_CONFIG_JSON"
-            exit 1
-          fi
-
-      - name: Generate web/firebase-config.js from secret
-        env:
-          FIREBASE_WEB_CONFIG_JSON: ${{ secrets.FIREBASE_WEB_CONFIG_JSON }}
-        run: |
-          node -e "const fs=require('fs');const cfg=JSON.parse(process.env.FIREBASE_WEB_CONFIG_JSON);fs.writeFileSync('web/firebase-config.js','export const firebaseConfig = '+JSON.stringify(cfg,null,2)+';\\n');"
+          test -n "$FIREBASE_WEB_CONFIG_JSON" || (echo "Missing FIREBASE_WEB_CONFIG_JSON secret" && exit 1)
+          node -e 'const cfg = JSON.parse(process.env.FIREBASE_WEB_CONFIG_JSON); const required = ["apiKey","authDomain","projectId","storageBucket","messagingSenderId","appId"]; for (const k of required) { if (!cfg[k] || String(cfg[k]).includes("REPLACE_ME") || String(cfg[k]).includes("TVUJ_NOVY_KEY")) { throw new Error(`Invalid FIREBASE_WEB_CONFIG_JSON key: ${k}`); } }'
+          printf 'export const firebaseConfig = %s;\n' "$FIREBASE_WEB_CONFIG_JSON" > web/firebase-config.js
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

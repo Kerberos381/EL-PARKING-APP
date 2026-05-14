@@ -263,17 +263,14 @@ function subscribeDayBookings() {
 function subscribeMyBookings() {
   state.listeners.myBookings?.();
   if (!state.user) return;
-  const email = state.user.email?.toLowerCase() || "";
-  const q = query(
-    collection(db, "bookings"),
-    where("email", "==", email),
-    orderBy("bookingDate", "asc"),
-    limit(200)
-  );
+  const q = query(collection(db, "bookings"), orderBy("bookingDate", "asc"), limit(800));
   state.listeners.myBookings = onSnapshot(
     q,
     (snap) => {
-      state.myBookings = snap.docs.map((d) => parseBooking(d.id, d.data())).filter(Boolean);
+      state.myBookings = snap.docs
+        .map((d) => parseBooking(d.id, d.data()))
+        .filter(Boolean)
+        .filter((booking) => isBookingForCurrentUser(booking));
       renderHomeHero();
       renderMyBookings();
     },
@@ -487,7 +484,6 @@ async function ensureSpotFreeForRange(spot, bookingDate, fromTime, toTime) {
   const to = dayEndExclusive(toYmd(bookingDate));
   const q = query(
     collection(db, "bookings"),
-    where("spot", "==", spot),
     where("bookingDate", ">=", Timestamp.fromDate(from)),
     where("bookingDate", "<", Timestamp.fromDate(to))
   );
@@ -495,6 +491,7 @@ async function ensureSpotFreeForRange(spot, bookingDate, fromTime, toTime) {
   const conflicts = snap.docs
     .map((d) => parseBooking(d.id, d.data()))
     .filter(Boolean)
+    .filter((b) => String(b.spot) === String(spot))
     .some((b) => timesOverlap(fromTime, toTime, b.fromTime, b.toTime));
   if (conflicts) {
     throw new Error("This spot is already booked in that time range.");
@@ -614,13 +611,27 @@ function parseBooking(id, data) {
   else if (typeof bookingDateRaw === "string" || typeof bookingDateRaw === "number") bookingDate = new Date(bookingDateRaw);
 
   const spot = String(data.spot ?? data.spotLabel ?? "");
-  const email = String(data.email ?? data.userEmail ?? "").toLowerCase();
+  const email = String(data.email ?? data.userEmail ?? data.bookedForEmail ?? data.ownerEmail ?? "").toLowerCase();
+  const bookedForUid = String(data.bookedForUid ?? data.userUid ?? data.uid ?? data.userId ?? data.ownerUid ?? "");
   const fromTime = String(data.fromTime ?? data.from ?? data.timeFrom ?? "07:00");
   const toTime = String(data.toTime ?? data.to ?? data.timeTo ?? "18:00");
   const user = String(data.user ?? data.displayName ?? "");
   const createdBy = String(data.createdBy ?? data.adminEmail ?? "").toLowerCase();
-  if (!spot || !email) return null;
-  return { id, spot, bookingDate, email, fromTime, toTime, user, createdBy };
+  if (!spot) return null;
+  return { id, spot, bookingDate, email, bookedForUid, fromTime, toTime, user, createdBy };
+}
+
+function isBookingForCurrentUser(booking) {
+  const currentUid = String(state.user?.uid || "");
+  const currentEmail = String(state.user?.email || "").trim().toLowerCase();
+  const bookingEmail = String(booking.email || "").trim().toLowerCase();
+  const creatorEmail = String(booking.createdBy || "").trim().toLowerCase();
+  const bookingUid = String(booking.bookedForUid || "").trim();
+
+  if (currentUid && bookingUid && currentUid === bookingUid) return true;
+  if (currentEmail && bookingEmail && currentEmail === bookingEmail) return true;
+  if (currentEmail && !bookingEmail && creatorEmail && currentEmail === creatorEmail) return true;
+  return false;
 }
 
 function parseSpot(id, data) {

@@ -89,6 +89,10 @@ const ui = {
   carInput: byId("carInput"),
   profileError: byId("profileError"),
   saveProfileBtn: byId("saveProfileBtn"),
+  bookingSuccessModal: byId("bookingSuccessModal"),
+  bookingSuccessMessage: byId("bookingSuccessMessage"),
+  bookingSuccessStay: byId("bookingSuccessStay"),
+  bookingSuccessGo: byId("bookingSuccessGo"),
   tabs: [...document.querySelectorAll(".tab")],
   tabPanels: {
     home: byId("homeTab"),
@@ -105,9 +109,33 @@ let db;
 
 boot();
 
+const REQUIRED_FIREBASE_KEYS = [
+  "apiKey",
+  "authDomain",
+  "projectId",
+  "storageBucket",
+  "messagingSenderId",
+  "appId",
+];
+
+function validateFirebaseConfig(config) {
+  if (!config || typeof config !== "object") return "Firebase config is missing.";
+  for (const key of REQUIRED_FIREBASE_KEYS) {
+    const value = String(config[key] ?? "").trim();
+    if (!value) return `Firebase config missing key: ${key}`;
+    if (value.includes("REPLACE_ME") || value.includes("TVUJ_NOVY_KEY")) {
+      return `Firebase config has placeholder value in key: ${key}`;
+    }
+  }
+  return "";
+}
+
 async function boot() {
   ui.loginForm.addEventListener("submit", (event) => event.preventDefault(), { capture: true });
   try {
+    const configError = validateFirebaseConfig(firebaseConfig);
+    if (configError) throw new Error(configError);
+
     const app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
@@ -119,44 +147,56 @@ async function boot() {
     bootstrap();
   } catch (error) {
     console.error("Web bootstrap failed:", error);
-    ui.authError.textContent =
-      "Initialization failed. Open browser console and send the first red error line.";
+    const reason = error?.message || String(error || "Unknown initialization error");
+    ui.authError.textContent = `Initialization failed: ${reason}`;
     ui.loginButton.disabled = true;
   }
 }
 
 function bootstrap() {
-  ui.bookDate.value = state.selectedDate;
+  if (ui.bookDate) ui.bookDate.value = state.selectedDate;
   bindEvents();
   syncBookUiState();
   onAuthStateChanged(auth, handleAuthState);
 }
 
 function bindEvents() {
-  ui.loginForm.addEventListener("submit", onLoginSubmit);
-  ui.signOutButton.addEventListener("click", () => signOut(auth));
-  ui.pendingSignOut.addEventListener("click", () => signOut(auth));
-  ui.refreshHome.addEventListener("click", () => renderAnnouncements());
-  ui.refreshBookings.addEventListener("click", () => renderMyBookings());
+  ui.loginForm?.addEventListener("submit", onLoginSubmit);
+  ui.signOutButton?.addEventListener("click", () => signOut(auth));
+  ui.pendingSignOut?.addEventListener("click", () => signOut(auth));
+  ui.refreshHome?.addEventListener("click", () => renderAnnouncements());
+  ui.refreshBookings?.addEventListener("click", () => renderMyBookings());
 
-  ui.bookDate.addEventListener("change", () => {
+  ui.bookDate?.addEventListener("change", () => {
     state.selectedDate = ui.bookDate.value || state.selectedDate;
     recalculateDerivedBookings();
     renderParking();
     renderDayPills();
   });
 
-  ui.spotSelect.addEventListener("change", () => {
+  ui.spotSelect?.addEventListener("change", () => {
     if (!ui.spotSelect.value) return;
     setSelectedSpot(ui.spotSelect.value);
     renderParking();
     syncBookUiState();
   });
 
-  ui.bookForm.addEventListener("submit", onBookSubmit);
-  ui.profileForm.addEventListener("submit", onSaveProfile);
-  ui.bookFrom.addEventListener("change", syncBookUiState);
-  ui.bookTo.addEventListener("change", syncBookUiState);
+  ui.bookForm?.addEventListener("submit", onBookSubmit);
+  ui.profileForm?.addEventListener("submit", onSaveProfile);
+  ui.bookFrom?.addEventListener("change", syncBookUiState);
+  ui.bookTo?.addEventListener("change", syncBookUiState);
+  ui.bookingSuccessStay?.addEventListener("click", hideBookingSuccessModal);
+  ui.bookingSuccessGo?.addEventListener("click", () => {
+    hideBookingSuccessModal();
+    switchTab("bookings");
+    renderMyBookings();
+  });
+  ui.bookingSuccessModal?.addEventListener("click", (event) => {
+    if (event.target === ui.bookingSuccessModal) hideBookingSuccessModal();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") hideBookingSuccessModal();
+  });
   ui.tabs.forEach((tab) => tab.addEventListener("click", () => switchTab(tab.dataset.tab)));
 }
 
@@ -550,6 +590,7 @@ async function onBookSubmit(event) {
     await createBookingTransaction(spot, date, dateYmd, fromTime, toTime);
     setSelectedSpot("");
     ui.bookError.textContent = "";
+    showBookingSuccessModal(spot, date, fromTime, toTime);
   } catch (err) {
     ui.bookError.textContent = err?.message || "Could not create booking.";
   } finally {
@@ -761,6 +802,21 @@ function syncBookUiState() {
 
   ui.selectedSpotHint.textContent = `Selected: Spot ${extractSpotNumber(state.selectedSpotLabel)}. Ready to confirm.`;
   ui.selectedSpotHint.classList.add("ok");
+}
+
+function showBookingSuccessModal(spotLabel, bookingDate, fromTime, toTime) {
+  if (!ui.bookingSuccessModal || !ui.bookingSuccessMessage) return;
+  const spot = extractSpotNumber(spotLabel);
+  const dateText = formatLongDate(bookingDate);
+  ui.bookingSuccessMessage.textContent = `Spot ${spot} booked for ${dateText}, ${fromTime}-${toTime}.`;
+  ui.bookingSuccessModal.classList.remove("hidden");
+  ui.bookingSuccessModal.setAttribute("aria-hidden", "false");
+}
+
+function hideBookingSuccessModal() {
+  if (!ui.bookingSuccessModal) return;
+  ui.bookingSuccessModal.classList.add("hidden");
+  ui.bookingSuccessModal.setAttribute("aria-hidden", "true");
 }
 
 function scrollBookingFormIntoView() {

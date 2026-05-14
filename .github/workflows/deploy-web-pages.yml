@@ -1,0 +1,55 @@
+name: Deploy Web to GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "web/**"
+      - ".github/workflows/deploy-web-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Firebase config secret
+        env:
+          FIREBASE_WEB_CONFIG_JSON: ${{ secrets.FIREBASE_WEB_CONFIG_JSON }}
+        run: |
+          if [ -z "$FIREBASE_WEB_CONFIG_JSON" ]; then
+            echo "Missing repository secret FIREBASE_WEB_CONFIG_JSON"
+            exit 1
+          fi
+
+      - name: Generate web/firebase-config.js from secret
+        env:
+          FIREBASE_WEB_CONFIG_JSON: ${{ secrets.FIREBASE_WEB_CONFIG_JSON }}
+        run: |
+          node -e "const fs=require('fs');const cfg=JSON.parse(process.env.FIREBASE_WEB_CONFIG_JSON);fs.writeFileSync('web/firebase-config.js','export const firebaseConfig = '+JSON.stringify(cfg,null,2)+';\\n');"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload static artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

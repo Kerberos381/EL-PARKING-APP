@@ -87,6 +87,13 @@
             </div>
             <p class="muted tiny spot-grid-hint">Tap a FREE spot tile to select it.</p>
             <div id="spotsGrid" class="spot-grid"></div>
+            <section id="adminSpotInspector" class="admin-inspector hidden">
+              <div class="admin-inspector-header">
+                <h4 id="adminSpotInspectorTitle">Spot</h4>
+                <button id="adminSpotInspectorClose" class="btn subtle small" type="button">Close</button>
+              </div>
+              <div id="adminSpotInspectorList" class="stack dense"></div>
+            </section>
           </article>
 
           <article class="card">
@@ -145,7 +152,7 @@
               <div><span id="usersPending">0</span><small>Pending</small></div>
             </div>
             <p class="muted tiny">
-              Admin features are read-only in this first web cut, to keep rollout safe.
+              Admin can inspect, edit and cancel bookings from Parking and Bookings tabs.
             </p>
           </article>
         </section>
@@ -184,6 +191,37 @@
               <button id="bookingSuccessStay" class="btn subtle" type="button">Continue</button>
               <button id="bookingSuccessGo" class="btn primary" type="button">Go to My Bookings</button>
             </div>
+          </article>
+        </section>
+
+        <section id="bookingEditModal" class="modal hidden" aria-hidden="true">
+          <article class="modal-card" role="dialog" aria-modal="true" aria-labelledby="bookingEditTitle">
+            <h3 id="bookingEditTitle">Edit Booking</h3>
+            <form id="bookingEditForm" class="stack">
+              <label class="field">
+                <span>Spot</span>
+                <select id="bookingEditSpot" required></select>
+              </label>
+              <div class="row">
+                <label class="field grow">
+                  <span>Date</span>
+                  <input id="bookingEditDate" type="date" required />
+                </label>
+                <label class="field grow">
+                  <span>From</span>
+                  <input id="bookingEditFrom" type="time" required />
+                </label>
+                <label class="field grow">
+                  <span>To</span>
+                  <input id="bookingEditTo" type="time" required />
+                </label>
+              </div>
+              <p id="bookingEditError" class="error" role="alert"></p>
+              <div class="modal-actions">
+                <button id="bookingEditCancel" class="btn subtle" type="button">Cancel</button>
+                <button id="bookingEditSave" class="btn primary" type="submit">Save</button>
+              </div>
+            </form>
           </article>
         </section>
       </section>

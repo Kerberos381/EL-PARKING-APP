@@ -450,6 +450,15 @@ h3 {
   cursor: default;
 }
 
+.spot-cell[data-state="booked"].admin-clickable {
+  cursor: pointer;
+}
+
+.spot-cell[data-state="booked"].admin-clickable:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(140, 30, 30, 0.08);
+}
+
 .spot-cell[data-state="blocked"] {
   opacity: 0.7;
   background: var(--surface-strong);
@@ -480,6 +489,17 @@ h3 {
   background: #35c759;
   color: #fff;
   box-shadow: 0 4px 10px rgba(34, 133, 58, 0.3);
+}
+
+.spot-cell-booking-owner {
+  margin-top: 6px;
+  color: #8a1b1b;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .spot-grid-hint {
@@ -515,6 +535,71 @@ h3 {
   margin: 3px 0 0;
   font-size: 13px;
   color: var(--subtle);
+}
+
+.admin-inspector {
+  border: 1px solid #d8e6dc;
+  background: #fbfefc;
+  border-radius: 20px;
+  padding: 14px;
+  margin-top: 12px;
+}
+
+.admin-inspector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.admin-inspector-header h4 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.admin-booking-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #e5ebf2;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 10px 12px;
+}
+
+.admin-booking-main {
+  min-width: 0;
+}
+
+.admin-booking-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-booking-meta {
+  margin: 3px 0 0;
+  color: var(--subtle);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-booking-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn.small {
+  min-height: 36px;
+  padding: 8px 12px;
+  font-size: 13px;
 }
 
 .announcement {

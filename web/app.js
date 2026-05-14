@@ -31,6 +31,8 @@ const state = {
   profile: null,
   selectedDate: toYmd(new Date()),
   selectedSpotLabel: "",
+  selectedAdminSpotLabel: "",
+  editingBooking: null,
   spots: [],
   allBookings: [],
   dayBookings: [],
@@ -67,6 +69,10 @@ const ui = {
   bookedCount: byId("bookedCount"),
   blockedCount: byId("blockedCount"),
   spotsGrid: byId("spotsGrid"),
+  adminSpotInspector: byId("adminSpotInspector"),
+  adminSpotInspectorTitle: byId("adminSpotInspectorTitle"),
+  adminSpotInspectorList: byId("adminSpotInspectorList"),
+  adminSpotInspectorClose: byId("adminSpotInspectorClose"),
   bookForm: byId("bookForm"),
   selectedSpotDisplay: byId("selectedSpotDisplay"),
   selectedSpotHint: byId("selectedSpotHint"),
@@ -93,6 +99,15 @@ const ui = {
   bookingSuccessMessage: byId("bookingSuccessMessage"),
   bookingSuccessStay: byId("bookingSuccessStay"),
   bookingSuccessGo: byId("bookingSuccessGo"),
+  bookingEditModal: byId("bookingEditModal"),
+  bookingEditForm: byId("bookingEditForm"),
+  bookingEditSpot: byId("bookingEditSpot"),
+  bookingEditDate: byId("bookingEditDate"),
+  bookingEditFrom: byId("bookingEditFrom"),
+  bookingEditTo: byId("bookingEditTo"),
+  bookingEditError: byId("bookingEditError"),
+  bookingEditSave: byId("bookingEditSave"),
+  bookingEditCancel: byId("bookingEditCancel"),
   tabs: [...document.querySelectorAll(".tab")],
   tabPanels: {
     home: byId("homeTab"),
@@ -167,6 +182,7 @@ function bindEvents() {
 
   ui.bookDate?.addEventListener("change", () => {
     state.selectedDate = ui.bookDate.value || state.selectedDate;
+    state.selectedAdminSpotLabel = "";
     recalculateDerivedBookings();
     renderParking();
     renderDayPills();
@@ -183,6 +199,7 @@ function bindEvents() {
   ui.profileForm?.addEventListener("submit", onSaveProfile);
   ui.bookFrom?.addEventListener("change", syncBookUiState);
   ui.bookTo?.addEventListener("change", syncBookUiState);
+  ui.adminSpotInspectorClose?.addEventListener("click", closeAdminSpotInspector);
   ui.bookingSuccessStay?.addEventListener("click", hideBookingSuccessModal);
   ui.bookingSuccessGo?.addEventListener("click", () => {
     hideBookingSuccessModal();
@@ -192,8 +209,16 @@ function bindEvents() {
   ui.bookingSuccessModal?.addEventListener("click", (event) => {
     if (event.target === ui.bookingSuccessModal) hideBookingSuccessModal();
   });
+  ui.bookingEditCancel?.addEventListener("click", closeBookingEditModal);
+  ui.bookingEditForm?.addEventListener("submit", onSaveBookingEdit);
+  ui.bookingEditModal?.addEventListener("click", (event) => {
+    if (event.target === ui.bookingEditModal) closeBookingEditModal();
+  });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") hideBookingSuccessModal();
+    if (event.key === "Escape") {
+      hideBookingSuccessModal();
+      closeBookingEditModal();
+    }
   });
   ui.tabs.forEach((tab) => tab.addEventListener("click", () => switchTab(tab.dataset.tab)));
 }
@@ -208,6 +233,8 @@ async function handleAuthState(user) {
   state.myBookings = [];
   state.announcements = [];
   state.selectedSpotLabel = "";
+  state.selectedAdminSpotLabel = "";
+  state.editingBooking = null;
 
   if (!user) {
     showOnly("auth");
@@ -312,6 +339,7 @@ function subscribeAllBookings() {
       renderHomeHero();
       renderMyBookings();
       renderParking();
+      renderAdminSpotInspector();
       renderDayPills();
     },
     () => {
@@ -321,6 +349,7 @@ function subscribeAllBookings() {
       renderHomeHero();
       renderMyBookings();
       renderParking();
+      renderAdminSpotInspector();
       renderDayPills();
     }
   );
@@ -362,6 +391,11 @@ function recalculateDerivedBookings() {
   const dayKey = state.selectedDate;
   state.dayBookings = state.allBookings.filter((booking) => toYmd(booking.bookingDate) === dayKey);
   state.myBookings = state.allBookings.filter((booking) => isBookingForCurrentUser(booking));
+}
+
+function isAdminLike() {
+  const role = (state.profile?.role || "").toLowerCase();
+  return role === "admin" || role === "privileged";
 }
 
 function renderGreeting() {
@@ -482,7 +516,20 @@ function renderSpotSelect() {
   }
 }
 
+function bookingsForSpotOnSelectedDay(spotLabel) {
+  const key = normalizedSpotKey(spotLabel);
+  return state.dayBookings
+    .filter((booking) => normalizedSpotKey(booking.spot) === key)
+    .slice()
+    .sort((a, b) => toMinutes(a.fromTime) - toMinutes(b.fromTime));
+}
+
+function bookingDisplayName(booking) {
+  return String(booking.user || booking.email || "Unknown user").trim();
+}
+
 function renderParking() {
+  const adminLike = isAdminLike();
   const blockedKeys = new Set(state.spots.filter((s) => s.isBlocked).map((s) => normalizedSpotKey(s.label)));
   const bookedKeys = new Set(state.dayBookings.map((b) => normalizedSpotKey(b.spot)));
   const usable = state.spots.filter((s) => !s.isBlocked);
@@ -495,6 +542,11 @@ function renderParking() {
   ui.freeCount.textContent = String(Math.max(usable.length - uniqueBookedUsable.size, 0));
   ui.bookedCount.textContent = String(uniqueBookedUsable.size);
   ui.blockedCount.textContent = String(state.spots.length - usable.length);
+  const hintText = adminLike
+    ? "Tap FREE to select for booking, or BOOKED to inspect who holds the spot."
+    : "Tap a FREE spot tile to select it.";
+  const hintNode = document.querySelector(".spot-grid-hint");
+  if (hintNode) hintNode.textContent = hintText;
 
   ui.spotsGrid.textContent = "";
   for (const spot of state.spots) {
@@ -503,19 +555,38 @@ function renderParking() {
     if (spot.isBlocked) stateName = "blocked";
     else if (bookedKeys.has(key)) stateName = "booked";
     const isSelectedFree = normalizedSpotKey(state.selectedSpotLabel) === key && stateName === "free";
+    const isSelectedBooked = normalizedSpotKey(state.selectedAdminSpotLabel) === key && stateName === "booked";
+    const spotBookings = stateName === "booked" ? bookingsForSpotOnSelectedDay(spot.label) : [];
+    const leadBooking = spotBookings[0];
 
     const cell = document.createElement("button");
     cell.type = "button";
     cell.className = "spot-cell";
     cell.dataset.state = stateName;
-    cell.classList.toggle("selected", isSelectedFree);
-    cell.disabled = stateName !== "free";
+    cell.classList.toggle("selected", isSelectedFree || isSelectedBooked);
+    if (stateName === "booked" && adminLike) cell.classList.add("admin-clickable");
+    cell.disabled = stateName !== "free" && !(stateName === "booked" && adminLike);
 
     const strong = document.createElement("strong");
     strong.textContent = String(extractSpotNumber(spot.label));
     const small = document.createElement("small");
-    small.textContent = stateName === "free" ? "FREE" : stateName === "booked" ? "BOOKED" : "BLOCKED";
+    if (stateName === "booked" && adminLike && leadBooking) {
+      small.textContent =
+        spotBookings.length > 1
+          ? `${spotBookings.length} BOOKINGS`
+          : `BOOKED ${leadBooking.fromTime}-${leadBooking.toTime}`;
+    } else {
+      small.textContent = stateName === "free" ? "FREE" : stateName === "booked" ? "BOOKED" : "BLOCKED";
+    }
     cell.append(strong, small);
+
+    if (stateName === "booked" && adminLike && leadBooking) {
+      const owner = document.createElement("div");
+      owner.className = "spot-cell-booking-owner";
+      owner.textContent = bookingDisplayName(leadBooking);
+      cell.append(owner);
+    }
+
     if (isSelectedFree) {
       const check = document.createElement("span");
       check.className = "spot-cell-check";
@@ -530,6 +601,13 @@ function renderParking() {
         syncBookUiState();
         scrollBookingFormIntoView();
       });
+    } else if (stateName === "booked" && adminLike) {
+      cell.addEventListener("click", () => {
+        state.selectedAdminSpotLabel = spot.label;
+        setSelectedSpot("");
+        renderParking();
+        renderAdminSpotInspector();
+      });
     }
 
     ui.spotsGrid.append(cell);
@@ -537,11 +615,14 @@ function renderParking() {
 
   ui.selectedSpotDisplay.value = state.selectedSpotLabel ? `Spot ${extractSpotNumber(state.selectedSpotLabel)}` : "";
   syncBookUiState();
+  renderAdminSpotInspector();
 }
 
 function renderMyBookings() {
   ui.myBookingsList.textContent = "";
-  const upcoming = state.myBookings
+  const adminLike = isAdminLike();
+  const source = adminLike ? state.allBookings : state.myBookings;
+  const upcoming = source
     .slice()
     .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime())
     .filter((b) => bookingEndDate(b.bookingDate, b.toTime) >= new Date());
@@ -553,17 +634,184 @@ function renderMyBookings() {
   }
 
   for (const booking of upcoming) {
+    if (adminLike) {
+      const row = document.createElement("article");
+      row.className = "admin-booking-row";
+
+      const main = document.createElement("div");
+      main.className = "admin-booking-main";
+      const title = document.createElement("p");
+      title.className = "admin-booking-title";
+      title.textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(booking.bookingDate)} · ${bookingDisplayName(
+        booking
+      )}`;
+      const meta = document.createElement("p");
+      meta.className = "admin-booking-meta";
+      meta.textContent = `${booking.fromTime} - ${booking.toTime}${booking.email ? ` · ${booking.email}` : ""}`;
+      main.append(title, meta);
+
+      const actions = document.createElement("div");
+      actions.className = "admin-booking-actions";
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "btn subtle small";
+      edit.textContent = "Edit";
+      edit.addEventListener("click", () => openBookingEditModal(booking));
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "btn danger small";
+      cancel.textContent = "Cancel";
+      cancel.addEventListener("click", () => cancelBooking(booking));
+      actions.append(edit, cancel);
+
+      row.append(main, actions);
+      ui.myBookingsList.append(row);
+      continue;
+    }
+
     const node = ui.bookingTemplate.content.firstElementChild.cloneNode(true);
-    node.querySelector(".title").textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(
-      booking.bookingDate
-    )}`;
+    node.querySelector(".title").textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(booking.bookingDate)}`;
     node.querySelector(".meta").textContent = `${booking.fromTime} - ${booking.toTime}`;
     const cancel = node.querySelector("button");
+    cancel.textContent = "Cancel";
     cancel.addEventListener("click", () => cancelBooking(booking));
     ui.myBookingsList.append(node);
   }
 
   renderHomeHero();
+}
+
+function renderAdminSpotInspector() {
+  if (!ui.adminSpotInspector) return;
+  if (!isAdminLike() || !state.selectedAdminSpotLabel) {
+    ui.adminSpotInspector.classList.add("hidden");
+    return;
+  }
+
+  const bookings = bookingsForSpotOnSelectedDay(state.selectedAdminSpotLabel);
+  if (!bookings.length) {
+    ui.adminSpotInspector.classList.add("hidden");
+    state.selectedAdminSpotLabel = "";
+    return;
+  }
+
+  ui.adminSpotInspector.classList.remove("hidden");
+  ui.adminSpotInspectorTitle.textContent = `Spot ${extractSpotNumber(state.selectedAdminSpotLabel)} · ${formatLongDate(dayStart(state.selectedDate))}`;
+  ui.adminSpotInspectorList.textContent = "";
+
+  for (const booking of bookings) {
+    const row = document.createElement("article");
+    row.className = "admin-booking-row";
+
+    const main = document.createElement("div");
+    main.className = "admin-booking-main";
+    const title = document.createElement("p");
+    title.className = "admin-booking-title";
+    title.textContent = bookingDisplayName(booking);
+    const meta = document.createElement("p");
+    meta.className = "admin-booking-meta";
+    meta.textContent = `${booking.fromTime} - ${booking.toTime}${booking.email ? ` · ${booking.email}` : ""}`;
+    main.append(title, meta);
+
+    const actions = document.createElement("div");
+    actions.className = "admin-booking-actions";
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "btn subtle small";
+    edit.textContent = "Edit";
+    edit.addEventListener("click", () => openBookingEditModal(booking));
+
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "btn danger small";
+    cancel.textContent = "Cancel";
+    cancel.addEventListener("click", () => cancelBooking(booking));
+
+    actions.append(edit, cancel);
+    row.append(main, actions);
+    ui.adminSpotInspectorList.append(row);
+  }
+}
+
+function closeAdminSpotInspector() {
+  state.selectedAdminSpotLabel = "";
+  ui.adminSpotInspector?.classList.add("hidden");
+}
+
+function openBookingEditModal(booking) {
+  if (!booking || !ui.bookingEditModal) return;
+  state.editingBooking = booking;
+  ui.bookingEditError.textContent = "";
+
+  const availableSpots = state.spots.filter((spot) => !spot.isBlocked).map((spot) => spot.label);
+  const hasCurrent = availableSpots.some((label) => normalizedSpotKey(label) === normalizedSpotKey(booking.spot));
+  if (!hasCurrent) availableSpots.unshift(booking.spot);
+
+  ui.bookingEditSpot.textContent = "";
+  for (const label of availableSpots) {
+    const option = document.createElement("option");
+    option.value = label;
+    option.textContent = label;
+    ui.bookingEditSpot.append(option);
+  }
+
+  ui.bookingEditSpot.value = booking.spot;
+  ui.bookingEditDate.value = toYmd(booking.bookingDate);
+  ui.bookingEditFrom.value = booking.fromTime;
+  ui.bookingEditTo.value = booking.toTime;
+  ui.bookingEditModal.classList.remove("hidden");
+  ui.bookingEditModal.setAttribute("aria-hidden", "false");
+}
+
+function closeBookingEditModal() {
+  state.editingBooking = null;
+  if (!ui.bookingEditModal) return;
+  ui.bookingEditModal.classList.add("hidden");
+  ui.bookingEditModal.setAttribute("aria-hidden", "true");
+}
+
+async function onSaveBookingEdit(event) {
+  event.preventDefault();
+  if (!state.editingBooking) return;
+  if (!isAdminLike()) {
+    ui.bookingEditError.textContent = "Only admin can edit bookings.";
+    return;
+  }
+
+  const booking = state.editingBooking;
+  const nextSpot = String(ui.bookingEditSpot.value || "").trim();
+  const nextDateYmd = String(ui.bookingEditDate.value || "").trim();
+  const nextFrom = String(ui.bookingEditFrom.value || "").trim();
+  const nextTo = String(ui.bookingEditTo.value || "").trim();
+
+  if (!nextSpot || !nextDateYmd || !nextFrom || !nextTo || nextFrom >= nextTo) {
+    ui.bookingEditError.textContent = "Check date and time range.";
+    return;
+  }
+
+  const isBlocked = state.spots.some(
+    (spot) => spot.isBlocked && normalizedSpotKey(spot.label) === normalizedSpotKey(nextSpot)
+  );
+  if (isBlocked) {
+    ui.bookingEditError.textContent = "Selected spot is blocked.";
+    return;
+  }
+
+  ui.bookingEditSave.disabled = true;
+  ui.bookingEditError.textContent = "";
+  try {
+    await updateBookingTransaction(booking, {
+      spot: nextSpot,
+      dateYmd: nextDateYmd,
+      fromTime: nextFrom,
+      toTime: nextTo,
+    });
+    closeBookingEditModal();
+  } catch (err) {
+    ui.bookingEditError.textContent = err?.message || "Booking update failed.";
+  } finally {
+    ui.bookingEditSave.disabled = false;
+  }
 }
 
 async function onBookSubmit(event) {
@@ -598,15 +846,14 @@ async function onBookSubmit(event) {
 
 function enforceBookingRules(spotLabel, dateYmd, fromTime, toTime) {
   if (fromTime >= toTime) throw new Error("Invalid time range.");
-  const role = (state.profile?.role || "").toLowerCase();
-  const isAdminLike = role === "admin" || role === "privileged";
+  const adminLike = isAdminLike();
 
   const blocked = state.spots.some(
     (spot) => spot.isBlocked && normalizedSpotKey(spot.label) === normalizedSpotKey(spotLabel)
   );
   if (blocked) throw new Error("This spot is blocked.");
 
-  if (!isAdminLike) {
+  if (!adminLike) {
     const todayStart = dayStart(toYmd(new Date()));
     const targetDate = dayStart(dateYmd);
     const advanceDays = Math.round((targetDate.getTime() - todayStart.getTime()) / 86400000);
@@ -676,6 +923,66 @@ async function createBookingTransaction(spotLabel, bookingDate, dateYmd, fromTim
   });
 }
 
+async function updateBookingTransaction(existingBooking, next) {
+  if (!existingBooking?.id) throw new Error("Booking is missing id.");
+
+  const nextDate = dayStart(next.dateYmd);
+  const bookingRef = doc(db, "bookings", existingBooking.id);
+  const oldDayKey = toYmd(existingBooking.bookingDate);
+  const newDayKey = next.dateYmd;
+  const oldLockRef = doc(db, "spot_locks", `${existingBooking.spot}_${oldDayKey}`);
+  const newLockRef = doc(db, "spot_locks", `${next.spot}_${newDayKey}`);
+
+  await runTransaction(db, async (transaction) => {
+    const [oldLockSnap, newLockSnap, bookingSnap] = await Promise.all([
+      transaction.get(oldLockRef),
+      transaction.get(newLockRef),
+      transaction.get(bookingRef),
+    ]);
+
+    if (!bookingSnap.exists()) throw new Error("Booking no longer exists.");
+
+    const newSlots = newLockSnap.data()?.slots ?? [];
+    const overlap = newSlots
+      .filter((slot) => String(slot.bookingId || "") !== existingBooking.id)
+      .some((slot) =>
+        timesOverlap(
+          next.fromTime,
+          next.toTime,
+          String(slot.from || "00:00"),
+          String(slot.to || "00:00")
+        )
+      );
+    if (overlap) throw new Error("This spot is already booked in that time range.");
+
+    const oldSlots = oldLockSnap.data()?.slots ?? [];
+    const oldSlotsWithoutCurrent = oldSlots.filter((slot) => String(slot.bookingId || "") !== existingBooking.id);
+    transaction.set(oldLockRef, { slots: oldSlotsWithoutCurrent }, { merge: true });
+
+    const newSlotsWithoutCurrent = newSlots.filter((slot) => String(slot.bookingId || "") !== existingBooking.id);
+    transaction.set(
+      newLockRef,
+      {
+        slots: [...newSlotsWithoutCurrent, { from: next.fromTime, to: next.toTime, bookingId: existingBooking.id }],
+      },
+      { merge: true }
+    );
+
+    const spotDoc = state.spots.find((spot) => normalizedSpotKey(spot.label) === normalizedSpotKey(next.spot));
+    const expiresAt = addDays(bookingEndDate(nextDate, next.toTime), APP_RULES.bookingRetentionDays);
+
+    transaction.update(bookingRef, {
+      spot: next.spot,
+      spotID: spotDoc?.id || extractSpotNumber(next.spot),
+      fromTime: next.fromTime,
+      toTime: next.toTime,
+      bookingDate: Timestamp.fromDate(nextDate),
+      expiresAt: Timestamp.fromDate(expiresAt),
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
 async function cancelBooking(booking) {
   if (!state.user || !state.profile) return;
   const ok = window.confirm(
@@ -685,9 +992,8 @@ async function cancelBooking(booking) {
 
   try {
     const myEmail = String(state.user.email || "").trim().toLowerCase();
-    const role = (state.profile.role || "").toLowerCase();
     const ownerEmail = String(booking.email || "").trim().toLowerCase();
-    if (myEmail !== ownerEmail && role !== "admin" && role !== "privileged") {
+    if (myEmail !== ownerEmail && !isAdminLike()) {
       throw new Error("You can cancel only your own bookings.");
     }
 
@@ -750,6 +1056,7 @@ function hydrateProfileForm() {
 
 function switchTab(tab) {
   if (!tab) return;
+  if (tab !== "parking") closeAdminSpotInspector();
   for (const [name, panel] of Object.entries(ui.tabPanels)) {
     panel.classList.toggle("hidden", name !== tab);
   }

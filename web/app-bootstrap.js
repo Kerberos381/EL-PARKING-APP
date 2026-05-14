@@ -14,6 +14,13 @@ try {
 
   let source = await response.text();
 
+  // Fix relative import when running from blob URL.
+  const firebaseConfigUrl = new URL("./firebase-config.js", import.meta.url).href;
+  source = source.replace(
+    /from\s+["']\.\/firebase-config\.js["']/,
+    `from "${firebaseConfigUrl}"`
+  );
+
   // TDZ hotfix: remove the first eager boot() invocation regardless of whitespace/newlines.
   source = source.replace(/\bboot\(\);\s*/, "");
 

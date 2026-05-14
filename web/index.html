@@ -68,7 +68,7 @@
           </article>
 
           <article class="card">
-            <div class="row between">
+            <div class="row between section-head">
               <h3>Pinned Updates</h3>
               <button id="refreshHome" class="btn subtle">Refresh</button>
             </div>
@@ -128,7 +128,7 @@
 
         <section id="bookingsTab" class="tabpanel hidden">
           <article class="card">
-            <div class="row between">
+            <div class="row between section-head">
               <h3>My Bookings</h3>
               <button id="refreshBookings" class="btn subtle">Refresh</button>
             </div>
@@ -173,6 +173,17 @@
               <button id="saveProfileBtn" class="btn primary" type="submit">Save Profile</button>
               <p id="profileError" class="error" role="alert"></p>
             </form>
+          </article>
+        </section>
+
+        <section id="bookingSuccessModal" class="modal hidden" aria-hidden="true">
+          <article class="modal-card" role="dialog" aria-modal="true" aria-labelledby="bookingSuccessTitle">
+            <h3 id="bookingSuccessTitle">Booking Confirmed</h3>
+            <p id="bookingSuccessMessage" class="muted"></p>
+            <div class="modal-actions">
+              <button id="bookingSuccessStay" class="btn subtle" type="button">Continue</button>
+              <button id="bookingSuccessGo" class="btn primary" type="button">Go to My Bookings</button>
+            </div>
           </article>
         </section>
       </section>

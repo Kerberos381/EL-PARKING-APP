@@ -37,9 +37,11 @@ body {
 }
 
 .app {
-  width: min(980px, 100vw);
+  width: 100%;
+  max-width: 980px;
   margin: 0 auto;
   padding: max(16px, env(safe-area-inset-top)) 16px calc(102px + env(safe-area-inset-bottom));
+  overflow-x: hidden;
 }
 
 .hidden {
@@ -83,6 +85,7 @@ h3 {
   border-radius: var(--radius-card);
   padding: 20px;
   box-shadow: var(--shadow-soft);
+  min-width: 0;
 }
 
 .dark {
@@ -170,6 +173,7 @@ h3 {
 .tabpanel {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .stack {
@@ -189,6 +193,19 @@ h3 {
 
 .row.between {
   justify-content: space-between;
+}
+
+.section-head {
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.section-head h3 {
+  margin: 0;
+}
+
+.section-head .btn {
+  margin-left: auto;
 }
 
 .field {
@@ -530,6 +547,44 @@ h3 {
   font-size: 14px;
 }
 
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(11, 14, 20, 0.38);
+  backdrop-filter: blur(4px);
+}
+
+.modal-card {
+  width: min(460px, 100%);
+  background: #ffffff;
+  border: 1px solid #dbe1ea;
+  border-radius: 24px;
+  box-shadow: 0 20px 48px rgba(13, 18, 28, 0.18);
+  padding: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.modal-card h3 {
+  margin: 0;
+}
+
+.modal-card p {
+  margin: 0;
+  font-size: 15px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
 @media (max-width: 760px) {
   .app {
     padding: max(10px, env(safe-area-inset-top)) 10px calc(110px + env(safe-area-inset-bottom));
@@ -604,7 +659,12 @@ h3 {
   }
 
   .spot-grid {
-    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .spot-cell {
+    min-height: 118px;
   }
 
   .day-pills {
@@ -624,6 +684,20 @@ h3 {
   .booking-row .btn {
     width: 100%;
   }
+
+  .modal {
+    padding: 14px;
+    align-items: end;
+  }
+
+  .modal-card {
+    border-radius: 22px;
+    padding: 16px;
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+  }
 }
 
 @media (max-width: 390px) {
@@ -637,5 +711,9 @@ h3 {
 
   .hero-spot {
     font-size: 52px;
+  }
+
+  .spot-grid {
+    grid-template-columns: 1fr;
   }
 }

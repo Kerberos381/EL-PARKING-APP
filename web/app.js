@@ -1,42 +1,43 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
 import {
+  browserSessionPersistence,
   getAuth,
-  signInWithEmailAndPassword,
-  signOut,
   onAuthStateChanged,
   setPersistence,
-  browserSessionPersistence,
+  signInWithEmailAndPassword,
+  signOut,
 } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js";
 import {
-  getFirestore,
   collection,
   doc,
-  setDoc,
   getDoc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  orderBy,
-  limit,
+  getFirestore,
   onSnapshot,
-  getDocs,
+  runTransaction,
   serverTimestamp,
   Timestamp,
+  updateDoc,
 } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
+
+const APP_RULES = {
+  selfBookingMaxAdvanceDays: 3,
+  selfBookingMaxPerDay: 1,
+  bookingRetentionDays: 2,
+};
 
 const state = {
   user: null,
   profile: null,
   selectedDate: toYmd(new Date()),
+  selectedSpotLabel: "",
   spots: [],
+  allBookings: [],
   dayBookings: [],
   myBookings: [],
   announcements: [],
   listeners: {
-    myBookings: null,
-    dayBookings: null,
+    allBookings: null,
     spots: null,
     announcements: null,
     users: null,
@@ -62,11 +63,13 @@ const ui = {
   announcementsList: byId("announcementsList"),
   refreshHome: byId("refreshHome"),
   parkingDateInput: byId("parkingDateInput"),
+  dayPills: byId("dayPills"),
   freeCount: byId("freeCount"),
   bookedCount: byId("bookedCount"),
   blockedCount: byId("blockedCount"),
   spotsGrid: byId("spotsGrid"),
   bookForm: byId("bookForm"),
+  selectedSpotDisplay: byId("selectedSpotDisplay"),
   spotSelect: byId("spotSelect"),
   bookDate: byId("bookDate"),
   bookFrom: byId("bookFrom"),
@@ -97,12 +100,30 @@ const ui = {
   bookingTemplate: byId("bookingRowTemplate"),
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-await setPersistence(auth, browserSessionPersistence);
+let auth;
+let db;
 
-bootstrap();
+boot();
+
+async function boot() {
+  ui.loginForm.addEventListener("submit", (event) => event.preventDefault(), { capture: true });
+  try {
+    const app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    try {
+      await setPersistence(auth, browserSessionPersistence);
+    } catch (persistError) {
+      console.warn("setPersistence failed, fallback to default:", persistError);
+    }
+    bootstrap();
+  } catch (error) {
+    console.error("Web bootstrap failed:", error);
+    ui.authError.textContent =
+      "Initialization failed. Open browser console and send the first red error line.";
+    ui.loginButton.disabled = true;
+  }
+}
 
 function bootstrap() {
   ui.parkingDateInput.value = state.selectedDate;
@@ -121,7 +142,23 @@ function bindEvents() {
   ui.parkingDateInput.addEventListener("change", () => {
     state.selectedDate = ui.parkingDateInput.value || toYmd(new Date());
     ui.bookDate.value = state.selectedDate;
-    subscribeDayBookings();
+    recalculateDerivedBookings();
+    renderParking();
+    renderDayPills();
+  });
+
+  ui.bookDate.addEventListener("change", () => {
+    state.selectedDate = ui.bookDate.value || state.selectedDate;
+    ui.parkingDateInput.value = state.selectedDate;
+    recalculateDerivedBookings();
+    renderParking();
+    renderDayPills();
+  });
+
+  ui.spotSelect.addEventListener("change", () => {
+    if (!ui.spotSelect.value) return;
+    setSelectedSpot(ui.spotSelect.value);
+    renderParking();
   });
 
   ui.bookForm.addEventListener("submit", onBookSubmit);
@@ -133,6 +170,12 @@ async function handleAuthState(user) {
   clearAllListeners();
   state.user = user;
   state.profile = null;
+  state.spots = [];
+  state.allBookings = [];
+  state.dayBookings = [];
+  state.myBookings = [];
+  state.announcements = [];
+  state.selectedSpotLabel = "";
 
   if (!user) {
     showOnly("auth");
@@ -159,8 +202,8 @@ async function handleAuthState(user) {
 
   showOnly("app");
   ui.adminTab.classList.toggle("hidden", !(role === "admin" || role === "privileged"));
-  if (role !== "admin" && role !== "privileged") {
-    if (currentTab() === "admin") switchTab("home");
+  if (role !== "admin" && role !== "privileged" && currentTab() === "admin") {
+    switchTab("home");
   }
 
   hydrateProfileForm();
@@ -192,8 +235,7 @@ async function onLoginSubmit(event) {
 
 function subscribeCoreData() {
   subscribeSpots();
-  subscribeDayBookings();
-  subscribeMyBookings();
+  subscribeAllBookings();
   subscribeAnnouncements();
   subscribeAdminStatsIfAllowed();
 }
@@ -207,76 +249,59 @@ function subscribeSpots() {
         .map((d) => parseSpot(d.id, d.data()))
         .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999) || compareNumberString(a.id, b.id));
       renderSpotSelect();
+      ensureSelectedSpotIsValid();
+      recalculateDerivedBookings();
       renderParking();
+      renderDayPills();
     },
     () => {
       state.spots = [];
       renderSpotSelect();
+      recalculateDerivedBookings();
       renderParking();
+      renderDayPills();
     }
   );
 }
 
-function subscribeDayBookings() {
-  state.listeners.dayBookings?.();
-  const from = dayStart(state.selectedDate);
-  const to = dayEndExclusive(state.selectedDate);
-  const q = query(
+function subscribeAllBookings() {
+  state.listeners.allBookings?.();
+  state.listeners.allBookings = onSnapshot(
     collection(db, "bookings"),
-    where("bookingDate", ">=", Timestamp.fromDate(from)),
-    where("bookingDate", "<", Timestamp.fromDate(to)),
-    orderBy("bookingDate", "asc")
-  );
-  state.listeners.dayBookings = onSnapshot(
-    q,
     (snap) => {
-      state.dayBookings = snap.docs.map((d) => parseBooking(d.id, d.data())).filter(Boolean);
-      renderParking();
-    },
-    () => {
-      state.dayBookings = [];
-      renderParking();
-    }
-  );
-}
-
-function subscribeMyBookings() {
-  state.listeners.myBookings?.();
-  if (!state.user) return;
-  const email = state.user.email?.toLowerCase() || "";
-  const q = query(
-    collection(db, "bookings"),
-    where("email", "==", email),
-    orderBy("bookingDate", "asc"),
-    limit(200)
-  );
-  state.listeners.myBookings = onSnapshot(
-    q,
-    (snap) => {
-      state.myBookings = snap.docs.map((d) => parseBooking(d.id, d.data())).filter(Boolean);
+      const loaded = snap.docs
+        .map((d) => parseBooking(d.id, d.data()))
+        .filter(Boolean)
+        .filter(shouldKeepBookingLocally)
+        .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime());
+      state.allBookings = loaded;
+      recalculateDerivedBookings();
       renderHomeHero();
       renderMyBookings();
+      renderParking();
+      renderDayPills();
     },
     () => {
-      state.myBookings = [];
+      state.allBookings = [];
+      recalculateDerivedBookings();
       renderHomeHero();
       renderMyBookings();
+      renderParking();
+      renderDayPills();
     }
   );
 }
 
 function subscribeAnnouncements() {
   state.listeners.announcements?.();
-  const q = query(
-    collection(db, "announcements"),
-    where("isActive", "==", true),
-    orderBy("createdAt", "desc"),
-    limit(12)
-  );
   state.listeners.announcements = onSnapshot(
-    q,
+    collection(db, "announcements"),
     (snap) => {
-      state.announcements = snap.docs.map((d) => parseAnnouncement(d.id, d.data())).filter(Boolean);
+      state.announcements = snap.docs
+        .map((d) => parseAnnouncement(d.id, d.data()))
+        .filter((item) => item?.isActive)
+        .sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0))
+        .slice(0, 12);
       renderAnnouncements();
     },
     () => {
@@ -299,17 +324,27 @@ function subscribeAdminStatsIfAllowed() {
   });
 }
 
+function recalculateDerivedBookings() {
+  const dayKey = state.selectedDate;
+  state.dayBookings = state.allBookings.filter((booking) => toYmd(booking.bookingDate) === dayKey);
+  state.myBookings = state.allBookings.filter((booking) => isBookingForCurrentUser(booking));
+}
+
 function renderGreeting() {
-  const name = (state.profile?.preferredVocative || "").trim() || firstName(state.profile?.displayName || state.user?.email || "there");
+  const name =
+    (state.profile?.preferredVocative || "").trim() ||
+    firstName(state.profile?.displayName || state.user?.email || "there");
   ui.greetingText.textContent = `Hello, ${name}`;
 }
 
 function renderHomeHero() {
   const now = new Date();
+  const todayKey = toYmd(now);
   const upcoming = state.myBookings
     .slice()
     .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime())
-    .find((b) => b.bookingDate >= dayStart(toYmd(now)));
+    .find((b) => toYmd(b.bookingDate) >= todayKey);
+
   if (!upcoming) {
     ui.heroState.textContent = "NO BOOKING";
     ui.heroDate.textContent = "";
@@ -317,9 +352,12 @@ function renderHomeHero() {
     ui.heroTime.textContent = "Book your next place";
     return;
   }
-  const isToday = toYmd(upcoming.bookingDate) === toYmd(now);
+
+  const isToday = toYmd(upcoming.bookingDate) === todayKey;
+  const isTomorrow = toYmd(upcoming.bookingDate) === toYmd(addDays(now, 1));
+  const lead = isToday ? "Today" : isTomorrow ? "Tomorrow" : "Upcoming";
   ui.heroState.textContent = isToday ? "ACTIVE" : "UPCOMING";
-  ui.heroDate.textContent = `${isToday ? "Today" : "Tomorrow"} · ${formatShortDate(upcoming.bookingDate)}`;
+  ui.heroDate.textContent = `${lead} · ${formatShortDate(upcoming.bookingDate)}`;
   ui.heroSpot.textContent = String(extractSpotNumber(upcoming.spot));
   ui.heroTime.textContent = `${upcoming.fromTime} - ${upcoming.toTime}`;
 }
@@ -328,25 +366,77 @@ function renderAnnouncements() {
   ui.announcementsList.textContent = "";
   const pinned = state.announcements.filter((a) => a.isPinned);
   const list = pinned.length ? pinned : state.announcements;
+
   if (!list.length) {
     ui.announcementsList.append(textRow("No active announcements."));
     return;
   }
+
   for (const item of list) {
     const wrap = document.createElement("article");
     wrap.className = "announcement";
+
+    if (item.imageURL) {
+      const img = document.createElement("img");
+      img.className = "announcement-media";
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.src = item.imageURL;
+      img.alt = item.title || "Announcement image";
+      wrap.append(img);
+    }
+
+    const body = document.createElement("div");
+    body.className = "announcement-body";
     const h = document.createElement("h4");
     h.textContent = `${item.emoji || "📣"} ${item.title}`;
     const p = document.createElement("p");
     p.textContent = item.body || "";
-    wrap.append(h, p);
+    body.append(h, p);
+    wrap.append(body);
+
     ui.announcementsList.append(wrap);
+  }
+}
+
+function renderDayPills() {
+  ui.dayPills.textContent = "";
+  const start = dayStart(toYmd(new Date()));
+  for (let i = 0; i < 7; i += 1) {
+    const date = addDays(start, i);
+    const ymd = toYmd(date);
+    const bookings = state.allBookings.filter((booking) => toYmd(booking.bookingDate) === ymd);
+    const occupancy = dayOccupancyPercent(bookings);
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "day-pill";
+    button.classList.toggle("active", ymd === state.selectedDate);
+    button.innerHTML = `
+      <strong>${ymd === toYmd(new Date()) ? "Today" : weekdayShort(date)}</strong>
+      <span>${date.getDate()}</span>
+      <small>${occupancy}% used</small>
+    `;
+    button.addEventListener("click", () => {
+      state.selectedDate = ymd;
+      ui.parkingDateInput.value = ymd;
+      ui.bookDate.value = ymd;
+      recalculateDerivedBookings();
+      renderParking();
+      renderDayPills();
+    });
+    ui.dayPills.append(button);
   }
 }
 
 function renderSpotSelect() {
   ui.spotSelect.textContent = "";
-  const available = state.spots.filter((s) => !s.isBlocked);
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select spot";
+  ui.spotSelect.append(placeholder);
+
+  const available = state.spots.filter((spot) => !spot.isBlocked);
   for (const spot of available) {
     const option = document.createElement("option");
     option.value = spot.label;
@@ -356,30 +446,49 @@ function renderSpotSelect() {
 }
 
 function renderParking() {
-  const blocked = new Set(state.spots.filter((s) => s.isBlocked).map((s) => s.label));
-  const booked = new Set(state.dayBookings.map((b) => b.spot));
+  const blockedKeys = new Set(state.spots.filter((s) => s.isBlocked).map((s) => normalizedSpotKey(s.label)));
+  const bookedKeys = new Set(state.dayBookings.map((b) => normalizedSpotKey(b.spot)));
   const usable = state.spots.filter((s) => !s.isBlocked);
+  const uniqueBookedUsable = new Set(
+    state.dayBookings
+      .map((b) => normalizedSpotKey(b.spot))
+      .filter((k) => !blockedKeys.has(k))
+  );
 
-  ui.freeCount.textContent = String(Math.max(usable.length - booked.size, 0));
-  ui.bookedCount.textContent = String(booked.size);
-  ui.blockedCount.textContent = String(blocked.size);
+  ui.freeCount.textContent = String(Math.max(usable.length - uniqueBookedUsable.size, 0));
+  ui.bookedCount.textContent = String(uniqueBookedUsable.size);
+  ui.blockedCount.textContent = String(state.spots.length - usable.length);
 
   ui.spotsGrid.textContent = "";
   for (const spot of state.spots) {
-    const cell = document.createElement("article");
-    cell.className = "spot-cell";
+    const key = normalizedSpotKey(spot.label);
     let stateName = "free";
     if (spot.isBlocked) stateName = "blocked";
-    else if (booked.has(spot.label)) stateName = "booked";
+    else if (bookedKeys.has(key)) stateName = "booked";
+
+    const cell = document.createElement("button");
+    cell.type = "button";
+    cell.className = "spot-cell";
     cell.dataset.state = stateName;
+    cell.classList.toggle("selected", normalizedSpotKey(state.selectedSpotLabel) === key);
 
     const strong = document.createElement("strong");
     strong.textContent = String(extractSpotNumber(spot.label));
     const small = document.createElement("small");
-    small.textContent = stateName.toUpperCase();
+    small.textContent = stateName === "free" ? "FREE" : stateName === "booked" ? "BOOKED" : "BLOCKED";
     cell.append(strong, small);
+
+    if (stateName === "free") {
+      cell.addEventListener("click", () => {
+        setSelectedSpot(spot.label);
+        renderParking();
+      });
+    }
+
     ui.spotsGrid.append(cell);
   }
+
+  ui.selectedSpotDisplay.value = state.selectedSpotLabel || "";
 }
 
 function renderMyBookings() {
@@ -387,20 +496,25 @@ function renderMyBookings() {
   const upcoming = state.myBookings
     .slice()
     .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime())
-    .filter((b) => b.bookingDate >= dayStart(toYmd(new Date())));
+    .filter((b) => bookingEndDate(b.bookingDate, b.toTime) >= new Date());
+
   if (!upcoming.length) {
     ui.myBookingsList.append(textRow("No upcoming bookings."));
     renderHomeHero();
     return;
   }
+
   for (const booking of upcoming) {
     const node = ui.bookingTemplate.content.firstElementChild.cloneNode(true);
-    node.querySelector(".title").textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(booking.bookingDate)}`;
+    node.querySelector(".title").textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(
+      booking.bookingDate
+    )}`;
     node.querySelector(".meta").textContent = `${booking.fromTime} - ${booking.toTime}`;
     const cancel = node.querySelector("button");
     cancel.addEventListener("click", () => cancelBooking(booking));
     ui.myBookingsList.append(node);
   }
+
   renderHomeHero();
 }
 
@@ -409,35 +523,23 @@ async function onBookSubmit(event) {
   ui.bookError.textContent = "";
   if (!state.user || !state.profile) return;
 
-  const spot = ui.spotSelect.value;
+  const spot = ui.spotSelect.value || state.selectedSpotLabel;
   const dateYmd = ui.bookDate.value;
   const fromTime = ui.bookFrom.value;
   const toTime = ui.bookTo.value;
 
   if (!spot || !dateYmd || !fromTime || !toTime || fromTime >= toTime) {
-    ui.bookError.textContent = "Check date and time range.";
+    ui.bookError.textContent = "Check date, time range and selected spot.";
     return;
   }
 
   ui.bookButton.disabled = true;
   try {
     const date = dayStart(dateYmd);
-    await ensureSpotFreeForRange(spot, date, fromTime, toTime);
-
-    const bookingRef = doc(collection(db, "bookings"));
-    const email = state.user.email.toLowerCase();
-    await setDoc(bookingRef, {
-      id: bookingRef.id,
-      title: `Reservation for ${state.profile.displayName || email}`,
-      spot,
-      user: state.profile.displayName || email,
-      email,
-      fromTime,
-      toTime,
-      createdBy: email,
-      bookingDate: Timestamp.fromDate(date),
-      createdAt: serverTimestamp(),
-    });
+    enforceBookingRules(spot, dateYmd, fromTime, toTime);
+    await createBookingTransaction(spot, date, dateYmd, fromTime, toTime);
+    setSelectedSpot("");
+    ui.bookError.textContent = "";
   } catch (err) {
     ui.bookError.textContent = err?.message || "Could not create booking.";
   } finally {
@@ -445,39 +547,112 @@ async function onBookSubmit(event) {
   }
 }
 
+function enforceBookingRules(spotLabel, dateYmd, fromTime, toTime) {
+  if (fromTime >= toTime) throw new Error("Invalid time range.");
+
+  const blocked = state.spots.some(
+    (spot) => spot.isBlocked && normalizedSpotKey(spot.label) === normalizedSpotKey(spotLabel)
+  );
+  if (blocked) throw new Error("This spot is blocked.");
+
+  const todayStart = dayStart(toYmd(new Date()));
+  const targetDate = dayStart(dateYmd);
+  const advanceDays = Math.round((targetDate.getTime() - todayStart.getTime()) / 86400000);
+  if (advanceDays > APP_RULES.selfBookingMaxAdvanceDays) {
+    throw new Error(`You can book max ${APP_RULES.selfBookingMaxAdvanceDays} days in advance.`);
+  }
+
+  const mySameDayCount = state.myBookings.filter((booking) => toYmd(booking.bookingDate) === dateYmd).length;
+  if (mySameDayCount >= APP_RULES.selfBookingMaxPerDay) {
+    throw new Error("You can book only 1 spot per day.");
+  }
+
+  const normalizedRequested = normalizedSpotKey(spotLabel);
+  const conflict = state.allBookings
+    .filter((booking) => toYmd(booking.bookingDate) === dateYmd)
+    .filter((booking) => normalizedSpotKey(booking.spot) === normalizedRequested)
+    .some((booking) => timesOverlap(fromTime, toTime, booking.fromTime, booking.toTime));
+  if (conflict) throw new Error("This spot is already booked in that time range.");
+}
+
+async function createBookingTransaction(spotLabel, bookingDate, dateYmd, fromTime, toTime) {
+  const bookingRef = doc(collection(db, "bookings"));
+  const lockRef = doc(db, "spot_locks", `${spotLabel}_${dateYmd}`);
+  const email = state.user.email.toLowerCase();
+  const displayName = state.profile.displayName || email;
+  const spotDoc = state.spots.find((spot) => normalizedSpotKey(spot.label) === normalizedSpotKey(spotLabel));
+  const expiresAt = addDays(bookingEndDate(bookingDate, toTime), APP_RULES.bookingRetentionDays);
+
+  await runTransaction(db, async (transaction) => {
+    const lockSnap = await transaction.get(lockRef);
+    const slots = lockSnap.data()?.slots ?? [];
+
+    for (const slot of slots) {
+      const sFrom = String(slot.from || "");
+      const sTo = String(slot.to || "");
+      if (!sFrom || !sTo) continue;
+      if (timesOverlap(fromTime, toTime, sFrom, sTo)) {
+        throw new Error("This spot is already booked in that time range.");
+      }
+    }
+
+    const bookingPayload = {
+      id: bookingRef.id,
+      title: `Reservation for ${displayName}`,
+      spot: spotLabel,
+      spotID: spotDoc?.id || extractSpotNumber(spotLabel),
+      user: displayName,
+      email,
+      bookedForUid: state.user.uid,
+      fromTime,
+      toTime,
+      createdBy: email,
+      bookingDate: Timestamp.fromDate(bookingDate),
+      createdAt: serverTimestamp(),
+      expiresAt: Timestamp.fromDate(expiresAt),
+    };
+
+    transaction.set(bookingRef, bookingPayload);
+    transaction.set(
+      lockRef,
+      {
+        slots: [...slots, { from: fromTime, to: toTime, bookingId: bookingRef.id }],
+      },
+      { merge: true }
+    );
+  });
+}
+
 async function cancelBooking(booking) {
   if (!state.user || !state.profile) return;
-  const ok = window.confirm(`Cancel booking for spot ${extractSpotNumber(booking.spot)} on ${formatLongDate(booking.bookingDate)}?`);
+  const ok = window.confirm(
+    `Cancel booking for spot ${extractSpotNumber(booking.spot)} on ${formatLongDate(booking.bookingDate)}?`
+  );
   if (!ok) return;
 
   try {
-    const email = state.user.email.toLowerCase();
+    const myEmail = String(state.user.email || "").trim().toLowerCase();
     const role = (state.profile.role || "").toLowerCase();
-    if (email !== booking.email.toLowerCase() && role !== "admin") {
+    const ownerEmail = String(booking.email || "").trim().toLowerCase();
+    if (myEmail !== ownerEmail && role !== "admin" && role !== "privileged") {
       throw new Error("You can cancel only your own bookings.");
     }
-    await deleteDoc(doc(db, "bookings", booking.id));
+
+    const bookingDateKey = toYmd(booking.bookingDate);
+    const lockRef = doc(db, "spot_locks", `${booking.spot}_${bookingDateKey}`);
+    const bookingRef = doc(db, "bookings", booking.id);
+
+    await runTransaction(db, async (transaction) => {
+      const lockSnap = await transaction.get(lockRef);
+      if (lockSnap.exists()) {
+        const slots = lockSnap.data()?.slots ?? [];
+        const updated = slots.filter((slot) => String(slot.bookingId || "") !== booking.id);
+        transaction.set(lockRef, { slots: updated }, { merge: true });
+      }
+      transaction.delete(bookingRef);
+    });
   } catch (err) {
     alert(err?.message || "Cancel failed.");
-  }
-}
-
-async function ensureSpotFreeForRange(spot, bookingDate, fromTime, toTime) {
-  const from = dayStart(toYmd(bookingDate));
-  const to = dayEndExclusive(toYmd(bookingDate));
-  const q = query(
-    collection(db, "bookings"),
-    where("spot", "==", spot),
-    where("bookingDate", ">=", Timestamp.fromDate(from)),
-    where("bookingDate", "<", Timestamp.fromDate(to))
-  );
-  const snap = await getDocs(q);
-  const conflicts = snap.docs
-    .map((d) => parseBooking(d.id, d.data()))
-    .filter(Boolean)
-    .some((b) => timesOverlap(fromTime, toTime, b.fromTime, b.toTime));
-  if (conflicts) {
-    throw new Error("This spot is already booked in that time range.");
   }
 }
 
@@ -506,7 +681,7 @@ async function onSaveProfile(event) {
     });
     state.profile = { ...state.profile, displayName, preferredVocative, registrationPlate, carDescription };
     renderGreeting();
-  } catch (err) {
+  } catch {
     ui.profileError.textContent = "Save failed.";
   } finally {
     ui.saveProfileBtn.disabled = false;
@@ -547,6 +722,35 @@ function clearAllListeners() {
   });
 }
 
+function setSelectedSpot(label) {
+  state.selectedSpotLabel = label || "";
+  ui.spotSelect.value = label || "";
+  ui.selectedSpotDisplay.value = label || "";
+}
+
+function ensureSelectedSpotIsValid() {
+  if (!state.selectedSpotLabel) return;
+  const exists = state.spots.some((spot) => spot.label === state.selectedSpotLabel && !spot.isBlocked);
+  if (!exists) setSelectedSpot("");
+}
+
+function dayOccupancyPercent(dayBookings) {
+  const blockedKeys = new Set(state.spots.filter((s) => s.isBlocked).map((s) => normalizedSpotKey(s.label)));
+  const usableCount = state.spots.filter((s) => !s.isBlocked).length;
+  if (!usableCount) return 0;
+  const bookedCount = new Set(
+    dayBookings
+      .map((b) => normalizedSpotKey(b.spot))
+      .filter((key) => !blockedKeys.has(key))
+  ).size;
+  return Math.max(0, Math.min(100, Math.round((bookedCount / usableCount) * 100)));
+}
+
+function shouldKeepBookingLocally(booking) {
+  const retentionCut = addDays(new Date(), -APP_RULES.bookingRetentionDays);
+  return bookingEndDate(booking.bookingDate, booking.toTime) >= retentionCut;
+}
+
 function byId(id) {
   return document.getElementById(id);
 }
@@ -570,9 +774,12 @@ function dayStart(dateYmd) {
   return new Date(y, m - 1, d, 0, 0, 0, 0);
 }
 
-function dayEndExclusive(dateYmd) {
-  const start = dayStart(dateYmd);
-  return new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1, 0, 0, 0, 0);
+function addDays(date, count) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + count, date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds());
+}
+
+function weekdayShort(date) {
+  return new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(date);
 }
 
 function formatShortDate(date) {
@@ -584,23 +791,68 @@ function formatLongDate(date) {
 }
 
 function firstName(value) {
-  return String(value || "").trim().split(/\s+/)[0] || "there";
+  return String(value || "")
+    .trim()
+    .split(/\s+/)[0] || "there";
+}
+
+function bookingEndDate(date, toTime) {
+  const [hour, minute] = String(toTime || "18:00")
+    .split(":")
+    .map((v) => Number(v));
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), Number.isFinite(hour) ? hour : 18, Number.isFinite(minute) ? minute : 0, 0, 0);
 }
 
 function parseBooking(id, data) {
-  const bookingDateRaw = data.bookingDate;
   let bookingDate = new Date();
-  if (bookingDateRaw?.toDate) bookingDate = bookingDateRaw.toDate();
-  else if (typeof bookingDateRaw === "string" || typeof bookingDateRaw === "number") bookingDate = new Date(bookingDateRaw);
+  const raw = data.bookingDate;
+  if (raw?.toDate) bookingDate = raw.toDate();
+  else if (typeof raw === "string") bookingDate = parseBookingDateString(raw);
+  else if (typeof raw === "number") bookingDate = new Date(raw);
 
-  const spot = String(data.spot ?? data.spotLabel ?? "");
-  const email = String(data.email ?? data.userEmail ?? "").toLowerCase();
+  if (!(bookingDate instanceof Date) || Number.isNaN(bookingDate.getTime())) return null;
+
+  const spot = String(data.spot ?? data.spotLabel ?? data.spotId ?? "");
+  if (!spot) return null;
+
+  const email = String(data.email ?? data.userEmail ?? data.bookedForEmail ?? data.ownerEmail ?? "")
+    .trim()
+    .toLowerCase();
+  const bookedForUid = String(data.bookedForUid ?? data.userUid ?? data.uid ?? data.userId ?? data.ownerUid ?? "").trim();
   const fromTime = String(data.fromTime ?? data.from ?? data.timeFrom ?? "07:00");
   const toTime = String(data.toTime ?? data.to ?? data.timeTo ?? "18:00");
   const user = String(data.user ?? data.displayName ?? "");
-  const createdBy = String(data.createdBy ?? data.adminEmail ?? "").toLowerCase();
-  if (!spot || !email) return null;
-  return { id, spot, bookingDate, email, fromTime, toTime, user, createdBy };
+  const createdBy = String(data.createdBy ?? data.adminEmail ?? "")
+    .trim()
+    .toLowerCase();
+
+  return { id, spot, bookingDate, email, bookedForUid, fromTime, toTime, user, createdBy };
+}
+
+function parseBookingDateString(value) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return dayStart(value);
+  }
+  return new Date(value);
+}
+
+function isBookingForCurrentUser(booking) {
+  const currentUid = String(state.user?.uid || "").trim();
+  const currentEmail = String(state.user?.email || "")
+    .trim()
+    .toLowerCase();
+  const bookingEmail = String(booking.email || "")
+    .trim()
+    .toLowerCase();
+  const creatorEmail = String(booking.createdBy || "")
+    .trim()
+    .toLowerCase();
+  const bookingUid = String(booking.bookedForUid || "").trim();
+
+  if (currentUid && bookingUid && currentUid === bookingUid) return true;
+  if (currentEmail && bookingEmail && currentEmail === bookingEmail) return true;
+  if (currentEmail && !bookingEmail && creatorEmail && currentEmail === creatorEmail) return true;
+  return false;
 }
 
 function parseSpot(id, data) {
@@ -614,12 +866,22 @@ function parseSpot(id, data) {
 }
 
 function parseAnnouncement(id, data) {
+  const createdAtRaw = data.createdAt;
+  let createdAtMs = 0;
+  if (createdAtRaw?.toDate) createdAtMs = createdAtRaw.toDate().getTime();
+  else if (typeof createdAtRaw === "string" || typeof createdAtRaw === "number") {
+    const parsed = new Date(createdAtRaw);
+    if (!Number.isNaN(parsed.getTime())) createdAtMs = parsed.getTime();
+  }
   return {
     id,
     title: String(data.title ?? ""),
     body: String(data.body ?? ""),
     emoji: String(data.emoji ?? "📣"),
+    isActive: Boolean(data.isActive),
     isPinned: Boolean(data.isPinned),
+    imageURL: String(data.imageURL ?? data.imageUrl ?? data.image ?? "").trim(),
+    createdAtMs,
   };
 }
 
@@ -637,13 +899,25 @@ function parseUser(data) {
 }
 
 function extractSpotNumber(spotLabel) {
-  const clean = String(spotLabel || "");
-  const fromParking = clean.replace(/^Parking\s+/i, "").trim();
-  return fromParking || clean;
+  const key = normalizedSpotKey(spotLabel);
+  return key || String(spotLabel || "");
+}
+
+function normalizedSpotKey(value) {
+  const trimmed = String(value || "").trim();
+  const match = trimmed.match(/\d+/);
+  return match?.[0] || trimmed.toLowerCase();
 }
 
 function timesOverlap(aFrom, aTo, bFrom, bTo) {
-  return aFrom < bTo && bFrom < aTo;
+  return toMinutes(aFrom) < toMinutes(bTo) && toMinutes(aTo) > toMinutes(bFrom);
+}
+
+function toMinutes(clock) {
+  const [h, m] = String(clock || "00:00")
+    .split(":")
+    .map(Number);
+  return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
 }
 
 function compareNumberString(a, b) {

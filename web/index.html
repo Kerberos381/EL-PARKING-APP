@@ -47,7 +47,7 @@
         <nav class="tabbar" aria-label="Main navigation">
           <button class="tab active" data-tab="home">Home</button>
           <button class="tab" data-tab="parking">Parking</button>
-          <button class="tab" data-tab="bookings">My Bookings</button>
+          <button class="tab" data-tab="bookings">Bookings</button>
           <button id="adminTab" class="tab hidden" data-tab="admin">Admin</button>
           <button class="tab" data-tab="settings">Settings</button>
         </nav>
@@ -85,6 +85,7 @@
                 <input id="parkingDateInput" type="date" />
               </label>
             </div>
+            <div id="dayPills" class="day-pills" aria-label="Day selector"></div>
             <div class="stats">
               <div><span id="freeCount">0</span><small>Free</small></div>
               <div><span id="bookedCount">0</span><small>Booked</small></div>
@@ -97,8 +98,17 @@
             <h3>Book a Spot</h3>
             <form id="bookForm" class="stack">
               <label class="field">
+                <span>Selected Spot</span>
+                <input
+                  id="selectedSpotDisplay"
+                  type="text"
+                  readonly
+                  placeholder="Tap a free spot in the grid above"
+                />
+              </label>
+              <label class="field">
                 <span>Spot</span>
-                <select id="spotSelect" required></select>
+                <select id="spotSelect" class="hidden-native-select" required></select>
               </label>
               <div class="row">
                 <label class="field grow">

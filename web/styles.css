@@ -18,6 +18,8 @@ html,
 body {
   margin: 0;
   padding: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -313,14 +315,22 @@ h3 {
 }
 
 .day-pills {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(68px, 1fr));
+  display: flex;
+  flex-wrap: nowrap;
   gap: 8px;
   overflow-x: auto;
   padding-bottom: 4px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
 }
 
 .day-pill {
+  flex: 0 0 108px;
+  scroll-snap-align: start;
   border: 1px solid #d9dde4;
   border-radius: 16px;
   background: #fbfcfd;
@@ -584,7 +594,12 @@ h3 {
   }
 
   .day-pills {
-    grid-template-columns: repeat(7, 78px);
+    gap: 10px;
+    padding-bottom: 6px;
+  }
+
+  .day-pill {
+    flex-basis: 96px;
   }
 
   .booking-row {

@@ -62,7 +62,6 @@ const ui = {
   heroTime: byId("heroTime"),
   announcementsList: byId("announcementsList"),
   refreshHome: byId("refreshHome"),
-  parkingDateInput: byId("parkingDateInput"),
   dayPills: byId("dayPills"),
   freeCount: byId("freeCount"),
   bookedCount: byId("bookedCount"),
@@ -127,7 +126,6 @@ async function boot() {
 }
 
 function bootstrap() {
-  ui.parkingDateInput.value = state.selectedDate;
   ui.bookDate.value = state.selectedDate;
   bindEvents();
   syncBookUiState();
@@ -141,17 +139,8 @@ function bindEvents() {
   ui.refreshHome.addEventListener("click", () => renderAnnouncements());
   ui.refreshBookings.addEventListener("click", () => renderMyBookings());
 
-  ui.parkingDateInput.addEventListener("change", () => {
-    state.selectedDate = ui.parkingDateInput.value || toYmd(new Date());
-    ui.bookDate.value = state.selectedDate;
-    recalculateDerivedBookings();
-    renderParking();
-    renderDayPills();
-  });
-
   ui.bookDate.addEventListener("change", () => {
     state.selectedDate = ui.bookDate.value || state.selectedDate;
-    ui.parkingDateInput.value = state.selectedDate;
     recalculateDerivedBookings();
     renderParking();
     renderDayPills();
@@ -426,7 +415,6 @@ function renderDayPills() {
     `;
     button.addEventListener("click", () => {
       state.selectedDate = ymd;
-      ui.parkingDateInput.value = ymd;
       ui.bookDate.value = ymd;
       recalculateDerivedBookings();
       renderParking();
@@ -502,6 +490,7 @@ function renderParking() {
         setSelectedSpot(spot.label);
         renderParking();
         syncBookUiState();
+        scrollBookingFormIntoView();
       });
     }
 
@@ -768,6 +757,15 @@ function syncBookUiState() {
 
   ui.selectedSpotHint.textContent = `Selected: Spot ${extractSpotNumber(state.selectedSpotLabel)}. Ready to confirm.`;
   ui.selectedSpotHint.classList.add("ok");
+}
+
+function scrollBookingFormIntoView() {
+  if (!ui.bookForm) return;
+  const rect = ui.bookForm.getBoundingClientRect();
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+  const alreadyVisible = rect.top >= 0 && rect.top <= viewportHeight * 0.6;
+  if (alreadyVisible) return;
+  ui.bookForm.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function ensureSelectedSpotIsValid() {

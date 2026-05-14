@@ -371,6 +371,7 @@ h3 {
 }
 
 .spot-cell {
+  position: relative;
   border-radius: 16px;
   border: 1px solid #dfe3ea;
   background: #fff;
@@ -378,6 +379,17 @@ h3 {
   min-height: 104px;
   text-align: left;
   cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.spot-cell[data-state="free"] {
+  border-color: #cfead7;
+  background: #f6fcf8;
+}
+
+.spot-cell[data-state="free"]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(24, 91, 40, 0.08);
 }
 
 .spot-cell strong {
@@ -404,8 +416,42 @@ h3 {
 }
 
 .spot-cell.selected {
-  border-color: #2db24d;
-  box-shadow: 0 0 0 2px rgba(53, 199, 89, 0.2) inset;
+  border-color: #1f9f45;
+  background: #e8f8ed;
+  box-shadow: 0 0 0 2px rgba(53, 199, 89, 0.3) inset, 0 8px 16px rgba(25, 95, 43, 0.14);
+}
+
+.spot-cell:disabled {
+  pointer-events: none;
+}
+
+.spot-cell-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 21px;
+  height: 21px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  background: #35c759;
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(34, 133, 58, 0.3);
+}
+
+.spot-grid-hint {
+  margin: 2px 0 10px;
+}
+
+.selection-hint {
+  margin: -2px 0 2px;
+}
+
+.selection-hint.ok {
+  color: #1f9f45;
+  font-weight: 640;
 }
 
 .booking-row {

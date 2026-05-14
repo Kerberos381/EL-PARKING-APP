@@ -1,1 +1,682 @@
-import { initializeApp } from \"https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js\";\nimport {\n  getAuth,\n  signInWithEmailAndPassword,\n  signOut,\n  onAuthStateChanged,\n  setPersistence,\n  browserSessionPersistence,\n} from \"https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js\";\nimport {\n  getFirestore,\n  collection,\n  doc,\n  setDoc,\n  getDoc,\n  updateDoc,\n  deleteDoc,\n  query,\n  where,\n  orderBy,\n  limit,\n  onSnapshot,\n  getDocs,\n  serverTimestamp,\n  Timestamp,\n} from \"https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js\";\nimport { firebaseConfig } from \"./firebase-config.js\";\n\nconst state = {\n  user: null,\n  profile: null,\n  selectedDate: toYmd(new Date()),\n  spots: [],\n  dayBookings: [],\n  myBookings: [],\n  announcements: [],\n  listeners: {\n    myBookings: null,\n    dayBookings: null,\n    spots: null,\n    announcements: null,\n    users: null,\n  },\n};\n\nconst ui = {\n  authView: byId(\"authView\"),\n  appView: byId(\"appView\"),\n  pendingView: byId(\"pendingView\"),\n  authError: byId(\"authError\"),\n  loginForm: byId(\"loginForm\"),\n  loginButton: byId(\"loginButton\"),\n  emailInput: byId(\"emailInput\"),\n  passwordInput: byId(\"passwordInput\"),\n  pendingSignOut: byId(\"pendingSignOut\"),\n  signOutButton: byId(\"signOutButton\"),\n  greetingText: byId(\"greetingText\"),\n  heroState: byId(\"heroState\"),\n  heroDate: byId(\"heroDate\"),\n  heroSpot: byId(\"heroSpot\"),\n  heroTime: byId(\"heroTime\"),\n  announcementsList: byId(\"announcementsList\"),\n  refreshHome: byId(\"refreshHome\"),\n  parkingDateInput: byId(\"parkingDateInput\"),\n  freeCount: byId(\"freeCount\"),\n  bookedCount: byId(\"bookedCount\"),\n  blockedCount: byId(\"blockedCount\"),\n  spotsGrid: byId(\"spotsGrid\"),\n  bookForm: byId(\"bookForm\"),\n  spotSelect: byId(\"spotSelect\"),\n  bookDate: byId(\"bookDate\"),\n  bookFrom: byId(\"bookFrom\"),\n  bookTo: byId(\"bookTo\"),\n  bookButton: byId(\"bookButton\"),\n  bookError: byId(\"bookError\"),\n  myBookingsList: byId(\"myBookingsList\"),\n  refreshBookings: byId(\"refreshBookings\"),\n  adminTab: byId(\"adminTab\"),\n  usersTotal: byId(\"usersTotal\"),\n  usersActive: byId(\"usersActive\"),\n  usersPending: byId(\"usersPending\"),\n  profileForm: byId(\"profileForm\"),\n  nameInput: byId(\"nameInput\"),\n  vocativeInput: byId(\"vocativeInput\"),\n  plateInput: byId(\"plateInput\"),\n  carInput: byId(\"carInput\"),\n  profileError: byId(\"profileError\"),\n  saveProfileBtn: byId(\"saveProfileBtn\"),\n  tabs: [...document.querySelectorAll(\".tab\")],\n  tabPanels: {\n    home: byId(\"homeTab\"),\n    parking: byId(\"parkingTab\"),\n    bookings: byId(\"bookingsTab\"),\n    admin: byId(\"adminTabPanel\"),\n    settings: byId(\"settingsTab\"),\n  },\n  bookingTemplate: byId(\"bookingRowTemplate\"),\n};\n\nconst app = initializeApp(firebaseConfig);\nconst auth = getAuth(app);\nconst db = getFirestore(app);\nawait setPersistence(auth, browserSessionPersistence);\n\nbootstrap();\n\nfunction bootstrap() {\n  ui.parkingDateInput.value = state.selectedDate;\n  ui.bookDate.value = state.selectedDate;\n  bindEvents();\n  onAuthStateChanged(auth, handleAuthState);\n}\n\nfunction bindEvents() {\n  ui.loginForm.addEventListener(\"submit\", onLoginSubmit);\n  ui.signOutButton.addEventListener(\"click\", () => signOut(auth));\n  ui.pendingSignOut.addEventListener(\"click\", () => signOut(auth));\n  ui.refreshHome.addEventListener(\"click\", () => renderAnnouncements());\n  ui.refreshBookings.addEventListener(\"click\", () => renderMyBookings());\n\n  ui.parkingDateInput.addEventListener(\"change\", () => {\n    state.selectedDate = ui.parkingDateInput.value || toYmd(new Date());\n    ui.bookDate.value = state.selectedDate;\n    subscribeDayBookings();\n  });\n\n  ui.bookForm.addEventListener(\"submit\", onBookSubmit);\n  ui.profileForm.addEventListener(\"submit\", onSaveProfile);\n  ui.tabs.forEach((tab) => tab.addEventListener(\"click\", () => switchTab(tab.dataset.tab)));\n}\n\nasync function handleAuthState(user) {\n  clearAllListeners();\n  state.user = user;\n  state.profile = null;\n\n  if (!user) {\n    showOnly(\"auth\");\n    ui.authError.textContent = \"\";\n    ui.passwordInput.value = \"\";\n    return;\n  }\n\n  const profileSnap = await getDoc(doc(db, \"users\", user.uid));\n  if (!profileSnap.exists()) {\n    await signOut(auth);\n    ui.authError.textContent = \"User profile not found.\";\n    return;\n  }\n\n  state.profile = parseUser(profileSnap.data());\n  const role = (state.profile.role || \"user\").toLowerCase();\n  const status = (state.profile.status || \"pending\").toLowerCase();\n\n  if (status !== \"active\") {\n    showOnly(\"pending\");\n    return;\n  }\n\n  showOnly(\"app\");\n  ui.adminTab.classList.toggle(\"hidden\", !(role === \"admin\" || role === \"privileged\"));\n  if (role !== \"admin\" && role !== \"privileged\") {\n    if (currentTab() === \"admin\") switchTab(\"home\");\n  }\n\n  hydrateProfileForm();\n  renderGreeting();\n  switchTab(\"home\");\n  subscribeCoreData();\n}\n\nasync function onLoginSubmit(event) {\n  event.preventDefault();\n  ui.authError.textContent = \"\";\n  const email = ui.emailInput.value.trim().toLowerCase();\n  const password = ui.passwordInput.value;\n\n  if (!email || password.length < 6) {\n    ui.authError.textContent = \"Use a valid email and password.\";\n    return;\n  }\n\n  ui.loginButton.disabled = true;\n  try {\n    await signInWithEmailAndPassword(auth, email, password);\n  } catch (err) {\n    ui.authError.textContent = friendlyAuthError(err);\n  } finally {\n    ui.loginButton.disabled = false;\n  }\n}\n\nfunction subscribeCoreData() {\n  subscribeSpots();\n  subscribeDayBookings();\n  subscribeMyBookings();\n  subscribeAnnouncements();\n  subscribeAdminStatsIfAllowed();\n}\n\nfunction subscribeSpots() {\n  state.listeners.spots?.();\n  state.listeners.spots = onSnapshot(\n    collection(db, \"parkingSpots\"),\n    (snap) => {\n      state.spots = snap.docs\n        .map((d) => parseSpot(d.id, d.data()))\n        .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999) || compareNumberString(a.id, b.id));\n      renderSpotSelect();\n      renderParking();\n    },\n    () => {\n      state.spots = [];\n      renderSpotSelect();\n      renderParking();\n    }\n  );\n}\n\nfunction subscribeDayBookings() {\n  state.listeners.dayBookings?.();\n  const from = dayStart(state.selectedDate);\n  const to = dayEndExclusive(state.selectedDate);\n  const q = query(\n    collection(db, \"bookings\"),\n    where(\"bookingDate\", \">=\", Timestamp.fromDate(from)),\n    where(\"bookingDate\", \"<\", Timestamp.fromDate(to)),\n    orderBy(\"bookingDate\", \"asc\")\n  );\n  state.listeners.dayBookings = onSnapshot(\n    q,\n    (snap) => {\n      state.dayBookings = snap.docs.map((d) => parseBooking(d.id, d.data())).filter(Boolean);\n      renderParking();\n    },\n    () => {\n      state.dayBookings = [];\n      renderParking();\n    }\n  );\n}\n\nfunction subscribeMyBookings() {\n  state.listeners.myBookings?.();\n  if (!state.user) return;\n  const email = state.user.email?.toLowerCase() || \"\";\n  const q = query(\n    collection(db, \"bookings\"),\n    where(\"email\", \"==\", email),\n    orderBy(\"bookingDate\", \"asc\"),\n    limit(200)\n  );\n  state.listeners.myBookings = onSnapshot(\n    q,\n    (snap) => {\n      state.myBookings = snap.docs.map((d) => parseBooking(d.id, d.data())).filter(Boolean);\n      renderHomeHero();\n      renderMyBookings();\n    },\n    () => {\n      state.myBookings = [];\n      renderHomeHero();\n      renderMyBookings();\n    }\n  );\n}\n\nfunction subscribeAnnouncements() {\n  state.listeners.announcements?.();\n  const q = query(\n    collection(db, \"announcements\"),\n    where(\"isActive\", \"==\", true),\n    orderBy(\"createdAt\", \"desc\"),\n    limit(12)\n  );\n  state.listeners.announcements = onSnapshot(\n    q,\n    (snap) => {\n      state.announcements = snap.docs.map((d) => parseAnnouncement(d.id, d.data())).filter(Boolean);\n      renderAnnouncements();\n    },\n    () => {\n      state.announcements = [];\n      renderAnnouncements();\n    }\n  );\n}\n\nfunction subscribeAdminStatsIfAllowed() {\n  state.listeners.users?.();\n  if (!state.profile || ![\"admin\", \"privileged\"].includes((state.profile.role || \"\").toLowerCase())) {\n    return;\n  }\n  state.listeners.users = onSnapshot(collection(db, \"users\"), (snap) => {\n    const users = snap.docs.map((d) => parseUser(d.data()));\n    ui.usersTotal.textContent = String(users.length);\n    ui.usersActive.textContent = String(users.filter((u) => (u.status || \"\").toLowerCase() === \"active\").length);\n    ui.usersPending.textContent = String(users.filter((u) => (u.status || \"\").toLowerCase() === \"pending\").length);\n  });\n}\n\nfunction renderGreeting() {\n  const name = (state.profile?.preferredVocative || \"\").trim() || firstName(state.profile?.displayName || state.user?.email || \"there\");\n  ui.greetingText.textContent = `Hello, ${name}`;\n}\n\nfunction renderHomeHero() {\n  const now = new Date();\n  const upcoming = state.myBookings\n    .slice()\n    .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime())\n    .find((b) => b.bookingDate >= dayStart(toYmd(now)));\n  if (!upcoming) {\n    ui.heroState.textContent = \"NO BOOKING\";\n    ui.heroDate.textContent = \"\";\n    ui.heroSpot.textContent = \"--\";\n    ui.heroTime.textContent = \"Book your next place\";\n    return;\n  }\n  const isToday = toYmd(upcoming.bookingDate) === toYmd(now);\n  ui.heroState.textContent = isToday ? \"ACTIVE\" : \"UPCOMING\";\n  ui.heroDate.textContent = `${isToday ? \"Today\" : \"Tomorrow\"} · ${formatShortDate(upcoming.bookingDate)}`;\n  ui.heroSpot.textContent = String(extractSpotNumber(upcoming.spot));\n  ui.heroTime.textContent = `${upcoming.fromTime} - ${upcoming.toTime}`;\n}\n\nfunction renderAnnouncements() {\n  ui.announcementsList.textContent = \"\";\n  const pinned = state.announcements.filter((a) => a.isPinned);\n  const list = pinned.length ? pinned : state.announcements;\n  if (!list.length) {\n    ui.announcementsList.append(textRow(\"No active announcements.\"));\n    return;\n  }\n  for (const item of list) {\n    const wrap = document.createElement(\"article\");\n    wrap.className = \"announcement\";\n    const h = document.createElement(\"h4\");\n    h.textContent = `${item.emoji || \"📣\"} ${item.title}`;\n    const p = document.createElement(\"p\");\n    p.textContent = item.body || \"\";\n    wrap.append(h, p);\n    ui.announcementsList.append(wrap);\n  }\n}\n\nfunction renderSpotSelect() {\n  ui.spotSelect.textContent = \"\";\n  const available = state.spots.filter((s) => !s.isBlocked);\n  for (const spot of available) {\n    const option = document.createElement(\"option\");\n    option.value = spot.label;\n    option.textContent = spot.label;\n    ui.spotSelect.append(option);\n  }\n}\n\nfunction renderParking() {\n  const blocked = new Set(state.spots.filter((s) => s.isBlocked).map((s) => s.label));\n  const booked = new Set(state.dayBookings.map((b) => b.spot));\n  const usable = state.spots.filter((s) => !s.isBlocked);\n\n  ui.freeCount.textContent = String(Math.max(usable.length - booked.size, 0));\n  ui.bookedCount.textContent = String(booked.size);\n  ui.blockedCount.textContent = String(blocked.size);\n\n  ui.spotsGrid.textContent = \"\";\n  for (const spot of state.spots) {\n    const cell = document.createElement(\"article\");\n    cell.className = \"spot-cell\";\n    let stateName = \"free\";\n    if (spot.isBlocked) stateName = \"blocked\";\n    else if (booked.has(spot.label)) stateName = \"booked\";\n    cell.dataset.state = stateName;\n\n    const strong = document.createElement(\"strong\");\n    strong.textContent = String(extractSpotNumber(spot.label));\n    const small = document.createElement(\"small\");\n    small.textContent = stateName.toUpperCase();\n    cell.append(strong, small);\n    ui.spotsGrid.append(cell);\n  }\n}\n\nfunction renderMyBookings() {\n  ui.myBookingsList.textContent = \"\";\n  const upcoming = state.myBookings\n    .slice()\n    .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime())\n    .filter((b) => b.bookingDate >= dayStart(toYmd(new Date())));\n  if (!upcoming.length) {\n    ui.myBookingsList.append(textRow(\"No upcoming bookings.\"));\n    renderHomeHero();\n    return;\n  }\n  for (const booking of upcoming) {\n    const node = ui.bookingTemplate.content.firstElementChild.cloneNode(true);\n    node.querySelector(\".title\").textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(booking.bookingDate)}`;\n    node.querySelector(\".meta\").textContent = `${booking.fromTime} - ${booking.toTime}`;\n    const cancel = node.querySelector(\"button\");\n    cancel.addEventListener(\"click\", () => cancelBooking(booking));\n    ui.myBookingsList.append(node);\n  }\n  renderHomeHero();\n}\n\nasync function onBookSubmit(event) {\n  event.preventDefault();\n  ui.bookError.textContent = \"\";\n  if (!state.user || !state.profile) return;\n\n  const spot = ui.spotSelect.value;\n  const dateYmd = ui.bookDate.value;\n  const fromTime = ui.bookFrom.value;\n  const toTime = ui.bookTo.value;\n\n  if (!spot || !dateYmd || !fromTime || !toTime || fromTime >= toTime) {\n    ui.bookError.textContent = \"Check date and time range.\";\n    return;\n  }\n\n  ui.bookButton.disabled = true;\n  try {\n    const date = dayStart(dateYmd);\n    await ensureSpotFreeForRange(spot, date, fromTime, toTime);\n\n    const bookingRef = doc(collection(db, \"bookings\"));\n    const email = state.user.email.toLowerCase();\n    await setDoc(bookingRef, {\n      id: bookingRef.id,\n      title: `Reservation for ${state.profile.displayName || email}`,\n      spot,\n      user: state.profile.displayName || email,\n      email,\n      fromTime,\n      toTime,\n      createdBy: email,\n      bookingDate: Timestamp.fromDate(date),\n      createdAt: serverTimestamp(),\n    });\n  } catch (err) {\n    ui.bookError.textContent = err?.message || \"Could not create booking.\";\n  } finally {\n    ui.bookButton.disabled = false;\n  }\n}\n\nasync function cancelBooking(booking) {\n  if (!state.user || !state.profile) return;\n  const ok = window.confirm(`Cancel booking for spot ${extractSpotNumber(booking.spot)} on ${formatLongDate(booking.bookingDate)}?`);\n  if (!ok) return;\n\n  try {\n    const email = state.user.email.toLowerCase();\n    const role = (state.profile.role || \"\").toLowerCase();\n    if (email !== booking.email.toLowerCase() && role !== \"admin\") {\n      throw new Error(\"You can cancel only your own bookings.\");\n    }\n    await deleteDoc(doc(db, \"bookings\", booking.id));\n  } catch (err) {\n    alert(err?.message || \"Cancel failed.\");\n  }\n}\n\nasync function ensureSpotFreeForRange(spot, bookingDate, fromTime, toTime) {\n  const from = dayStart(toYmd(bookingDate));\n  const to = dayEndExclusive(toYmd(bookingDate));\n  const q = query(\n    collection(db, \"bookings\"),\n    where(\"spot\", \"==\", spot),\n    where(\"bookingDate\", \">=\", Timestamp.fromDate(from)),\n    where(\"bookingDate\", \"<\", Timestamp.fromDate(to))\n  );\n  const snap = await getDocs(q);\n  const conflicts = snap.docs\n    .map((d) => parseBooking(d.id, d.data()))\n    .filter(Boolean)\n    .some((b) => timesOverlap(fromTime, toTime, b.fromTime, b.toTime));\n  if (conflicts) {\n    throw new Error(\"This spot is already booked in that time range.\");\n  }\n}\n\nasync function onSaveProfile(event) {\n  event.preventDefault();\n  ui.profileError.textContent = \"\";\n  if (!state.user || !state.profile) return;\n\n  const displayName = ui.nameInput.value.trim();\n  const preferredVocative = ui.vocativeInput.value.trim();\n  const registrationPlate = ui.plateInput.value.trim().toUpperCase();\n  const carDescription = ui.carInput.value.trim();\n\n  if (displayName.length < 2) {\n    ui.profileError.textContent = \"Display name is too short.\";\n    return;\n  }\n\n  ui.saveProfileBtn.disabled = true;\n  try {\n    await updateDoc(doc(db, \"users\", state.user.uid), {\n      displayName,\n      preferredVocative,\n      registrationPlate,\n      carDescription,\n    });\n    state.profile = { ...state.profile, displayName, preferredVocative, registrationPlate, carDescription };\n    renderGreeting();\n  } catch (err) {\n    ui.profileError.textContent = \"Save failed.\";\n  } finally {\n    ui.saveProfileBtn.disabled = false;\n  }\n}\n\nfunction hydrateProfileForm() {\n  ui.nameInput.value = state.profile?.displayName || \"\";\n  ui.vocativeInput.value = state.profile?.preferredVocative || \"\";\n  ui.plateInput.value = state.profile?.registrationPlate || \"\";\n  ui.carInput.value = state.profile?.carDescription || \"\";\n}\n\nfunction switchTab(tab) {\n  if (!tab) return;\n  for (const [name, panel] of Object.entries(ui.tabPanels)) {\n    panel.classList.toggle(\"hidden\", name !== tab);\n  }\n  for (const btn of ui.tabs) {\n    btn.classList.toggle(\"active\", btn.dataset.tab === tab);\n  }\n}\n\nfunction currentTab() {\n  return ui.tabs.find((tab) => tab.classList.contains(\"active\"))?.dataset.tab || \"home\";\n}\n\nfunction showOnly(mode) {\n  ui.authView.classList.toggle(\"hidden\", mode !== \"auth\");\n  ui.appView.classList.toggle(\"hidden\", mode !== \"app\");\n  ui.pendingView.classList.toggle(\"hidden\", mode !== \"pending\");\n}\n\nfunction clearAllListeners() {\n  Object.keys(state.listeners).forEach((key) => {\n    if (typeof state.listeners[key] === \"function\") state.listeners[key]();\n    state.listeners[key] = null;\n  });\n}\n\nfunction byId(id) {\n  return document.getElementById(id);\n}\n\nfunction textRow(message) {\n  const p = document.createElement(\"p\");\n  p.className = \"muted\";\n  p.textContent = message;\n  return p;\n}\n\nfunction toYmd(date) {\n  const yyyy = date.getFullYear();\n  const mm = String(date.getMonth() + 1).padStart(2, \"0\");\n  const dd = String(date.getDate()).padStart(2, \"0\");\n  return `${yyyy}-${mm}-${dd}`;\n}\n\nfunction dayStart(dateYmd) {\n  const [y, m, d] = dateYmd.split(\"-\").map(Number);\n  return new Date(y, m - 1, d, 0, 0, 0, 0);\n}\n\nfunction dayEndExclusive(dateYmd) {\n  const start = dayStart(dateYmd);\n  return new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1, 0, 0, 0, 0);\n}\n\nfunction formatShortDate(date) {\n  return new Intl.DateTimeFormat(\"cs-CZ\", { weekday: \"short\", day: \"numeric\", month: \"short\" }).format(date);\n}\n\nfunction formatLongDate(date) {\n  return new Intl.DateTimeFormat(\"cs-CZ\", { day: \"2-digit\", month: \"2-digit\", year: \"numeric\" }).format(date);\n}\n\nfunction firstName(value) {\n  return String(value || \"\").trim().split(/\\s+/)[0] || \"there\";\n}\n\nfunction parseBooking(id, data) {\n  const bookingDateRaw = data.bookingDate;\n  let bookingDate = new Date();\n  if (bookingDateRaw?.toDate) bookingDate = bookingDateRaw.toDate();\n  else if (typeof bookingDateRaw === \"string\" || typeof bookingDateRaw === \"number\") bookingDate = new Date(bookingDateRaw);\n\n  const spot = String(data.spot ?? data.spotLabel ?? \"\");\n  const email = String(data.email ?? data.userEmail ?? \"\").toLowerCase();\n  const fromTime = String(data.fromTime ?? data.from ?? data.timeFrom ?? \"07:00\");\n  const toTime = String(data.toTime ?? data.to ?? data.timeTo ?? \"18:00\");\n  const user = String(data.user ?? data.displayName ?? \"\");\n  const createdBy = String(data.createdBy ?? data.adminEmail ?? \"\").toLowerCase();\n  if (!spot || !email) return null;\n  return { id, spot, bookingDate, email, fromTime, toTime, user, createdBy };\n}\n\nfunction parseSpot(id, data) {\n  return {\n    id: String(data.id ?? id),\n    label: String(data.label ?? `Parking ${id}`),\n    isAccessible: Boolean(data.isAccessible),\n    isBlocked: Boolean(data.isBlocked),\n    sortOrder: Number(data.sortOrder ?? 999),\n  };\n}\n\nfunction parseAnnouncement(id, data) {\n  return {\n    id,\n    title: String(data.title ?? \"\"),\n    body: String(data.body ?? \"\"),\n    emoji: String(data.emoji ?? \"📣\"),\n    isPinned: Boolean(data.isPinned),\n  };\n}\n\nfunction parseUser(data) {\n  return {\n    uid: String(data.uid ?? \"\"),\n    email: String(data.email ?? \"\").toLowerCase(),\n    displayName: String(data.displayName ?? \"\"),\n    role: String(data.role ?? \"user\"),\n    status: String(data.status ?? \"pending\"),\n    registrationPlate: String(data.registrationPlate ?? \"\"),\n    carDescription: String(data.carDescription ?? \"\"),\n    preferredVocative: String(data.preferredVocative ?? \"\"),\n  };\n}\n\nfunction extractSpotNumber(spotLabel) {\n  const clean = String(spotLabel || \"\");\n  const fromParking = clean.replace(/^Parking\\s+/i, \"\").trim();\n  return fromParking || clean;\n}\n\nfunction timesOverlap(aFrom, aTo, bFrom, bTo) {\n  return aFrom < bTo && bFrom < aTo;\n}\n\nfunction compareNumberString(a, b) {\n  const na = Number(a);\n  const nb = Number(b);\n  if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;\n  return String(a).localeCompare(String(b));\n}\n\nfunction friendlyAuthError(err) {\n  const code = err?.code || \"\";\n  if (code.includes(\"invalid-credential\")) return \"Invalid email or password.\";\n  if (code.includes(\"too-many-requests\")) return \"Too many attempts, try again shortly.\";\n  if (code.includes(\"network-request-failed\")) return \"Network error. Check connection.\";\n  return \"Sign in failed.\";\n}\n
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  setPersistence,
+  browserSessionPersistence,
+} from "https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js";
+import {
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  onSnapshot,
+  getDocs,
+  serverTimestamp,
+  Timestamp,
+} from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
+import { firebaseConfig } from "./firebase-config.js";
+
+const state = {
+  user: null,
+  profile: null,
+  selectedDate: toYmd(new Date()),
+  spots: [],
+  dayBookings: [],
+  myBookings: [],
+  announcements: [],
+  listeners: {
+    myBookings: null,
+    dayBookings: null,
+    spots: null,
+    announcements: null,
+    users: null,
+  },
+};
+
+const ui = {
+  authView: byId("authView"),
+  appView: byId("appView"),
+  pendingView: byId("pendingView"),
+  authError: byId("authError"),
+  loginForm: byId("loginForm"),
+  loginButton: byId("loginButton"),
+  emailInput: byId("emailInput"),
+  passwordInput: byId("passwordInput"),
+  pendingSignOut: byId("pendingSignOut"),
+  signOutButton: byId("signOutButton"),
+  greetingText: byId("greetingText"),
+  heroState: byId("heroState"),
+  heroDate: byId("heroDate"),
+  heroSpot: byId("heroSpot"),
+  heroTime: byId("heroTime"),
+  announcementsList: byId("announcementsList"),
+  refreshHome: byId("refreshHome"),
+  parkingDateInput: byId("parkingDateInput"),
+  freeCount: byId("freeCount"),
+  bookedCount: byId("bookedCount"),
+  blockedCount: byId("blockedCount"),
+  spotsGrid: byId("spotsGrid"),
+  bookForm: byId("bookForm"),
+  spotSelect: byId("spotSelect"),
+  bookDate: byId("bookDate"),
+  bookFrom: byId("bookFrom"),
+  bookTo: byId("bookTo"),
+  bookButton: byId("bookButton"),
+  bookError: byId("bookError"),
+  myBookingsList: byId("myBookingsList"),
+  refreshBookings: byId("refreshBookings"),
+  adminTab: byId("adminTab"),
+  usersTotal: byId("usersTotal"),
+  usersActive: byId("usersActive"),
+  usersPending: byId("usersPending"),
+  profileForm: byId("profileForm"),
+  nameInput: byId("nameInput"),
+  vocativeInput: byId("vocativeInput"),
+  plateInput: byId("plateInput"),
+  carInput: byId("carInput"),
+  profileError: byId("profileError"),
+  saveProfileBtn: byId("saveProfileBtn"),
+  tabs: [...document.querySelectorAll(".tab")],
+  tabPanels: {
+    home: byId("homeTab"),
+    parking: byId("parkingTab"),
+    bookings: byId("bookingsTab"),
+    admin: byId("adminTabPanel"),
+    settings: byId("settingsTab"),
+  },
+  bookingTemplate: byId("bookingRowTemplate"),
+};
+
+let auth;
+let db;
+
+boot();
+
+async function boot() {
+  // Never let startup fail silently; keep form from hard-refresh fallback.
+  ui.loginForm.addEventListener("submit", (event) => event.preventDefault(), { capture: true });
+  try {
+    const app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    try {
+      await setPersistence(auth, browserSessionPersistence);
+    } catch (persistError) {
+      // Continue with default persistence if browser/session storage is restricted.
+      console.warn("setPersistence failed, continuing with default:", persistError);
+    }
+    bootstrap();
+  } catch (error) {
+    console.error("Web app bootstrap failed:", error);
+    ui.authError.textContent =
+      "Initialization failed. Open browser console and send me the first red error line.";
+    ui.loginButton.disabled = true;
+  }
+}
+
+function bootstrap() {
+  ui.parkingDateInput.value = state.selectedDate;
+  ui.bookDate.value = state.selectedDate;
+  bindEvents();
+  onAuthStateChanged(auth, handleAuthState);
+}
+
+function bindEvents() {
+  ui.loginForm.addEventListener("submit", onLoginSubmit);
+  ui.signOutButton.addEventListener("click", () => signOut(auth));
+  ui.pendingSignOut.addEventListener("click", () => signOut(auth));
+  ui.refreshHome.addEventListener("click", () => renderAnnouncements());
+  ui.refreshBookings.addEventListener("click", () => renderMyBookings());
+
+  ui.parkingDateInput.addEventListener("change", () => {
+    state.selectedDate = ui.parkingDateInput.value || toYmd(new Date());
+    ui.bookDate.value = state.selectedDate;
+    subscribeDayBookings();
+  });
+
+  ui.bookForm.addEventListener("submit", onBookSubmit);
+  ui.profileForm.addEventListener("submit", onSaveProfile);
+  ui.tabs.forEach((tab) => tab.addEventListener("click", () => switchTab(tab.dataset.tab)));
+}
+
+async function handleAuthState(user) {
+  clearAllListeners();
+  state.user = user;
+  state.profile = null;
+
+  if (!user) {
+    showOnly("auth");
+    ui.authError.textContent = "";
+    ui.passwordInput.value = "";
+    return;
+  }
+
+  const profileSnap = await getDoc(doc(db, "users", user.uid));
+  if (!profileSnap.exists()) {
+    await signOut(auth);
+    ui.authError.textContent = "User profile not found.";
+    return;
+  }
+
+  state.profile = parseUser(profileSnap.data());
+  const role = (state.profile.role || "user").toLowerCase();
+  const status = (state.profile.status || "pending").toLowerCase();
+
+  if (status !== "active") {
+    showOnly("pending");
+    return;
+  }
+
+  showOnly("app");
+  ui.adminTab.classList.toggle("hidden", !(role === "admin" || role === "privileged"));
+  if (role !== "admin" && role !== "privileged") {
+    if (currentTab() === "admin") switchTab("home");
+  }
+
+  hydrateProfileForm();
+  renderGreeting();
+  switchTab("home");
+  subscribeCoreData();
+}
+
+async function onLoginSubmit(event) {
+  event.preventDefault();
+  ui.authError.textContent = "";
+  const email = ui.emailInput.value.trim().toLowerCase();
+  const password = ui.passwordInput.value;
+
+  if (!email || password.length < 6) {
+    ui.authError.textContent = "Use a valid email and password.";
+    return;
+  }
+
+  ui.loginButton.disabled = true;
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (err) {
+    ui.authError.textContent = friendlyAuthError(err);
+  } finally {
+    ui.loginButton.disabled = false;
+  }
+}
+
+function subscribeCoreData() {
+  subscribeSpots();
+  subscribeDayBookings();
+  subscribeMyBookings();
+  subscribeAnnouncements();
+  subscribeAdminStatsIfAllowed();
+}
+
+function subscribeSpots() {
+  state.listeners.spots?.();
+  state.listeners.spots = onSnapshot(
+    collection(db, "parkingSpots"),
+    (snap) => {
+      state.spots = snap.docs
+        .map((d) => parseSpot(d.id, d.data()))
+        .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999) || compareNumberString(a.id, b.id));
+      renderSpotSelect();
+      renderParking();
+    },
+    () => {
+      state.spots = [];
+      renderSpotSelect();
+      renderParking();
+    }
+  );
+}
+
+function subscribeDayBookings() {
+  state.listeners.dayBookings?.();
+  const from = dayStart(state.selectedDate);
+  const to = dayEndExclusive(state.selectedDate);
+  const q = query(
+    collection(db, "bookings"),
+    where("bookingDate", ">=", Timestamp.fromDate(from)),
+    where("bookingDate", "<", Timestamp.fromDate(to)),
+    orderBy("bookingDate", "asc")
+  );
+  state.listeners.dayBookings = onSnapshot(
+    q,
+    (snap) => {
+      state.dayBookings = snap.docs.map((d) => parseBooking(d.id, d.data())).filter(Boolean);
+      renderParking();
+    },
+    () => {
+      state.dayBookings = [];
+      renderParking();
+    }
+  );
+}
+
+function subscribeMyBookings() {
+  state.listeners.myBookings?.();
+  if (!state.user) return;
+  const email = state.user.email?.toLowerCase() || "";
+  const q = query(
+    collection(db, "bookings"),
+    where("email", "==", email),
+    orderBy("bookingDate", "asc"),
+    limit(200)
+  );
+  state.listeners.myBookings = onSnapshot(
+    q,
+    (snap) => {
+      state.myBookings = snap.docs.map((d) => parseBooking(d.id, d.data())).filter(Boolean);
+      renderHomeHero();
+      renderMyBookings();
+    },
+    () => {
+      state.myBookings = [];
+      renderHomeHero();
+      renderMyBookings();
+    }
+  );
+}
+
+function subscribeAnnouncements() {
+  state.listeners.announcements?.();
+  const q = query(
+    collection(db, "announcements"),
+    where("isActive", "==", true),
+    orderBy("createdAt", "desc"),
+    limit(12)
+  );
+  state.listeners.announcements = onSnapshot(
+    q,
+    (snap) => {
+      state.announcements = snap.docs.map((d) => parseAnnouncement(d.id, d.data())).filter(Boolean);
+      renderAnnouncements();
+    },
+    () => {
+      state.announcements = [];
+      renderAnnouncements();
+    }
+  );
+}
+
+function subscribeAdminStatsIfAllowed() {
+  state.listeners.users?.();
+  if (!state.profile || !["admin", "privileged"].includes((state.profile.role || "").toLowerCase())) {
+    return;
+  }
+  state.listeners.users = onSnapshot(collection(db, "users"), (snap) => {
+    const users = snap.docs.map((d) => parseUser(d.data()));
+    ui.usersTotal.textContent = String(users.length);
+    ui.usersActive.textContent = String(users.filter((u) => (u.status || "").toLowerCase() === "active").length);
+    ui.usersPending.textContent = String(users.filter((u) => (u.status || "").toLowerCase() === "pending").length);
+  });
+}
+
+function renderGreeting() {
+  const name = (state.profile?.preferredVocative || "").trim() || firstName(state.profile?.displayName || state.user?.email || "there");
+  ui.greetingText.textContent = `Hello, ${name}`;
+}
+
+function renderHomeHero() {
+  const now = new Date();
+  const upcoming = state.myBookings
+    .slice()
+    .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime())
+    .find((b) => b.bookingDate >= dayStart(toYmd(now)));
+  if (!upcoming) {
+    ui.heroState.textContent = "NO BOOKING";
+    ui.heroDate.textContent = "";
+    ui.heroSpot.textContent = "--";
+    ui.heroTime.textContent = "Book your next place";
+    return;
+  }
+  const isToday = toYmd(upcoming.bookingDate) === toYmd(now);
+  ui.heroState.textContent = isToday ? "ACTIVE" : "UPCOMING";
+  ui.heroDate.textContent = `${isToday ? "Today" : "Tomorrow"} · ${formatShortDate(upcoming.bookingDate)}`;
+  ui.heroSpot.textContent = String(extractSpotNumber(upcoming.spot));
+  ui.heroTime.textContent = `${upcoming.fromTime} - ${upcoming.toTime}`;
+}
+
+function renderAnnouncements() {
+  ui.announcementsList.textContent = "";
+  const pinned = state.announcements.filter((a) => a.isPinned);
+  const list = pinned.length ? pinned : state.announcements;
+  if (!list.length) {
+    ui.announcementsList.append(textRow("No active announcements."));
+    return;
+  }
+  for (const item of list) {
+    const wrap = document.createElement("article");
+    wrap.className = "announcement";
+    const h = document.createElement("h4");
+    h.textContent = `${item.emoji || "📣"} ${item.title}`;
+    const p = document.createElement("p");
+    p.textContent = item.body || "";
+    wrap.append(h, p);
+    ui.announcementsList.append(wrap);
+  }
+}
+
+function renderSpotSelect() {
+  ui.spotSelect.textContent = "";
+  const available = state.spots.filter((s) => !s.isBlocked);
+  for (const spot of available) {
+    const option = document.createElement("option");
+    option.value = spot.label;
+    option.textContent = spot.label;
+    ui.spotSelect.append(option);
+  }
+}
+
+function renderParking() {
+  const blocked = new Set(state.spots.filter((s) => s.isBlocked).map((s) => s.label));
+  const booked = new Set(state.dayBookings.map((b) => b.spot));
+  const usable = state.spots.filter((s) => !s.isBlocked);
+
+  ui.freeCount.textContent = String(Math.max(usable.length - booked.size, 0));
+  ui.bookedCount.textContent = String(booked.size);
+  ui.blockedCount.textContent = String(blocked.size);
+
+  ui.spotsGrid.textContent = "";
+  for (const spot of state.spots) {
+    const cell = document.createElement("article");
+    cell.className = "spot-cell";
+    let stateName = "free";
+    if (spot.isBlocked) stateName = "blocked";
+    else if (booked.has(spot.label)) stateName = "booked";
+    cell.dataset.state = stateName;
+
+    const strong = document.createElement("strong");
+    strong.textContent = String(extractSpotNumber(spot.label));
+    const small = document.createElement("small");
+    small.textContent = stateName.toUpperCase();
+    cell.append(strong, small);
+    ui.spotsGrid.append(cell);
+  }
+}
+
+function renderMyBookings() {
+  ui.myBookingsList.textContent = "";
+  const upcoming = state.myBookings
+    .slice()
+    .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime())
+    .filter((b) => b.bookingDate >= dayStart(toYmd(new Date())));
+  if (!upcoming.length) {
+    ui.myBookingsList.append(textRow("No upcoming bookings."));
+    renderHomeHero();
+    return;
+  }
+  for (const booking of upcoming) {
+    const node = ui.bookingTemplate.content.firstElementChild.cloneNode(true);
+    node.querySelector(".title").textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(booking.bookingDate)}`;
+    node.querySelector(".meta").textContent = `${booking.fromTime} - ${booking.toTime}`;
+    const cancel = node.querySelector("button");
+    cancel.addEventListener("click", () => cancelBooking(booking));
+    ui.myBookingsList.append(node);
+  }
+  renderHomeHero();
+}
+
+async function onBookSubmit(event) {
+  event.preventDefault();
+  ui.bookError.textContent = "";
+  if (!state.user || !state.profile) return;
+
+  const spot = ui.spotSelect.value;
+  const dateYmd = ui.bookDate.value;
+  const fromTime = ui.bookFrom.value;
+  const toTime = ui.bookTo.value;
+
+  if (!spot || !dateYmd || !fromTime || !toTime || fromTime >= toTime) {
+    ui.bookError.textContent = "Check date and time range.";
+    return;
+  }
+
+  ui.bookButton.disabled = true;
+  try {
+    const date = dayStart(dateYmd);
+    await ensureSpotFreeForRange(spot, date, fromTime, toTime);
+
+    const bookingRef = doc(collection(db, "bookings"));
+    const email = state.user.email.toLowerCase();
+    await setDoc(bookingRef, {
+      id: bookingRef.id,
+      title: `Reservation for ${state.profile.displayName || email}`,
+      spot,
+      user: state.profile.displayName || email,
+      email,
+      fromTime,
+      toTime,
+      createdBy: email,
+      bookingDate: Timestamp.fromDate(date),
+      createdAt: serverTimestamp(),
+    });
+  } catch (err) {
+    ui.bookError.textContent = err?.message || "Could not create booking.";
+  } finally {
+    ui.bookButton.disabled = false;
+  }
+}
+
+async function cancelBooking(booking) {
+  if (!state.user || !state.profile) return;
+  const ok = window.confirm(`Cancel booking for spot ${extractSpotNumber(booking.spot)} on ${formatLongDate(booking.bookingDate)}?`);
+  if (!ok) return;
+
+  try {
+    const email = state.user.email.toLowerCase();
+    const role = (state.profile.role || "").toLowerCase();
+    if (email !== booking.email.toLowerCase() && role !== "admin") {
+      throw new Error("You can cancel only your own bookings.");
+    }
+    await deleteDoc(doc(db, "bookings", booking.id));
+  } catch (err) {
+    alert(err?.message || "Cancel failed.");
+  }
+}
+
+async function ensureSpotFreeForRange(spot, bookingDate, fromTime, toTime) {
+  const from = dayStart(toYmd(bookingDate));
+  const to = dayEndExclusive(toYmd(bookingDate));
+  const q = query(
+    collection(db, "bookings"),
+    where("spot", "==", spot),
+    where("bookingDate", ">=", Timestamp.fromDate(from)),
+    where("bookingDate", "<", Timestamp.fromDate(to))
+  );
+  const snap = await getDocs(q);
+  const conflicts = snap.docs
+    .map((d) => parseBooking(d.id, d.data()))
+    .filter(Boolean)
+    .some((b) => timesOverlap(fromTime, toTime, b.fromTime, b.toTime));
+  if (conflicts) {
+    throw new Error("This spot is already booked in that time range.");
+  }
+}
+
+async function onSaveProfile(event) {
+  event.preventDefault();
+  ui.profileError.textContent = "";
+  if (!state.user || !state.profile) return;
+
+  const displayName = ui.nameInput.value.trim();
+  const preferredVocative = ui.vocativeInput.value.trim();
+  const registrationPlate = ui.plateInput.value.trim().toUpperCase();
+  const carDescription = ui.carInput.value.trim();
+
+  if (displayName.length < 2) {
+    ui.profileError.textContent = "Display name is too short.";
+    return;
+  }
+
+  ui.saveProfileBtn.disabled = true;
+  try {
+    await updateDoc(doc(db, "users", state.user.uid), {
+      displayName,
+      preferredVocative,
+      registrationPlate,
+      carDescription,
+    });
+    state.profile = { ...state.profile, displayName, preferredVocative, registrationPlate, carDescription };
+    renderGreeting();
+  } catch (err) {
+    ui.profileError.textContent = "Save failed.";
+  } finally {
+    ui.saveProfileBtn.disabled = false;
+  }
+}
+
+function hydrateProfileForm() {
+  ui.nameInput.value = state.profile?.displayName || "";
+  ui.vocativeInput.value = state.profile?.preferredVocative || "";
+  ui.plateInput.value = state.profile?.registrationPlate || "";
+  ui.carInput.value = state.profile?.carDescription || "";
+}
+
+function switchTab(tab) {
+  if (!tab) return;
+  for (const [name, panel] of Object.entries(ui.tabPanels)) {
+    panel.classList.toggle("hidden", name !== tab);
+  }
+  for (const btn of ui.tabs) {
+    btn.classList.toggle("active", btn.dataset.tab === tab);
+  }
+}
+
+function currentTab() {
+  return ui.tabs.find((tab) => tab.classList.contains("active"))?.dataset.tab || "home";
+}
+
+function showOnly(mode) {
+  ui.authView.classList.toggle("hidden", mode !== "auth");
+  ui.appView.classList.toggle("hidden", mode !== "app");
+  ui.pendingView.classList.toggle("hidden", mode !== "pending");
+}
+
+function clearAllListeners() {
+  Object.keys(state.listeners).forEach((key) => {
+    if (typeof state.listeners[key] === "function") state.listeners[key]();
+    state.listeners[key] = null;
+  });
+}
+
+function byId(id) {
+  return document.getElementById(id);
+}
+
+function textRow(message) {
+  const p = document.createElement("p");
+  p.className = "muted";
+  p.textContent = message;
+  return p;
+}
+
+function toYmd(date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function dayStart(dateYmd) {
+  const [y, m, d] = dateYmd.split("-").map(Number);
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
+}
+
+function dayEndExclusive(dateYmd) {
+  const start = dayStart(dateYmd);
+  return new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1, 0, 0, 0, 0);
+}
+
+function formatShortDate(date) {
+  return new Intl.DateTimeFormat("cs-CZ", { weekday: "short", day: "numeric", month: "short" }).format(date);
+}
+
+function formatLongDate(date) {
+  return new Intl.DateTimeFormat("cs-CZ", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+}
+
+function firstName(value) {
+  return String(value || "").trim().split(/\s+/)[0] || "there";
+}
+
+function parseBooking(id, data) {
+  const bookingDateRaw = data.bookingDate;
+  let bookingDate = new Date();
+  if (bookingDateRaw?.toDate) bookingDate = bookingDateRaw.toDate();
+  else if (typeof bookingDateRaw === "string" || typeof bookingDateRaw === "number") bookingDate = new Date(bookingDateRaw);
+
+  const spot = String(data.spot ?? data.spotLabel ?? "");
+  const email = String(data.email ?? data.userEmail ?? "").toLowerCase();
+  const fromTime = String(data.fromTime ?? data.from ?? data.timeFrom ?? "07:00");
+  const toTime = String(data.toTime ?? data.to ?? data.timeTo ?? "18:00");
+  const user = String(data.user ?? data.displayName ?? "");
+  const createdBy = String(data.createdBy ?? data.adminEmail ?? "").toLowerCase();
+  if (!spot || !email) return null;
+  return { id, spot, bookingDate, email, fromTime, toTime, user, createdBy };
+}
+
+function parseSpot(id, data) {
+  return {
+    id: String(data.id ?? id),
+    label: String(data.label ?? `Parking ${id}`),
+    isAccessible: Boolean(data.isAccessible),
+    isBlocked: Boolean(data.isBlocked),
+    sortOrder: Number(data.sortOrder ?? 999),
+  };
+}
+
+function parseAnnouncement(id, data) {
+  return {
+    id,
+    title: String(data.title ?? ""),
+    body: String(data.body ?? ""),
+    emoji: String(data.emoji ?? "📣"),
+    isPinned: Boolean(data.isPinned),
+  };
+}
+
+function parseUser(data) {
+  return {
+    uid: String(data.uid ?? ""),
+    email: String(data.email ?? "").toLowerCase(),
+    displayName: String(data.displayName ?? ""),
+    role: String(data.role ?? "user"),
+    status: String(data.status ?? "pending"),
+    registrationPlate: String(data.registrationPlate ?? ""),
+    carDescription: String(data.carDescription ?? ""),
+    preferredVocative: String(data.preferredVocative ?? ""),
+  };
+}
+
+function extractSpotNumber(spotLabel) {
+  const clean = String(spotLabel || "");
+  const fromParking = clean.replace(/^Parking\s+/i, "").trim();
+  return fromParking || clean;
+}
+
+function timesOverlap(aFrom, aTo, bFrom, bTo) {
+  return aFrom < bTo && bFrom < aTo;
+}
+
+function compareNumberString(a, b) {
+  const na = Number(a);
+  const nb = Number(b);
+  if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+  return String(a).localeCompare(String(b));
+}
+
+function friendlyAuthError(err) {
+  const code = err?.code || "";
+  if (code.includes("invalid-credential")) return "Invalid email or password.";
+  if (code.includes("too-many-requests")) return "Too many attempts, try again shortly.";
+  if (code.includes("network-request-failed")) return "Network error. Check connection.";
+  return "Sign in failed.";
+}

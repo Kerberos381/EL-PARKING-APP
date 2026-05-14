@@ -37,9 +37,11 @@ body {
 }
 
 .app {
-  width: min(980px, 100vw);
+  width: 100%;
+  max-width: 980px;
   margin: 0 auto;
   padding: max(16px, env(safe-area-inset-top)) 16px calc(102px + env(safe-area-inset-bottom));
+  overflow-x: hidden;
 }
 
 .hidden {
@@ -83,6 +85,7 @@ h3 {
   border-radius: var(--radius-card);
   padding: 20px;
   box-shadow: var(--shadow-soft);
+  min-width: 0;
 }
 
 .dark {
@@ -170,6 +173,7 @@ h3 {
 .tabpanel {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .stack {
@@ -655,7 +659,12 @@ h3 {
   }
 
   .spot-grid {
-    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .spot-cell {
+    min-height: 118px;
   }
 
   .day-pills {
@@ -702,5 +711,9 @@ h3 {
 
   .hero-spot {
     font-size: 52px;
+  }
+
+  .spot-grid {
+    grid-template-columns: 1fr;
   }
 }

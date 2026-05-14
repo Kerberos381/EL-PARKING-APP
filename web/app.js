@@ -62,7 +62,6 @@ const ui = {
   heroTime: byId("heroTime"),
   announcementsList: byId("announcementsList"),
   refreshHome: byId("refreshHome"),
-  parkingDateInput: byId("parkingDateInput"),
   dayPills: byId("dayPills"),
   freeCount: byId("freeCount"),
   bookedCount: byId("bookedCount"),
@@ -127,7 +126,6 @@ async function boot() {
 }
 
 function bootstrap() {
-  ui.parkingDateInput.value = state.selectedDate;
   ui.bookDate.value = state.selectedDate;
   bindEvents();
   syncBookUiState();
@@ -141,17 +139,8 @@ function bindEvents() {
   ui.refreshHome.addEventListener("click", () => renderAnnouncements());
   ui.refreshBookings.addEventListener("click", () => renderMyBookings());
 
-  ui.parkingDateInput.addEventListener("change", () => {
-    state.selectedDate = ui.parkingDateInput.value || toYmd(new Date());
-    ui.bookDate.value = state.selectedDate;
-    recalculateDerivedBookings();
-    renderParking();
-    renderDayPills();
-  });
-
   ui.bookDate.addEventListener("change", () => {
     state.selectedDate = ui.bookDate.value || state.selectedDate;
-    ui.parkingDateInput.value = state.selectedDate;
     recalculateDerivedBookings();
     renderParking();
     renderDayPills();
@@ -426,7 +415,6 @@ function renderDayPills() {
     `;
     button.addEventListener("click", () => {
       state.selectedDate = ymd;
-      ui.parkingDateInput.value = ymd;
       ui.bookDate.value = ymd;
       recalculateDerivedBookings();
       renderParking();
@@ -502,6 +490,7 @@ function renderParking() {
         setSelectedSpot(spot.label);
         renderParking();
         syncBookUiState();
+        scrollBookingFormIntoView();
       });
     }
 
@@ -570,22 +559,26 @@ async function onBookSubmit(event) {
 
 function enforceBookingRules(spotLabel, dateYmd, fromTime, toTime) {
   if (fromTime >= toTime) throw new Error("Invalid time range.");
+  const role = (state.profile?.role || "").toLowerCase();
+  const isAdminLike = role === "admin" || role === "privileged";
 
   const blocked = state.spots.some(
     (spot) => spot.isBlocked && normalizedSpotKey(spot.label) === normalizedSpotKey(spotLabel)
   );
   if (blocked) throw new Error("This spot is blocked.");
 
-  const todayStart = dayStart(toYmd(new Date()));
-  const targetDate = dayStart(dateYmd);
-  const advanceDays = Math.round((targetDate.getTime() - todayStart.getTime()) / 86400000);
-  if (advanceDays > APP_RULES.selfBookingMaxAdvanceDays) {
-    throw new Error(`You can book max ${APP_RULES.selfBookingMaxAdvanceDays} days in advance.`);
-  }
+  if (!isAdminLike) {
+    const todayStart = dayStart(toYmd(new Date()));
+    const targetDate = dayStart(dateYmd);
+    const advanceDays = Math.round((targetDate.getTime() - todayStart.getTime()) / 86400000);
+    if (advanceDays > APP_RULES.selfBookingMaxAdvanceDays) {
+      throw new Error(`You can book max ${APP_RULES.selfBookingMaxAdvanceDays} days in advance.`);
+    }
 
-  const mySameDayCount = state.myBookings.filter((booking) => toYmd(booking.bookingDate) === dateYmd).length;
-  if (mySameDayCount >= APP_RULES.selfBookingMaxPerDay) {
-    throw new Error("You can book only 1 spot per day.");
+    const mySameDayCount = state.myBookings.filter((booking) => toYmd(booking.bookingDate) === dateYmd).length;
+    if (mySameDayCount >= APP_RULES.selfBookingMaxPerDay) {
+      throw new Error("You can book only 1 spot per day.");
+    }
   }
 
   const normalizedRequested = normalizedSpotKey(spotLabel);
@@ -768,6 +761,15 @@ function syncBookUiState() {
 
   ui.selectedSpotHint.textContent = `Selected: Spot ${extractSpotNumber(state.selectedSpotLabel)}. Ready to confirm.`;
   ui.selectedSpotHint.classList.add("ok");
+}
+
+function scrollBookingFormIntoView() {
+  if (!ui.bookForm) return;
+  const rect = ui.bookForm.getBoundingClientRect();
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+  const alreadyVisible = rect.top >= 0 && rect.top <= viewportHeight * 0.6;
+  if (alreadyVisible) return;
+  ui.bookForm.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function ensureSelectedSpotIsValid() {

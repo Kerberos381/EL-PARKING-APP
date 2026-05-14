@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' https://www.gstatic.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-src https://*.firebaseapp.com;"
+    />
+    <title>EL Parking Web</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section id="authView" class="card auth-card">
+        <h1>EL Parking</h1>
+        <p class="muted">Sign in with your existing account</p>
+        <form id="loginForm" class="stack">
+          <label class="field">
+            <span>Email</span>
+            <input id="emailInput" type="email" autocomplete="email" required />
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input id="passwordInput" type="password" autocomplete="current-password" required />
+          </label>
+          <button id="loginButton" class="btn primary" type="submit">Sign In</button>
+          <p id="authError" class="error" role="alert"></p>
+        </form>
+      </section>
+
+      <section id="pendingView" class="card pending-card hidden">
+        <h2>Account Pending</h2>
+        <p class="muted">Your account is waiting for admin approval.</p>
+        <button id="pendingSignOut" class="btn">Sign Out</button>
+      </section>
+
+      <section id="appView" class="hidden">
+        <header class="topbar">
+          <div>
+            <p class="overline">EXECUTIVE MOBILITY</p>
+            <h1 id="greetingText">Hello</h1>
+          </div>
+          <button id="signOutButton" class="btn subtle">Sign Out</button>
+        </header>
+
+        <nav class="tabbar" aria-label="Main navigation">
+          <button class="tab active" data-tab="home">Home</button>
+          <button class="tab" data-tab="parking">Parking</button>
+          <button class="tab" data-tab="bookings">My Bookings</button>
+          <button id="adminTab" class="tab hidden" data-tab="admin">Admin</button>
+          <button class="tab" data-tab="settings">Settings</button>
+        </nav>
+
+        <section id="homeTab" class="tabpanel">
+          <article class="hero card dark">
+            <div class="hero-head">
+              <span id="heroState" class="dot">ACTIVE</span>
+              <span id="heroDate"></span>
+            </div>
+            <div class="hero-main">
+              <div id="heroSpot" class="hero-spot">--</div>
+              <div class="hero-meta">
+                <p id="heroTime">--:-- - --:--</p>
+                <p>Rohanske nabrezi 721/39, Praha</p>
+              </div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="row between">
+              <h3>Pinned Updates</h3>
+              <button id="refreshHome" class="btn subtle">Refresh</button>
+            </div>
+            <div id="announcementsList" class="stack dense"></div>
+          </article>
+        </section>
+
+        <section id="parkingTab" class="tabpanel hidden">
+          <article class="card">
+            <div class="row between">
+              <h3>Parking Overview</h3>
+              <label class="field inline">
+                <span>Date</span>
+                <input id="parkingDateInput" type="date" />
+              </label>
+            </div>
+            <div class="stats">
+              <div><span id="freeCount">0</span><small>Free</small></div>
+              <div><span id="bookedCount">0</span><small>Booked</small></div>
+              <div><span id="blockedCount">0</span><small>Blocked</small></div>
+            </div>
+            <div id="spotsGrid" class="spot-grid"></div>
+          </article>
+
+          <article class="card">
+            <h3>Book a Spot</h3>
+            <form id="bookForm" class="stack">
+              <label class="field">
+                <span>Spot</span>
+                <select id="spotSelect" required></select>
+              </label>
+              <div class="row">
+                <label class="field grow">
+                  <span>Date</span>
+                  <input id="bookDate" type="date" required />
+                </label>
+                <label class="field grow">
+                  <span>From</span>
+                  <input id="bookFrom" type="time" value="07:00" required />
+                </label>
+                <label class="field grow">
+                  <span>To</span>
+                  <input id="bookTo" type="time" value="18:00" required />
+                </label>
+              </div>
+              <button id="bookButton" class="btn primary" type="submit">Confirm Booking</button>
+              <p id="bookError" class="error" role="alert"></p>
+            </form>
+          </article>
+        </section>
+
+        <section id="bookingsTab" class="tabpanel hidden">
+          <article class="card">
+            <div class="row between">
+              <h3>My Bookings</h3>
+              <button id="refreshBookings" class="btn subtle">Refresh</button>
+            </div>
+            <div id="myBookingsList" class="stack"></div>
+          </article>
+        </section>
+
+        <section id="adminTabPanel" class="tabpanel hidden">
+          <article class="card">
+            <h3>Admin Snapshot</h3>
+            <div class="stats">
+              <div><span id="usersTotal">0</span><small>Users</small></div>
+              <div><span id="usersActive">0</span><small>Active</small></div>
+              <div><span id="usersPending">0</span><small>Pending</small></div>
+            </div>
+            <p class="muted tiny">
+              Admin features are read-only in this first web cut, to keep rollout safe.
+            </p>
+          </article>
+        </section>
+
+        <section id="settingsTab" class="tabpanel hidden">
+          <article class="card">
+            <h3>Profile</h3>
+            <form id="profileForm" class="stack">
+              <label class="field">
+                <span>Display Name</span>
+                <input id="nameInput" type="text" maxlength="80" required />
+              </label>
+              <label class="field">
+                <span>Greeting Name (optional)</span>
+                <input id="vocativeInput" type="text" maxlength="40" placeholder="e.g. Jane / Katko" />
+              </label>
+              <label class="field">
+                <span>Registration Plate</span>
+                <input id="plateInput" type="text" maxlength="24" />
+              </label>
+              <label class="field">
+                <span>Vehicle Description</span>
+                <input id="carInput" type="text" maxlength="120" />
+              </label>
+              <button id="saveProfileBtn" class="btn primary" type="submit">Save Profile</button>
+              <p id="profileError" class="error" role="alert"></p>
+            </form>
+          </article>
+        </section>
+      </section>
+    </main>
+
+    <template id="bookingRowTemplate">
+      <article class="booking-row">
+        <div>
+          <p class="title"></p>
+          <p class="meta"></p>
+        </div>
+        <button class="btn danger">Cancel</button>
+      </article>
+    </template>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

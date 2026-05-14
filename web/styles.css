@@ -54,6 +54,20 @@ body {
   padding: 8px 4px 16px;
 }
 
+.topbar > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.topbar h1 {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.topbar .btn {
+  flex-shrink: 0;
+}
+
 .overline {
   margin: 0;
   font-size: 11px;
@@ -119,11 +133,11 @@ h3 {
 }
 
 .hero-spot {
-  font-size: 78px;
+  font-size: clamp(52px, 15vw, 78px);
   font-weight: 900;
   color: var(--accent);
   line-height: 1;
-  min-width: 92px;
+  min-width: clamp(72px, 18vw, 92px);
 }
 
 .hero-meta p {
@@ -136,8 +150,7 @@ h3 {
   top: 8px;
   z-index: 10;
   margin: 0 0 16px;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  display: flex;
   gap: 6px;
   background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(14px);
@@ -148,6 +161,8 @@ h3 {
 }
 
 .tab {
+  flex: 1 1 0;
+  min-width: 0;
   border: 0;
   background: transparent;
   border-radius: 14px;
@@ -189,6 +204,12 @@ h3 {
 
 .row.between {
   justify-content: space-between;
+}
+
+.row.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  align-items: stretch;
 }
 
 .section-head {
@@ -606,7 +627,6 @@ h3 {
     top: auto;
     margin: 0;
     padding: 7px;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
     border-radius: 28px;
     background: rgba(252, 252, 254, 0.92);
     box-shadow: 0 12px 32px rgba(13, 15, 18, 0.12);
@@ -625,11 +645,6 @@ h3 {
   .hero-main {
     align-items: flex-start;
     gap: 12px;
-  }
-
-  .hero-spot {
-    font-size: 58px;
-    min-width: 72px;
   }
 
   .hero-meta p {
@@ -696,11 +711,15 @@ h3 {
     font-size: 34px;
   }
 
+  .tab {
+    font-size: 12px;
+    padding: 10px 4px;
+    letter-spacing: -0.01em;
+  }
+}
+
+@media (max-width: 340px) {
   .stats {
     grid-template-columns: 1fr;
-  }
-
-  .hero-spot {
-    font-size: 52px;
   }
 }

@@ -1,0 +1,2 @@
+# Local web Firebase config (do not commit project-specific config)
+web/firebase-config.js

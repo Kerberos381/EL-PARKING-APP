@@ -70,6 +70,7 @@ const ui = {
   spotsGrid: byId("spotsGrid"),
   bookForm: byId("bookForm"),
   selectedSpotDisplay: byId("selectedSpotDisplay"),
+  selectedSpotHint: byId("selectedSpotHint"),
   spotSelect: byId("spotSelect"),
   bookDate: byId("bookDate"),
   bookFrom: byId("bookFrom"),
@@ -129,6 +130,7 @@ function bootstrap() {
   ui.parkingDateInput.value = state.selectedDate;
   ui.bookDate.value = state.selectedDate;
   bindEvents();
+  syncBookUiState();
   onAuthStateChanged(auth, handleAuthState);
 }
 
@@ -159,10 +161,13 @@ function bindEvents() {
     if (!ui.spotSelect.value) return;
     setSelectedSpot(ui.spotSelect.value);
     renderParking();
+    syncBookUiState();
   });
 
   ui.bookForm.addEventListener("submit", onBookSubmit);
   ui.profileForm.addEventListener("submit", onSaveProfile);
+  ui.bookFrom.addEventListener("change", syncBookUiState);
+  ui.bookTo.addEventListener("change", syncBookUiState);
   ui.tabs.forEach((tab) => tab.addEventListener("click", () => switchTab(tab.dataset.tab)));
 }
 
@@ -276,6 +281,7 @@ function subscribeAllBookings() {
         .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime());
       state.allBookings = loaded;
       recalculateDerivedBookings();
+      ensureSelectedSpotIsValid();
       renderHomeHero();
       renderMyBookings();
       renderParking();
@@ -284,6 +290,7 @@ function subscribeAllBookings() {
     () => {
       state.allBookings = [];
       recalculateDerivedBookings();
+      ensureSelectedSpotIsValid();
       renderHomeHero();
       renderMyBookings();
       renderParking();
@@ -443,6 +450,10 @@ function renderSpotSelect() {
     option.textContent = spot.label;
     ui.spotSelect.append(option);
   }
+
+  if (!state.selectedSpotLabel) {
+    ui.spotSelect.value = "";
+  }
 }
 
 function renderParking() {
@@ -465,30 +476,40 @@ function renderParking() {
     let stateName = "free";
     if (spot.isBlocked) stateName = "blocked";
     else if (bookedKeys.has(key)) stateName = "booked";
+    const isSelectedFree = normalizedSpotKey(state.selectedSpotLabel) === key && stateName === "free";
 
     const cell = document.createElement("button");
     cell.type = "button";
     cell.className = "spot-cell";
     cell.dataset.state = stateName;
-    cell.classList.toggle("selected", normalizedSpotKey(state.selectedSpotLabel) === key);
+    cell.classList.toggle("selected", isSelectedFree);
+    cell.disabled = stateName !== "free";
 
     const strong = document.createElement("strong");
     strong.textContent = String(extractSpotNumber(spot.label));
     const small = document.createElement("small");
     small.textContent = stateName === "free" ? "FREE" : stateName === "booked" ? "BOOKED" : "BLOCKED";
     cell.append(strong, small);
+    if (isSelectedFree) {
+      const check = document.createElement("span");
+      check.className = "spot-cell-check";
+      check.textContent = "✓";
+      cell.append(check);
+    }
 
     if (stateName === "free") {
       cell.addEventListener("click", () => {
         setSelectedSpot(spot.label);
         renderParking();
+        syncBookUiState();
       });
     }
 
     ui.spotsGrid.append(cell);
   }
 
-  ui.selectedSpotDisplay.value = state.selectedSpotLabel || "";
+  ui.selectedSpotDisplay.value = state.selectedSpotLabel ? `Spot ${extractSpotNumber(state.selectedSpotLabel)}` : "";
+  syncBookUiState();
 }
 
 function renderMyBookings() {
@@ -543,7 +564,7 @@ async function onBookSubmit(event) {
   } catch (err) {
     ui.bookError.textContent = err?.message || "Could not create booking.";
   } finally {
-    ui.bookButton.disabled = false;
+    syncBookUiState();
   }
 }
 
@@ -725,13 +746,41 @@ function clearAllListeners() {
 function setSelectedSpot(label) {
   state.selectedSpotLabel = label || "";
   ui.spotSelect.value = label || "";
-  ui.selectedSpotDisplay.value = label || "";
+  ui.selectedSpotDisplay.value = label ? `Spot ${extractSpotNumber(label)}` : "";
+}
+
+function syncBookUiState() {
+  const hasSelectedSpot = Boolean(state.selectedSpotLabel);
+  const hasValidTimes = Boolean(ui.bookFrom.value && ui.bookTo.value && ui.bookFrom.value < ui.bookTo.value);
+  ui.bookButton.disabled = !(hasSelectedSpot && hasValidTimes);
+
+  if (!hasSelectedSpot) {
+    ui.selectedSpotHint.textContent = "No spot selected yet.";
+    ui.selectedSpotHint.classList.remove("ok");
+    return;
+  }
+
+  if (!hasValidTimes) {
+    ui.selectedSpotHint.textContent = "Selected, now fix time range.";
+    ui.selectedSpotHint.classList.remove("ok");
+    return;
+  }
+
+  ui.selectedSpotHint.textContent = `Selected: Spot ${extractSpotNumber(state.selectedSpotLabel)}. Ready to confirm.`;
+  ui.selectedSpotHint.classList.add("ok");
 }
 
 function ensureSelectedSpotIsValid() {
   if (!state.selectedSpotLabel) return;
   const exists = state.spots.some((spot) => spot.label === state.selectedSpotLabel && !spot.isBlocked);
-  if (!exists) setSelectedSpot("");
+  if (!exists || !isSpotFreeForSelectedDay(state.selectedSpotLabel)) setSelectedSpot("");
+}
+
+function isSpotFreeForSelectedDay(label) {
+  const key = normalizedSpotKey(label);
+  const isBlocked = state.spots.some((spot) => spot.isBlocked && normalizedSpotKey(spot.label) === key);
+  if (isBlocked) return false;
+  return !state.dayBookings.some((booking) => normalizedSpotKey(booking.spot) === key);
 }
 
 function dayOccupancyPercent(dayBookings) {

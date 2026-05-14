@@ -91,6 +91,7 @@
               <div><span id="bookedCount">0</span><small>Booked</small></div>
               <div><span id="blockedCount">0</span><small>Blocked</small></div>
             </div>
+            <p class="muted tiny spot-grid-hint">Tap a FREE spot tile to select it.</p>
             <div id="spotsGrid" class="spot-grid"></div>
           </article>
 
@@ -106,6 +107,7 @@
                   placeholder="Tap a free spot in the grid above"
                 />
               </label>
+              <p id="selectedSpotHint" class="selection-hint muted tiny">No spot selected yet.</p>
               <label class="field">
                 <span>Spot</span>
                 <select id="spotSelect" class="hidden-native-select" required></select>

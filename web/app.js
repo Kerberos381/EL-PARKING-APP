@@ -10,6 +10,7 @@ import {
 import {
   collection,
   doc,
+  getDocsFromServer,
   getDoc,
   getFirestore,
   onSnapshot,
@@ -838,7 +839,19 @@ async function onBookSubmit(event) {
     ui.bookError.textContent = "";
     showBookingSuccessModal(spot, date, fromTime, toTime);
   } catch (err) {
-    ui.bookError.textContent = err?.message || "Could not create booking.";
+    const message = err?.message || "Could not create booking.";
+    const isConflict = message.toLowerCase().includes("already booked");
+    if (isConflict) {
+      ui.bookError.textContent = "Spot was booked meanwhile. Refreshing availability...";
+      try {
+        await refreshBookingsFromServer();
+      } catch (_) {
+        // keep original message below
+      }
+      ui.bookError.textContent = message;
+    } else {
+      ui.bookError.textContent = message;
+    }
   } finally {
     syncBookUiState();
   }
@@ -921,6 +934,24 @@ async function createBookingTransaction(spotLabel, bookingDate, dateYmd, fromTim
       { merge: true }
     );
   });
+}
+
+async function refreshBookingsFromServer() {
+  if (!db) return;
+  const snap = await getDocsFromServer(collection(db, "bookings"));
+  const loaded = snap.docs
+    .map((d) => parseBooking(d.id, d.data()))
+    .filter(Boolean)
+    .filter(shouldKeepBookingLocally)
+    .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime());
+  state.allBookings = loaded;
+  recalculateDerivedBookings();
+  ensureSelectedSpotIsValid();
+  renderHomeHero();
+  renderMyBookings();
+  renderParking();
+  renderAdminSpotInspector();
+  renderDayPills();
 }
 
 async function updateBookingTransaction(existingBooking, next) {
@@ -1216,15 +1247,12 @@ function bookingEndDate(date, toTime) {
 }
 
 function parseBooking(id, data) {
-  let bookingDate = new Date();
-  const raw = data.bookingDate;
-  if (raw?.toDate) bookingDate = raw.toDate();
-  else if (typeof raw === "string") bookingDate = parseBookingDateString(raw);
-  else if (typeof raw === "number") bookingDate = new Date(raw);
-
+  const rawDate = data.bookingDate ?? data.date ?? data.booking_day ?? data.bookingDateString;
+  const bookingDate = parseDateLike(rawDate);
   if (!(bookingDate instanceof Date) || Number.isNaN(bookingDate.getTime())) return null;
 
-  const spot = String(data.spot ?? data.spotLabel ?? data.spotId ?? "");
+  const rawSpot = data.spot ?? data.spotLabel ?? data.spotId ?? data.spotID ?? data.spotNumber ?? data.spotNo ?? "";
+  const spot = normalizeSpotLabel(rawSpot);
   if (!spot) return null;
 
   const email = String(data.email ?? data.userEmail ?? data.bookedForEmail ?? data.ownerEmail ?? "")
@@ -1242,10 +1270,48 @@ function parseBooking(id, data) {
 }
 
 function parseBookingDateString(value) {
+  if (!value) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+
+  const czechLike = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+  if (czechLike) {
+    const d = Number(czechLike[1]);
+    const m = Number(czechLike[2]);
+    const y = Number(czechLike[3]);
+    if (Number.isFinite(y) && Number.isFinite(m) && Number.isFinite(d)) {
+      return new Date(y, m - 1, d, 0, 0, 0, 0);
+    }
+  }
+
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return dayStart(value);
   }
   return new Date(value);
+}
+
+function parseDateLike(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value?.toDate === "function") return value.toDate();
+  if (typeof value === "number") return new Date(value);
+  if (typeof value === "string") return parseBookingDateString(value);
+  if (typeof value === "object") {
+    const seconds = Number(value.seconds ?? value._seconds);
+    const nanos = Number(value.nanoseconds ?? value._nanoseconds ?? 0);
+    if (Number.isFinite(seconds)) {
+      const millis = seconds * 1000 + (Number.isFinite(nanos) ? Math.floor(nanos / 1_000_000) : 0);
+      return new Date(millis);
+    }
+  }
+  return null;
+}
+
+function normalizeSpotLabel(raw) {
+  const value = String(raw ?? "").trim();
+  if (!value) return "";
+  if (/^\d+$/.test(value)) return `Parking ${value}`;
+  return value;
 }
 
 function isBookingForCurrentUser(booking) {

@@ -584,8 +584,8 @@ async function createBookingTransaction(spotLabel, bookingDate, dateYmd, fromTim
   const expiresAt = addDays(bookingEndDate(bookingDate, toTime), APP_RULES.bookingRetentionDays);
 
   await runTransaction(db, async (transaction) => {
-    const lockSnap = await transaction.get(lockRef);
-    const slots = lockSnap.data()?.slots ?? [];
+    const lockState = await loadLiveLockSlots(transaction, lockRef, spotLabel, dateYmd);
+    const slots = lockState.slots;
 
     for (const slot of slots) {
       const sFrom = String(slot.from || "");
@@ -643,17 +643,45 @@ async function cancelBooking(booking) {
     const bookingRef = doc(db, "bookings", booking.id);
 
     await runTransaction(db, async (transaction) => {
-      const lockSnap = await transaction.get(lockRef);
-      if (lockSnap.exists()) {
-        const slots = lockSnap.data()?.slots ?? [];
-        const updated = slots.filter((slot) => String(slot.bookingId || "") !== booking.id);
-        transaction.set(lockRef, { slots: updated }, { merge: true });
-      }
+      const lockState = await loadLiveLockSlots(transaction, lockRef, booking.spot, bookingDateKey);
+      const updated = lockState.slots.filter((slot) => String(slot.bookingId || "") !== booking.id);
+      transaction.set(lockRef, { slots: updated }, { merge: true });
       transaction.delete(bookingRef);
     });
   } catch (err) {
     alert(err?.message || "Cancel failed.");
   }
+}
+
+async function loadLiveLockSlots(transaction, lockRef, spotLabel, dateYmd) {
+  const lockSnap = await transaction.get(lockRef);
+  const rawSlots = lockSnap.data()?.slots ?? [];
+  const normalizedRequestedSpot = normalizedSpotKey(spotLabel);
+  const liveSlots = [];
+
+  for (const raw of rawSlots) {
+    const bookingId = String(raw?.bookingId || "").trim();
+    if (!bookingId) continue;
+
+    const from = String(raw?.from || "").trim();
+    const to = String(raw?.to || "").trim();
+    if (!from || !to) continue;
+
+    const bookingRef = doc(db, "bookings", bookingId);
+    const bookingSnap = await transaction.get(bookingRef);
+    if (!bookingSnap.exists()) continue;
+
+    const parsed = parseBooking(bookingId, bookingSnap.data());
+    if (!parsed) continue;
+
+    const sameDay = toYmd(parsed.bookingDate) === dateYmd;
+    const sameSpot = normalizedSpotKey(parsed.spot) === normalizedRequestedSpot;
+    if (!sameDay || !sameSpot) continue;
+
+    liveSlots.push({ from: parsed.fromTime, to: parsed.toTime, bookingId });
+  }
+
+  return { slots: liveSlots };
 }
 
 async function onSaveProfile(event) {

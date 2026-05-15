@@ -55,7 +55,7 @@
           <div class="brand-lockup">
             <img class="brand-icon" src="./app-icon.png" alt="" />
             <div>
-              <p class="overline">KARLIN OFFICE PARKING</p>
+              <p class="overline">EXECUTIVE MOBILITY</p>
               <h1 id="greetingText">Hello</h1>
             </div>
           </div>
@@ -225,13 +225,35 @@
                 <span>Registration Plate</span>
                 <input id="plateInput" type="text" maxlength="24" />
               </label>
-              <label class="field">
-                <span>Vehicle Description</span>
-                <input id="carInput" type="text" maxlength="120" />
-              </label>
+              <input id="carInput" type="hidden" />
+              <div class="settings-section-block">
+                <p class="settings-section-title">Vehicle</p>
+                <div id="vehiclePreview" class="vehicle-preview"></div>
+                <div class="settings-grid">
+                  <label class="field">
+                    <span>Make</span>
+                    <select id="vehicleMakeSelect"></select>
+                  </label>
+                  <label class="field">
+                    <span>Model</span>
+                    <select id="vehicleModelSelect"></select>
+                  </label>
+                </div>
+                <button id="vehicleIconButton" class="settings-row-button" type="button">
+                  <span>Choose Vehicle Icon</span>
+                  <strong id="vehicleIconLabel">Automatic</strong>
+                </button>
+              </div>
               <button id="saveProfileBtn" class="btn primary" type="submit">Save Profile</button>
               <p id="profileError" class="error" role="alert"></p>
             </form>
+          </article>
+
+          <article class="card settings-link-card">
+            <a href="./privacy-policy.html" target="_blank" rel="noopener noreferrer">
+              <span>Privacy Policy</span>
+              <strong>Open</strong>
+            </a>
           </article>
         </section>
 
@@ -275,6 +297,39 @@
                 <button id="bookingEditSave" class="btn primary" type="submit">Save</button>
               </div>
             </form>
+          </article>
+        </section>
+
+        <section id="spotDetailsModal" class="modal hidden" aria-hidden="true">
+          <article class="modal-card" role="dialog" aria-modal="true" aria-labelledby="spotDetailsTitle">
+            <div class="modal-title-row">
+              <h3 id="spotDetailsTitle">Spot Details</h3>
+              <button id="spotDetailsClose" class="btn subtle small" type="button">Close</button>
+            </div>
+            <p id="spotDetailsMeta" class="muted"></p>
+            <div id="spotDetailsList" class="stack dense"></div>
+          </article>
+        </section>
+
+        <section id="vehiclePickerModal" class="modal hidden" aria-hidden="true">
+          <article class="modal-card vehicle-picker-card" role="dialog" aria-modal="true" aria-labelledby="vehiclePickerTitle">
+            <div class="modal-title-row">
+              <h3 id="vehiclePickerTitle">Choose Vehicle Icon</h3>
+              <button id="vehiclePickerClose" class="btn subtle small" type="button">Close</button>
+            </div>
+            <p id="vehiclePickerMeta" class="muted"></p>
+            <div id="vehiclePickerList" class="vehicle-picker-list"></div>
+          </article>
+        </section>
+
+        <section id="confirmModal" class="modal hidden" aria-hidden="true">
+          <article class="modal-card confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+            <h3 id="confirmTitle">Confirm Action</h3>
+            <p id="confirmMessage" class="muted"></p>
+            <div class="modal-actions">
+              <button id="confirmCancel" class="btn subtle" type="button">Keep</button>
+              <button id="confirmAccept" class="btn danger" type="button">Confirm</button>
+            </div>
           </article>
         </section>
 

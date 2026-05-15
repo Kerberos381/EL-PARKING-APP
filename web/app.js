@@ -31,6 +31,141 @@ const APP_RULES = {
   bookingRetentionDays: 2,
 };
 
+const CAR_MAKES = [
+  "Škoda",
+  "Hyundai",
+  "Toyota",
+  "Volkswagen",
+  "Kia",
+  "Dacia",
+  "Ford",
+  "Mercedes-Benz",
+  "Renault",
+  "BMW",
+  "Audi",
+  "Volvo",
+  "Tesla",
+  "MG",
+  "Nissan",
+  "Peugeot",
+  "MINI",
+  "Subaru",
+  "Porsche",
+  "Honda",
+  "Alfa Romeo",
+  "Opel",
+  "Mazda",
+  "Citroën",
+  "Seat",
+];
+
+const MODELS_BY_MAKE = {
+  "Škoda": ["Octavia", "Octavia RS", "Octavia Combi Style", "Kamiq", "Karoq", "Karoq Style", "Kodiaq", "Fabia", "Scala", "Superb", "Superb Combi L&K", "Enyaq", "Elroq"],
+  Hyundai: ["i20", "i30", "Tucson", "Kona", "Bayon", "Santa Fe", "IONIQ 5", "IONIQ 6"],
+  Toyota: ["Corolla", "Yaris", "Yaris Cross", "RAV4", "C-HR", "Camry"],
+  Volkswagen: ["Golf", "Golf Variant", "Tiguan", "Tiguan 2.0 TSI Elegance", "Passat", "T-Roc", "Polo", "Touareg", "ID.3", "ID.4"],
+  Kia: ["Ceed", "Sportage", "Sorento", "Niro", "EV6", "EV9", "Picanto"],
+  Dacia: ["Duster", "Jogger", "Sandero", "Spring"],
+  Ford: ["Focus", "Kuga", "Puma", "Mustang Mach-E"],
+  "Mercedes-Benz": ["A-Class", "C-Class", "C 220 d 4MATIC", "E-Class", "GLA", "GLC", "GLE", "EQA", "EQA 250", "EQB"],
+  Renault: ["Clio", "Captur", "Megane", "Austral", "Arkana", "Kangoo"],
+  BMW: ["3 Series", "5 Series", "X1", "X3", "X5", "i4", "iX"],
+  Audi: ["A3", "A4", "A4 Avant B9", "A4 Avant 35 TDI S-Line", "A6", "Q3", "Q5", "Q7", "Q8", "Q4", "Q4 e-tron"],
+  Volvo: ["EX30", "XC40", "XC60", "XC90", "V60", "V90"],
+  Tesla: ["Model 3", "Model Y", "Model S", "Model X"],
+  MG: ["ZS", "HS", "MG4", "Marvel R"],
+  Nissan: ["Qashqai", "Juke", "X-Trail", "Leaf"],
+  Peugeot: ["208", "308", "3008", "5008", "Rifter"],
+  MINI: ["Cooper", "Countryman", "Countryman Electric"],
+  Subaru: ["Outback", "Forester", "Crosstrek", "Impreza"],
+  Porsche: ["911", "Cayenne", "Macan", "Taycan"],
+  Honda: ["Civic", "CR-V", "HR-V", "Jazz"],
+  "Alfa Romeo": ["Giulia", "Stelvio", "Tonale"],
+  Opel: ["Corsa", "Astra", "Mokka", "Grandland"],
+  Mazda: ["Mazda 2", "Mazda 3", "CX-30", "CX-5", "CX-60"],
+  Citroën: ["C3", "C4", "C5 Aircross", "Berlingo"],
+  Seat: ["Ibiza", "Leon", "Ateca", "Tarraco"],
+};
+
+const MAKER_LOGOS = {
+  "Alfa Romeo": "car_maker_logo_alfa_romeo",
+  Audi: "car_maker_logo_audi",
+  BMW: "car_maker_logo_bmw",
+  Citroën: "car_maker_logo_citroen",
+  Dacia: "car_maker_logo_dacia",
+  Ford: "car_maker_logo_ford",
+  Honda: "car_maker_logo_honda",
+  Hyundai: "car_maker_logo_hyundai",
+  Kia: "car_maker_logo_kia",
+  Mazda: "car_maker_logo_mazda",
+  "Mercedes-Benz": "car_maker_logo_mercedes_benz",
+  MG: "car_maker_logo_mg",
+  MINI: "car_maker_logo_mini",
+  Nissan: "car_maker_logo_nissan",
+  Opel: "car_maker_logo_opel",
+  Peugeot: "car_maker_logo_peugeot",
+  Porsche: "car_maker_logo_porsche",
+  Renault: "car_maker_logo_renault",
+  Seat: "car_maker_logo_seat",
+  Škoda: "car_maker_logo_skoda",
+  Subaru: "car_maker_logo_subaru",
+  Tesla: "car_maker_logo_tesla",
+  Toyota: "car_maker_logo_toyota",
+  Volkswagen: "car_maker_logo_volkswagen",
+  Volvo: "car_maker_logo_volvo",
+};
+
+const VEHICLE_PRESETS = [
+  { id: "volvo_ex30_yellow", make: "Volvo", models: ["EX30"], title: "Volvo EX30 · Moss Yellow", asset: "vehicle_mini_volvo_ex30_moss_yellow_yellow" },
+  { id: "volvo_ex30_gray", make: "Volvo", models: ["EX30"], title: "Volvo EX30 · Gray", asset: "vehicle_mini_volvo_ex30_moss_yellow_gray" },
+  { id: "tesla_model3_white", make: "Tesla", models: ["Model 3"], title: "Tesla Model 3 · White", asset: "vehicle_mini_tesla_model3_white" },
+  { id: "tesla_model3_red", make: "Tesla", models: ["Model 3"], title: "Tesla Model 3 · Red", asset: "vehicle_mini_tesla_model3_red" },
+  { id: "tesla_model3_black", make: "Tesla", models: ["Model 3"], title: "Tesla Model 3 · Black", asset: "vehicle_mini_tesla_model3_black" },
+  { id: "tesla_model3_blue", make: "Tesla", models: ["Model 3"], title: "Tesla Model 3 · Blue", asset: "vehicle_mini_tesla_model3_blue" },
+  { id: "tesla_model_y", make: "Tesla", models: ["Model Y"], title: "Tesla Model Y", asset: "vehicle_mini_tesla_model_y" },
+  { id: "tesla_model_y_white", make: "Tesla", models: ["Model Y"], title: "Tesla Model Y · White", asset: "vehicle_mini_tesla_model_y_white" },
+  { id: "tesla_model_y_black", make: "Tesla", models: ["Model Y"], title: "Tesla Model Y · Black", asset: "vehicle_mini_tesla_model_y_black" },
+  { id: "tesla_model_y_gray", make: "Tesla", models: ["Model Y"], title: "Tesla Model Y · Gray", asset: "vehicle_mini_tesla_model_y_gray" },
+  { id: "octavia_rs", make: "Škoda", models: ["Octavia RS"], title: "Škoda Octavia RS", asset: "vehicle_mini_skoda_octavia_rs" },
+  { id: "octavia_rs_dragon", make: "Škoda", models: ["Octavia RS"], title: "Škoda Octavia RS · Dragon Green", asset: "vehicle_mini_skoda_octavia_rs_dragon_green" },
+  { id: "octavia_rs_white", make: "Škoda", models: ["Octavia RS"], title: "Škoda Octavia RS · White", asset: "vehicle_mini_skoda_octavia_rs_white" },
+  { id: "octavia_rs_gray", make: "Škoda", models: ["Octavia RS"], title: "Škoda Octavia RS · Gray", asset: "vehicle_mini_skoda_octavia_rs_gray" },
+  { id: "octavia_combi_style", make: "Škoda", models: ["Octavia", "Octavia Combi Style"], title: "Škoda Octavia Combi Style", asset: "vehicle_mini_skoda_octavia_combi_style" },
+  { id: "octavia_combi_mamba", make: "Škoda", models: ["Octavia", "Octavia Combi Style"], title: "Škoda Octavia Combi RS · Mamba Green", asset: "vehicle_mini_octavia_combi_green" },
+  { id: "octavia_combi_white", make: "Škoda", models: ["Octavia", "Octavia Combi Style"], title: "Škoda Octavia Combi · White", asset: "vehicle_mini_octavia_combi_white" },
+  { id: "octavia_combi_gray", make: "Škoda", models: ["Octavia", "Octavia Combi Style"], title: "Škoda Octavia Combi · Gray", asset: "vehicle_mini_octavia_combi_gray" },
+  { id: "skoda_superb_white", make: "Škoda", models: ["Superb"], title: "Škoda Superb · White", asset: "vehicle_mini_superb_white" },
+  { id: "skoda_superb_gray", make: "Škoda", models: ["Superb"], title: "Škoda Superb · Gray", asset: "vehicle_mini_superb_gray" },
+  { id: "skoda_superb_green", make: "Škoda", models: ["Superb"], title: "Škoda Superb · Green", asset: "vehicle_mini_superb_green" },
+  { id: "skoda_superb_combi_lk", make: "Škoda", models: ["Superb Combi L&K"], title: "Škoda Superb Combi L&K", asset: "vehicle_mini_skoda_superb_combi_lk" },
+  { id: "skoda_kodiaq", make: "Škoda", models: ["Kodiaq"], title: "Škoda Kodiaq", asset: "vehicle_mini_skoda_kodiaq" },
+  { id: "skoda_kodiaq_white", make: "Škoda", models: ["Kodiaq"], title: "Škoda Kodiaq · White", asset: "vehicle_mini_skoda_kodiaq_white" },
+  { id: "skoda_kodiaq_gray", make: "Škoda", models: ["Kodiaq"], title: "Škoda Kodiaq · Gray", asset: "vehicle_mini_skoda_kodiaq_gray" },
+  { id: "skoda_kodiaq_black", make: "Škoda", models: ["Kodiaq"], title: "Škoda Kodiaq · Black", asset: "vehicle_mini_skoda_kodiaq_black" },
+  { id: "skoda_karoq_style", make: "Škoda", models: ["Karoq", "Karoq Style"], title: "Škoda Karoq Style", asset: "vehicle_mini_skoda_karoq_style" },
+  { id: "vw_tiguan", make: "Volkswagen", models: ["Tiguan", "Tiguan 2.0 TSI Elegance"], title: "Volkswagen Tiguan", asset: "vehicle_mini_vw_tiguan" },
+  { id: "vw_golf_variant", make: "Volkswagen", models: ["Golf", "Golf Variant"], title: "Volkswagen Golf Variant", asset: "vehicle_mini_vw_golf_variant" },
+  { id: "mercedes_eqa_250", make: "Mercedes-Benz", models: ["EQA", "EQA 250"], title: "Mercedes EQA 250", asset: "vehicle_mini_mercedes_eqa_250" },
+  { id: "mercedes_c220d_4matic", make: "Mercedes-Benz", models: ["C-Class", "C 220 d 4MATIC"], title: "Mercedes C 220 d 4MATIC", asset: "vehicle_mini_mercedes_c220d_4matic" },
+  { id: "bmw_i4", make: "BMW", models: ["i4"], title: "BMW i4", asset: "vehicle_mini_bmw_i4" },
+  { id: "bmw_3", make: "BMW", models: ["3 Series"], title: "BMW 3 Series", asset: "vehicle_mini_bmw_3" },
+  { id: "bmw_3_white", make: "BMW", models: ["3 Series"], title: "BMW 3 Series · White", asset: "vehicle_mini_bmw_3_white" },
+  { id: "bmw_3_black", make: "BMW", models: ["3 Series"], title: "BMW 3 Series · Black", asset: "vehicle_mini_bmw_3_black" },
+  { id: "audi_q4", make: "Audi", models: ["Q4", "Q4 e-tron"], title: "Audi Q4", asset: "vehicle_mini_audi_q4" },
+  { id: "audi_a4_avant_b9", make: "Audi", models: ["A4", "A4 Avant B9", "A4 Avant 35 TDI S-Line"], title: "Audi A4 Avant", asset: "vehicle_mini_audi_a4_avant_b9" },
+  { id: "alfa_romeo_stelvio", make: "Alfa Romeo", models: ["Stelvio"], title: "Alfa Romeo Stelvio", asset: "vehicle_mini_alfa_romeo_stelvio" },
+  { id: "mini_countryman", make: "MINI", models: ["Countryman"], title: "MINI Countryman", asset: "vehicle_mini_mini_countryman" },
+  { id: "mini_countryman_white", make: "MINI", models: ["Countryman"], title: "MINI Countryman · White", asset: "vehicle_mini_mini_countryman_white" },
+  { id: "mini_countryman_black", make: "MINI", models: ["Countryman"], title: "MINI Countryman · Black", asset: "vehicle_mini_mini_countryman_black" },
+  { id: "mini_countryman_green_electric", make: "MINI", models: ["Countryman Electric"], title: "MINI Countryman Electric · Green", asset: "vehicle_mini_mini_countryman_green" },
+  { id: "subaru_outback", make: "Subaru", models: ["Outback"], title: "Subaru Outback", asset: "vehicle_mini_subaru_outback" },
+  { id: "subaru_outback_white", make: "Subaru", models: ["Outback"], title: "Subaru Outback · White", asset: "vehicle_mini_subaru_outback_white" },
+  { id: "ford_focus", make: "Ford", models: ["Focus"], title: "Ford Focus", asset: "vehicle_mini_ford_focus" },
+  { id: "ford_focus_white", make: "Ford", models: ["Focus"], title: "Ford Focus · White", asset: "vehicle_mini_ford_focus_white" },
+  { id: "hyundai_bayon", make: "Hyundai", models: ["Bayon"], title: "Hyundai Bayon", asset: "vehicle_mini_hyundai_bayon" },
+  { id: "kia_ev9", make: "Kia", models: ["EV9"], title: "Kia EV9", asset: "vehicle_mini_kia_ev9" },
+];
+
 const state = {
   user: null,
   profile: null,
@@ -47,6 +182,10 @@ const state = {
   adminAnnouncements: [],
   infoItems: [],
   lastBookedSummary: null,
+  selectedVehicleMake: "",
+  selectedVehicleModel: "",
+  selectedVehiclePresetID: "",
+  confirmResolver: null,
   editingContent: null,
   listeners: {
     allBookings: null,
@@ -117,6 +256,11 @@ const ui = {
   vocativeInput: byId("vocativeInput"),
   plateInput: byId("plateInput"),
   carInput: byId("carInput"),
+  vehiclePreview: byId("vehiclePreview"),
+  vehicleMakeSelect: byId("vehicleMakeSelect"),
+  vehicleModelSelect: byId("vehicleModelSelect"),
+  vehicleIconButton: byId("vehicleIconButton"),
+  vehicleIconLabel: byId("vehicleIconLabel"),
   profileError: byId("profileError"),
   saveProfileBtn: byId("saveProfileBtn"),
   bookingSuccessModal: byId("bookingSuccessModal"),
@@ -133,6 +277,21 @@ const ui = {
   bookingEditError: byId("bookingEditError"),
   bookingEditSave: byId("bookingEditSave"),
   bookingEditCancel: byId("bookingEditCancel"),
+  spotDetailsModal: byId("spotDetailsModal"),
+  spotDetailsTitle: byId("spotDetailsTitle"),
+  spotDetailsMeta: byId("spotDetailsMeta"),
+  spotDetailsList: byId("spotDetailsList"),
+  spotDetailsClose: byId("spotDetailsClose"),
+  vehiclePickerModal: byId("vehiclePickerModal"),
+  vehiclePickerTitle: byId("vehiclePickerTitle"),
+  vehiclePickerMeta: byId("vehiclePickerMeta"),
+  vehiclePickerList: byId("vehiclePickerList"),
+  vehiclePickerClose: byId("vehiclePickerClose"),
+  confirmModal: byId("confirmModal"),
+  confirmTitle: byId("confirmTitle"),
+  confirmMessage: byId("confirmMessage"),
+  confirmCancel: byId("confirmCancel"),
+  confirmAccept: byId("confirmAccept"),
   adminContentModal: byId("adminContentModal"),
   adminContentForm: byId("adminContentForm"),
   adminContentTitle: byId("adminContentTitle"),
@@ -282,6 +441,25 @@ function bindEvents() {
 
   ui.bookForm?.addEventListener("submit", onBookSubmit);
   ui.profileForm?.addEventListener("submit", onSaveProfile);
+  ui.vehicleMakeSelect?.addEventListener("change", () => {
+    state.selectedVehicleMake = ui.vehicleMakeSelect.value;
+    populateVehicleModelSelect();
+    state.selectedVehicleModel = ui.vehicleModelSelect.value;
+    if (!presetMatchesVehicle(state.selectedVehiclePresetID, state.selectedVehicleMake, state.selectedVehicleModel)) {
+      state.selectedVehiclePresetID = "";
+    }
+    syncCarDescriptionField();
+    renderVehiclePreview();
+  });
+  ui.vehicleModelSelect?.addEventListener("change", () => {
+    state.selectedVehicleModel = ui.vehicleModelSelect.value;
+    if (!presetMatchesVehicle(state.selectedVehiclePresetID, state.selectedVehicleMake, state.selectedVehicleModel)) {
+      state.selectedVehiclePresetID = "";
+    }
+    syncCarDescriptionField();
+    renderVehiclePreview();
+  });
+  ui.vehicleIconButton?.addEventListener("click", openVehiclePicker);
   ui.bookFrom?.addEventListener("change", syncBookUiState);
   ui.bookTo?.addEventListener("change", syncBookUiState);
   ui.adminSpotInspectorClose?.addEventListener("click", closeAdminSpotInspector);
@@ -303,10 +481,26 @@ function bindEvents() {
   ui.bookingEditModal?.addEventListener("click", (event) => {
     if (event.target === ui.bookingEditModal) closeBookingEditModal();
   });
+  ui.spotDetailsClose?.addEventListener("click", closeSpotDetailsModal);
+  ui.spotDetailsModal?.addEventListener("click", (event) => {
+    if (event.target === ui.spotDetailsModal) closeSpotDetailsModal();
+  });
+  ui.vehiclePickerClose?.addEventListener("click", closeVehiclePicker);
+  ui.vehiclePickerModal?.addEventListener("click", (event) => {
+    if (event.target === ui.vehiclePickerModal) closeVehiclePicker();
+  });
+  ui.confirmCancel?.addEventListener("click", () => resolveConfirm(false));
+  ui.confirmAccept?.addEventListener("click", () => resolveConfirm(true));
+  ui.confirmModal?.addEventListener("click", (event) => {
+    if (event.target === ui.confirmModal) resolveConfirm(false);
+  });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       hideBookingSuccessModal();
       closeBookingEditModal();
+      closeSpotDetailsModal();
+      closeVehiclePicker();
+      resolveConfirm(false);
       closeContentModal();
     }
   });
@@ -326,6 +520,9 @@ async function handleAuthState(user) {
   state.adminAnnouncements = [];
   state.infoItems = [];
   state.lastBookedSummary = null;
+  state.selectedVehicleMake = "";
+  state.selectedVehicleModel = "";
+  state.selectedVehiclePresetID = "";
   state.editingContent = null;
   state.selectedSpotLabel = "";
   state.selectedAdminSpotLabel = "";
@@ -1054,6 +1251,16 @@ function bookingDisplayName(booking) {
   return String(booking.user || booking.email || "Unknown user").trim();
 }
 
+function userForBooking(booking) {
+  const email = String(booking?.email || "").toLowerCase();
+  const uid = String(booking?.bookedForUid || "").trim();
+  return (
+    state.users.find((candidate) => uid && candidate.uid === uid) ||
+    state.users.find((candidate) => email && candidate.email === email) ||
+    null
+  );
+}
+
 function renderParking() {
   const adminLike = isAdminLike();
   const blockedKeys = new Set(state.spots.filter((s) => s.isBlocked).map((s) => normalizedSpotKey(s.label)));
@@ -1090,8 +1297,8 @@ function renderParking() {
     cell.className = "spot-cell";
     cell.dataset.state = stateName;
     cell.classList.toggle("selected", isSelectedFree || isSelectedBooked);
-    if (stateName === "booked" && adminLike) cell.classList.add("admin-clickable");
-    cell.disabled = stateName !== "free" && !(stateName === "booked" && adminLike);
+    if (stateName === "booked") cell.classList.add("admin-clickable");
+    cell.disabled = stateName === "blocked";
 
     const strong = document.createElement("strong");
     strong.textContent = String(extractSpotNumber(spot.label));
@@ -1127,12 +1334,13 @@ function renderParking() {
         syncBookUiState();
         scrollBookingFormIntoView();
       });
-    } else if (stateName === "booked" && adminLike) {
+    } else if (stateName === "booked") {
       cell.addEventListener("click", () => {
         state.selectedAdminSpotLabel = spot.label;
         setSelectedSpot("");
         renderParking();
         renderAdminSpotInspector();
+        openSpotDetailsModal(spot.label);
       });
     }
 
@@ -1273,6 +1481,108 @@ function renderAdminSpotInspector() {
 function closeAdminSpotInspector() {
   state.selectedAdminSpotLabel = "";
   ui.adminSpotInspector?.classList.add("hidden");
+}
+
+function openSpotDetailsModal(spotLabel) {
+  if (!ui.spotDetailsModal) return;
+  const bookings = bookingsForSpotOnSelectedDay(spotLabel);
+  ui.spotDetailsTitle.textContent = `Spot ${extractSpotNumber(spotLabel)}`;
+  ui.spotDetailsMeta.textContent = `${formatLongDate(dayStart(state.selectedDate))} · ${
+    bookings.length ? `${bookings.length} active booking${bookings.length === 1 ? "" : "s"}` : "No active bookings"
+  }`;
+  ui.spotDetailsList.textContent = "";
+
+  if (!bookings.length) {
+    ui.spotDetailsList.append(textRow("No booking is active for this spot on the selected day."));
+  }
+
+  for (const booking of bookings) {
+    const row = document.createElement("article");
+    row.className = "spot-detail-row";
+
+    const owner = userForBooking(booking);
+    const avatar = document.createElement("div");
+    avatar.className = "spot-detail-avatar";
+    const presetID = owner?.vehicleMiniaturePresetID || "";
+    const image = vehicleImageElement(presetID, owner?.carDescription || "");
+    if (image) {
+      avatar.append(image);
+    } else {
+      avatar.textContent = initials(bookingDisplayName(booking));
+    }
+
+    const main = document.createElement("div");
+    main.className = "spot-detail-main";
+    const title = document.createElement("p");
+    title.className = "spot-detail-title";
+    title.textContent = isAdminLike() ? bookingDisplayName(booking) : "Booked";
+    const meta = document.createElement("p");
+    meta.className = "spot-detail-meta";
+    const vehicleText = owner?.carDescription ? ` · ${owner.carDescription}` : "";
+    const plateText = owner?.registrationPlate ? ` · ${owner.registrationPlate}` : "";
+    meta.textContent = `${booking.fromTime} - ${booking.toTime}${isAdminLike() ? `${vehicleText}${plateText}` : ""}`;
+    main.append(title, meta);
+
+    row.append(avatar, main);
+
+    if (isAdminLike()) {
+      const actions = document.createElement("div");
+      actions.className = "spot-detail-actions";
+      const calendar = document.createElement("button");
+      calendar.type = "button";
+      calendar.className = "btn subtle small";
+      calendar.textContent = "Calendar";
+      calendar.addEventListener("click", () => downloadCalendarForBooking(booking));
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "btn subtle small";
+      edit.textContent = "Edit";
+      edit.addEventListener("click", () => {
+        closeSpotDetailsModal();
+        openBookingEditModal(booking);
+      });
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "btn danger small";
+      cancel.textContent = "Cancel";
+      cancel.addEventListener("click", () => cancelBooking(booking));
+      actions.append(calendar, edit, cancel);
+      row.append(actions);
+    }
+
+    ui.spotDetailsList.append(row);
+  }
+
+  ui.spotDetailsModal.classList.remove("hidden");
+  ui.spotDetailsModal.setAttribute("aria-hidden", "false");
+}
+
+function closeSpotDetailsModal() {
+  if (!ui.spotDetailsModal) return;
+  ui.spotDetailsModal.classList.add("hidden");
+  ui.spotDetailsModal.setAttribute("aria-hidden", "true");
+}
+
+function showConfirm({ title, message, acceptLabel = "Confirm", cancelLabel = "Cancel" }) {
+  if (!ui.confirmModal) return Promise.resolve(window.confirm(message));
+  ui.confirmTitle.textContent = title || "Confirm Action";
+  ui.confirmMessage.textContent = message || "";
+  ui.confirmAccept.textContent = acceptLabel;
+  ui.confirmCancel.textContent = cancelLabel;
+  ui.confirmModal.classList.remove("hidden");
+  ui.confirmModal.setAttribute("aria-hidden", "false");
+  return new Promise((resolve) => {
+    state.confirmResolver = resolve;
+  });
+}
+
+function resolveConfirm(value) {
+  if (!ui.confirmModal || !state.confirmResolver) return;
+  const resolve = state.confirmResolver;
+  state.confirmResolver = null;
+  ui.confirmModal.classList.add("hidden");
+  ui.confirmModal.setAttribute("aria-hidden", "true");
+  resolve(Boolean(value));
 }
 
 function openBookingEditModal(booking) {
@@ -1566,9 +1876,12 @@ async function updateBookingTransaction(existingBooking, next) {
 
 async function cancelBooking(booking) {
   if (!state.user || !state.profile) return;
-  const ok = window.confirm(
-    `Cancel booking for spot ${extractSpotNumber(booking.spot)} on ${formatLongDate(booking.bookingDate)}?`
-  );
+  const ok = await showConfirm({
+    title: "Cancel Booking",
+    message: `Cancel spot ${extractSpotNumber(booking.spot)} on ${formatLongDate(booking.bookingDate)}?`,
+    acceptLabel: "Cancel Booking",
+    cancelLabel: "Keep Booking",
+  });
   if (!ok) return;
 
   try {
@@ -1588,6 +1901,7 @@ async function cancelBooking(booking) {
       transaction.set(lockRef, { slots: updated }, { merge: true });
       transaction.delete(bookingRef);
     });
+    closeSpotDetailsModal();
   } catch (err) {
     alert(err?.message || "Cancel failed.");
   }
@@ -1632,7 +1946,10 @@ async function onSaveProfile(event) {
   const displayName = ui.nameInput.value.trim();
   const preferredVocative = ui.vocativeInput.value.trim();
   const registrationPlate = ui.plateInput.value.trim().toUpperCase();
+  syncCarDescriptionField();
   const carDescription = ui.carInput.value.trim();
+  const vehicleMiniaturePresetID = state.selectedVehiclePresetID || "";
+  const carColor = presetColorLabel(vehicleMiniaturePresetID);
 
   if (displayName.length < 2) {
     ui.profileError.textContent = "Display name is too short.";
@@ -1646,8 +1963,20 @@ async function onSaveProfile(event) {
       preferredVocative,
       registrationPlate,
       carDescription,
+      carColor,
+      carType: "",
+      vehicleMiniaturePresetID,
     });
-    state.profile = { ...state.profile, displayName, preferredVocative, registrationPlate, carDescription };
+    state.profile = {
+      ...state.profile,
+      displayName,
+      preferredVocative,
+      registrationPlate,
+      carDescription,
+      carColor,
+      carType: "",
+      vehicleMiniaturePresetID,
+    };
     renderGreeting();
   } catch {
     ui.profileError.textContent = "Save failed.";
@@ -1661,6 +1990,277 @@ function hydrateProfileForm() {
   ui.vocativeInput.value = state.profile?.preferredVocative || "";
   ui.plateInput.value = state.profile?.registrationPlate || "";
   ui.carInput.value = state.profile?.carDescription || "";
+  hydrateVehicleSelection();
+}
+
+function hydrateVehicleSelection() {
+  const parsed = parseVehicleDescription(state.profile?.carDescription || "");
+  const presetID = state.profile?.vehicleMiniaturePresetID || "";
+  const preset = presetByID(presetID);
+  state.selectedVehicleMake = preset?.make || parsed.make || CAR_MAKES[0] || "";
+  populateVehicleMakeSelect();
+  ui.vehicleMakeSelect.value = state.selectedVehicleMake;
+  state.selectedVehicleModel = preset?.models?.[0] || parsed.model || firstModelForMake(state.selectedVehicleMake);
+  populateVehicleModelSelect();
+  ui.vehicleModelSelect.value = state.selectedVehicleModel;
+  state.selectedVehiclePresetID = presetMatchesVehicle(presetID, state.selectedVehicleMake, state.selectedVehicleModel)
+    ? presetID
+    : "";
+  syncCarDescriptionField();
+  renderVehiclePreview();
+}
+
+function populateVehicleMakeSelect() {
+  if (!ui.vehicleMakeSelect) return;
+  const previous = ui.vehicleMakeSelect.value || state.selectedVehicleMake;
+  ui.vehicleMakeSelect.textContent = "";
+  for (const make of CAR_MAKES) {
+    const option = document.createElement("option");
+    option.value = make;
+    option.textContent = make;
+    ui.vehicleMakeSelect.append(option);
+  }
+  if (CAR_MAKES.includes(previous)) ui.vehicleMakeSelect.value = previous;
+  else ui.vehicleMakeSelect.value = CAR_MAKES[0] || "";
+}
+
+function populateVehicleModelSelect() {
+  if (!ui.vehicleModelSelect) return;
+  const make = ui.vehicleMakeSelect?.value || state.selectedVehicleMake;
+  const previous = ui.vehicleModelSelect.value || state.selectedVehicleModel;
+  const models = MODELS_BY_MAKE[make] || [];
+  ui.vehicleModelSelect.textContent = "";
+  for (const model of models) {
+    const option = document.createElement("option");
+    option.value = model;
+    option.textContent = model;
+    ui.vehicleModelSelect.append(option);
+  }
+  if (models.includes(previous)) ui.vehicleModelSelect.value = previous;
+  else ui.vehicleModelSelect.value = models[0] || "";
+}
+
+function renderVehiclePreview() {
+  if (!ui.vehiclePreview) return;
+  const make = state.selectedVehicleMake || ui.vehicleMakeSelect?.value || "";
+  const model = state.selectedVehicleModel || ui.vehicleModelSelect?.value || "";
+  const preset = presetByID(state.selectedVehiclePresetID);
+  const title = preset?.title || [make, model].filter(Boolean).join(" ");
+  const logo = makerLogoElement(make);
+  const car = vehicleImageElement(state.selectedVehiclePresetID, title);
+
+  ui.vehiclePreview.textContent = "";
+  const logoWrap = document.createElement("div");
+  logoWrap.className = "vehicle-preview-logo";
+  if (logo) logoWrap.append(logo);
+  else logoWrap.textContent = initials(make || "EL");
+
+  const copy = document.createElement("div");
+  copy.className = "vehicle-preview-copy";
+  const titleNode = document.createElement("strong");
+  titleNode.textContent = title || "Vehicle";
+  const meta = document.createElement("span");
+  meta.textContent = preset ? "Specific icon selected" : "Automatic icon";
+  copy.append(titleNode, meta);
+
+  const carWrap = document.createElement("div");
+  carWrap.className = "vehicle-preview-car";
+  if (car) carWrap.append(car);
+  else carWrap.textContent = "Choose icon";
+
+  ui.vehiclePreview.append(logoWrap, copy, carWrap);
+  if (ui.vehicleIconLabel) ui.vehicleIconLabel.textContent = preset?.title || "Automatic";
+}
+
+function openVehiclePicker() {
+  if (!ui.vehiclePickerModal) return;
+  const make = ui.vehicleMakeSelect?.value || state.selectedVehicleMake;
+  const model = ui.vehicleModelSelect?.value || state.selectedVehicleModel;
+  ui.vehiclePickerTitle.textContent = "Choose Vehicle Icon";
+  ui.vehiclePickerMeta.textContent = [make, model].filter(Boolean).join(" · ");
+  renderVehiclePickerOptions();
+  ui.vehiclePickerModal.classList.remove("hidden");
+  ui.vehiclePickerModal.setAttribute("aria-hidden", "false");
+}
+
+function closeVehiclePicker() {
+  if (!ui.vehiclePickerModal) return;
+  ui.vehiclePickerModal.classList.add("hidden");
+  ui.vehiclePickerModal.setAttribute("aria-hidden", "true");
+}
+
+function renderVehiclePickerOptions() {
+  if (!ui.vehiclePickerList) return;
+  const make = ui.vehicleMakeSelect?.value || state.selectedVehicleMake;
+  const model = ui.vehicleModelSelect?.value || state.selectedVehicleModel;
+  const options = presetsForVehicle(make, model);
+  ui.vehiclePickerList.textContent = "";
+
+  const automatic = document.createElement("button");
+  automatic.type = "button";
+  automatic.className = "vehicle-picker-row";
+  automatic.innerHTML = `<span class="vehicle-picker-auto">Auto</span><span><strong>Automatic</strong><small>Use best match from make and model</small></span>`;
+  automatic.addEventListener("click", () => {
+    state.selectedVehiclePresetID = "";
+    renderVehiclePreview();
+    closeVehiclePicker();
+  });
+  ui.vehiclePickerList.append(automatic);
+
+  for (const option of options) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "vehicle-picker-row";
+    row.classList.toggle("selected", state.selectedVehiclePresetID === option.id);
+    const image = vehicleImageElement(option.id, option.title);
+    const media = document.createElement("span");
+    media.className = "vehicle-picker-media";
+    if (image) media.append(image);
+    const copy = document.createElement("span");
+    copy.className = "vehicle-picker-copy";
+    const title = document.createElement("strong");
+    title.textContent = option.title;
+    const meta = document.createElement("small");
+    meta.textContent = option.make;
+    copy.append(title, meta);
+    const check = document.createElement("span");
+    check.className = "vehicle-picker-check";
+    check.textContent = state.selectedVehiclePresetID === option.id ? "✓" : "";
+    row.append(media, copy, check);
+    row.addEventListener("click", () => {
+      state.selectedVehiclePresetID = option.id;
+      renderVehiclePreview();
+      closeVehiclePicker();
+    });
+    ui.vehiclePickerList.append(row);
+  }
+
+  if (!options.length) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "No specific miniature is available for this make and model yet.";
+    ui.vehiclePickerList.append(empty);
+  }
+}
+
+function syncCarDescriptionField() {
+  if (!ui.carInput) return;
+  const make = ui.vehicleMakeSelect?.value || state.selectedVehicleMake || "";
+  const model = ui.vehicleModelSelect?.value || state.selectedVehicleModel || "";
+  ui.carInput.value = [make, model].filter(Boolean).join(" ");
+}
+
+function parseVehicleDescription(description) {
+  const text = String(description || "").trim();
+  if (!text) return { make: "", model: "" };
+  const normalized = normalizeSearchText(text);
+  const make = CAR_MAKES.find((candidate) => normalized.startsWith(normalizeSearchText(candidate))) || "";
+  if (!make) return { make: "", model: text };
+  const rest = text.slice(make.length).trim();
+  const model =
+    (MODELS_BY_MAKE[make] || []).find((candidate) => normalizeSearchText(rest) === normalizeSearchText(candidate)) ||
+    rest ||
+    firstModelForMake(make);
+  return { make, model };
+}
+
+function firstModelForMake(make) {
+  return (MODELS_BY_MAKE[make] || [])[0] || "";
+}
+
+function presetsForVehicle(make, model) {
+  const normalizedMake = normalizeSearchText(make);
+  const normalizedModel = normalizeSearchText(model);
+  return VEHICLE_PRESETS.filter((preset) => {
+    if (normalizeSearchText(preset.make) !== normalizedMake) return false;
+    if (!normalizedModel) return true;
+    return preset.models.some((candidate) => {
+      const normalizedCandidate = normalizeSearchText(candidate);
+      return normalizedCandidate === normalizedModel || normalizedModel.includes(normalizedCandidate) || normalizedCandidate.includes(normalizedModel);
+    });
+  });
+}
+
+function presetMatchesVehicle(presetID, make, model) {
+  if (!presetID) return false;
+  return presetsForVehicle(make, model).some((preset) => preset.id === presetID);
+}
+
+function presetByID(id) {
+  return VEHICLE_PRESETS.find((preset) => preset.id === id) || null;
+}
+
+function presetColorLabel(id) {
+  const preset = presetByID(id);
+  const parts = String(preset?.title || "").split("·");
+  return parts[1]?.trim() || "";
+}
+
+function makerLogoElement(make) {
+  const asset = MAKER_LOGOS[make];
+  if (!asset) return null;
+  const img = document.createElement("img");
+  img.src = `./assets/makers/${asset}.png`;
+  img.alt = `${make} logo`;
+  img.loading = "lazy";
+  img.decoding = "async";
+  return img;
+}
+
+function vehicleImageElement(presetID, fallbackDescription) {
+  const preset = presetByID(presetID);
+  const asset = preset?.asset || automaticVehicleAsset(fallbackDescription);
+  if (!asset) return null;
+  const img = document.createElement("img");
+  img.src = `./assets/vehicles/${asset}.png`;
+  img.alt = preset?.title || fallbackDescription || "Vehicle";
+  img.loading = "lazy";
+  img.decoding = "async";
+  return img;
+}
+
+function automaticVehicleAsset(description) {
+  const text = normalizeSearchText(description);
+  if (text.includes("volvo") && text.includes("ex30")) return "vehicle_mini_volvo_ex30_moss_yellow_yellow";
+  if (text.includes("tesla") && text.includes("model 3")) return "vehicle_mini_tesla_model3_white";
+  if (text.includes("tesla") && text.includes("model y")) return "vehicle_mini_tesla_model_y_white";
+  if (text.includes("octavia") && text.includes("rs")) return "vehicle_mini_skoda_octavia_rs";
+  if (text.includes("octavia")) return "vehicle_mini_octavia_combi_white";
+  if (text.includes("kodiaq")) return "vehicle_mini_skoda_kodiaq";
+  if (text.includes("karoq")) return "vehicle_mini_skoda_karoq_style";
+  if (text.includes("superb")) return "vehicle_mini_superb_white";
+  if (text.includes("tiguan")) return "vehicle_mini_vw_tiguan";
+  if (text.includes("golf")) return "vehicle_mini_vw_golf_variant";
+  if (text.includes("bmw") && text.includes("i4")) return "vehicle_mini_bmw_i4";
+  if (text.includes("bmw")) return "vehicle_mini_bmw_3";
+  if (text.includes("audi") && text.includes("q4")) return "vehicle_mini_audi_q4";
+  if (text.includes("audi")) return "vehicle_mini_audi_a4_avant_b9";
+  if (text.includes("mercedes") && text.includes("eqa")) return "vehicle_mini_mercedes_eqa_250";
+  if (text.includes("mercedes")) return "vehicle_mini_mercedes_c220d_4matic";
+  if (text.includes("mini")) return "vehicle_mini_mini_countryman";
+  if (text.includes("subaru")) return "vehicle_mini_subaru_outback";
+  if (text.includes("ford")) return "vehicle_mini_ford_focus";
+  if (text.includes("hyundai") && text.includes("bayon")) return "vehicle_mini_hyundai_bayon";
+  if (text.includes("kia") && text.includes("ev9")) return "vehicle_mini_kia_ev9";
+  return "vehicle_mini_generic_sedan_white";
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function initials(value) {
+  const parts = String(value || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+  return parts.map((part) => part[0]?.toUpperCase() || "").join("") || "EL";
 }
 
 function switchTab(tab) {
@@ -1973,6 +2573,9 @@ function parseUser(data, docId = "") {
     status: String(data.status ?? "pending"),
     registrationPlate: String(data.registrationPlate ?? ""),
     carDescription: String(data.carDescription ?? ""),
+    carType: String(data.carType ?? ""),
+    carColor: String(data.carColor ?? ""),
+    vehicleMiniaturePresetID: String(data.vehicleMiniaturePresetID ?? ""),
     preferredVocative: String(data.preferredVocative ?? ""),
   };
 }

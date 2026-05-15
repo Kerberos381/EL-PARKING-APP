@@ -4,12 +4,14 @@ import {
   browserSessionPersistence,
   getAuth,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   setPersistence,
   signInWithEmailAndPassword,
   signOut,
 } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js";
 import {
   collection,
+  deleteDoc,
   doc,
   getDocsFromServer,
   getDoc,
@@ -17,6 +19,7 @@ import {
   onSnapshot,
   runTransaction,
   serverTimestamp,
+  setDoc,
   Timestamp,
   updateDoc,
 } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
@@ -39,12 +42,17 @@ const state = {
   allBookings: [],
   dayBookings: [],
   myBookings: [],
+  users: [],
   announcements: [],
+  adminAnnouncements: [],
+  infoItems: [],
   lastBookedSummary: null,
+  editingContent: null,
   listeners: {
     allBookings: null,
     spots: null,
     announcements: null,
+    infoItems: null,
     users: null,
   },
 };
@@ -89,9 +97,21 @@ const ui = {
   myBookingsList: byId("myBookingsList"),
   refreshBookings: byId("refreshBookings"),
   adminTab: byId("adminTab"),
+  adminRefresh: byId("adminRefresh"),
   usersTotal: byId("usersTotal"),
   usersActive: byId("usersActive"),
   usersPending: byId("usersPending"),
+  adminTotalBookings: byId("adminTotalBookings"),
+  adminPinnedAnnouncements: byId("adminPinnedAnnouncements"),
+  adminInfoCards: byId("adminInfoCards"),
+  adminUserSearch: byId("adminUserSearch"),
+  adminUsersList: byId("adminUsersList"),
+  adminSpotsSummary: byId("adminSpotsSummary"),
+  adminSpotsGrid: byId("adminSpotsGrid"),
+  adminNewAnnouncement: byId("adminNewAnnouncement"),
+  adminAnnouncementsList: byId("adminAnnouncementsList"),
+  adminNewInfoCard: byId("adminNewInfoCard"),
+  adminInfoList: byId("adminInfoList"),
   profileForm: byId("profileForm"),
   nameInput: byId("nameInput"),
   vocativeInput: byId("vocativeInput"),
@@ -113,6 +133,23 @@ const ui = {
   bookingEditError: byId("bookingEditError"),
   bookingEditSave: byId("bookingEditSave"),
   bookingEditCancel: byId("bookingEditCancel"),
+  adminContentModal: byId("adminContentModal"),
+  adminContentForm: byId("adminContentForm"),
+  adminContentTitle: byId("adminContentTitle"),
+  adminContentIcon: byId("adminContentIcon"),
+  adminContentTitleInput: byId("adminContentTitleInput"),
+  adminContentBody: byId("adminContentBody"),
+  adminContentImageField: byId("adminContentImageField"),
+  adminContentImageURL: byId("adminContentImageURL"),
+  adminAnnouncementOptions: byId("adminAnnouncementOptions"),
+  adminContentActive: byId("adminContentActive"),
+  adminContentPinned: byId("adminContentPinned"),
+  adminInfoLinkField: byId("adminInfoLinkField"),
+  adminContentLinkURL: byId("adminContentLinkURL"),
+  adminContentError: byId("adminContentError"),
+  adminContentDelete: byId("adminContentDelete"),
+  adminContentCancel: byId("adminContentCancel"),
+  adminContentSave: byId("adminContentSave"),
   tabs: [...document.querySelectorAll(".tab")],
   tabPanels: {
     home: byId("homeTab"),
@@ -209,6 +246,16 @@ function bindEvents() {
   ui.pendingSignOut?.addEventListener("click", () => signOut(auth));
   ui.refreshHome?.addEventListener("click", () => renderAnnouncements());
   ui.refreshBookings?.addEventListener("click", () => renderMyBookings());
+  ui.adminRefresh?.addEventListener("click", refreshAdminFromServer);
+  ui.adminUserSearch?.addEventListener("input", renderAdminUsers);
+  ui.adminNewAnnouncement?.addEventListener("click", () => openContentModal("announcement"));
+  ui.adminNewInfoCard?.addEventListener("click", () => openContentModal("info"));
+  ui.adminContentCancel?.addEventListener("click", closeContentModal);
+  ui.adminContentDelete?.addEventListener("click", deleteCurrentContent);
+  ui.adminContentForm?.addEventListener("submit", saveCurrentContent);
+  ui.adminContentModal?.addEventListener("click", (event) => {
+    if (event.target === ui.adminContentModal) closeContentModal();
+  });
   ui.rememberMeInput?.addEventListener("change", async () => {
     saveKeepSignedInPreference(Boolean(ui.rememberMeInput.checked));
     try {
@@ -260,6 +307,7 @@ function bindEvents() {
     if (event.key === "Escape") {
       hideBookingSuccessModal();
       closeBookingEditModal();
+      closeContentModal();
     }
   });
   ui.tabs.forEach((tab) => tab.addEventListener("click", () => switchTab(tab.dataset.tab)));
@@ -273,8 +321,12 @@ async function handleAuthState(user) {
   state.allBookings = [];
   state.dayBookings = [];
   state.myBookings = [];
+  state.users = [];
   state.announcements = [];
+  state.adminAnnouncements = [];
+  state.infoItems = [];
   state.lastBookedSummary = null;
+  state.editingContent = null;
   state.selectedSpotLabel = "";
   state.selectedAdminSpotLabel = "";
   state.editingBooking = null;
@@ -341,6 +393,7 @@ function subscribeCoreData() {
   subscribeSpots();
   subscribeAllBookings();
   subscribeAnnouncements();
+  subscribeInfoItems();
   subscribeAdminStatsIfAllowed();
 }
 
@@ -356,6 +409,7 @@ function subscribeSpots() {
       ensureSelectedSpotIsValid();
       recalculateDerivedBookings();
       renderParking();
+      renderAdminSpots();
       renderDayPills();
     },
     () => {
@@ -363,6 +417,7 @@ function subscribeSpots() {
       renderSpotSelect();
       recalculateDerivedBookings();
       renderParking();
+      renderAdminSpots();
       renderDayPills();
     }
   );
@@ -385,6 +440,7 @@ function subscribeAllBookings() {
       renderMyBookings();
       renderParking();
       renderAdminSpotInspector();
+      renderAdminDashboard();
       renderDayPills();
     },
     () => {
@@ -395,6 +451,7 @@ function subscribeAllBookings() {
       renderMyBookings();
       renderParking();
       renderAdminSpotInspector();
+      renderAdminDashboard();
       renderDayPills();
     }
   );
@@ -405,16 +462,42 @@ function subscribeAnnouncements() {
   state.listeners.announcements = onSnapshot(
     collection(db, "announcements"),
     (snap) => {
-      state.announcements = snap.docs
+      state.adminAnnouncements = snap.docs
         .map((d) => parseAnnouncement(d.id, d.data()))
-        .filter((item) => item?.isActive)
+        .filter(Boolean)
         .sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0))
-        .slice(0, 12);
+        .slice(0, 50);
+      state.announcements = state.adminAnnouncements.filter((item) => item?.isActive).slice(0, 12);
       renderAnnouncements();
+      renderAdminAnnouncements();
+      renderAdminDashboard();
     },
     () => {
       state.announcements = [];
+      state.adminAnnouncements = [];
       renderAnnouncements();
+      renderAdminAnnouncements();
+      renderAdminDashboard();
+    }
+  );
+}
+
+function subscribeInfoItems() {
+  state.listeners.infoItems?.();
+  state.listeners.infoItems = onSnapshot(
+    collection(db, "info_items"),
+    (snap) => {
+      state.infoItems = snap.docs
+        .map((d) => parseInfoItem(d.id, d.data()))
+        .filter(Boolean)
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+      renderAdminInfoItems();
+      renderAdminDashboard();
+    },
+    () => {
+      state.infoItems = [];
+      renderAdminInfoItems();
+      renderAdminDashboard();
     }
   );
 }
@@ -425,10 +508,9 @@ function subscribeAdminStatsIfAllowed() {
     return;
   }
   state.listeners.users = onSnapshot(collection(db, "users"), (snap) => {
-    const users = snap.docs.map((d) => parseUser(d.data()));
-    ui.usersTotal.textContent = String(users.length);
-    ui.usersActive.textContent = String(users.filter((u) => (u.status || "").toLowerCase() === "active").length);
-    ui.usersPending.textContent = String(users.filter((u) => (u.status || "").toLowerCase() === "pending").length);
+    state.users = snap.docs.map((d) => parseUser(d.data(), d.id));
+    renderAdminDashboard();
+    renderAdminUsers();
   });
 }
 
@@ -441,6 +523,405 @@ function recalculateDerivedBookings() {
 function isAdminLike() {
   const role = (state.profile?.role || "").toLowerCase();
   return role === "admin" || role === "privileged";
+}
+
+function renderAdminDashboard() {
+  if (!isAdminLike()) return;
+  const users = state.users || [];
+  ui.usersTotal.textContent = String(users.length);
+  ui.usersActive.textContent = String(users.filter((u) => (u.status || "").toLowerCase() === "active").length);
+  ui.usersPending.textContent = String(users.filter((u) => (u.status || "").toLowerCase() === "pending").length);
+  ui.adminTotalBookings.textContent = String(state.allBookings.length);
+  ui.adminPinnedAnnouncements.textContent = String(state.adminAnnouncements.filter((a) => a.isPinned).length);
+  ui.adminInfoCards.textContent = String(state.infoItems.length);
+}
+
+function renderAdminUsers() {
+  if (!ui.adminUsersList || !isAdminLike()) return;
+  ui.adminUsersList.textContent = "";
+  const needle = String(ui.adminUserSearch?.value || "").trim().toLowerCase();
+  const users = state.users
+    .filter((user) => {
+      if (!needle) return true;
+      return [user.displayName, user.email, user.registrationPlate, user.carDescription, user.role, user.status]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle);
+    })
+    .sort((a, b) => (a.displayName || a.email).localeCompare(b.displayName || b.email));
+
+  if (!users.length) {
+    ui.adminUsersList.append(textRow("No users found."));
+    return;
+  }
+
+  for (const user of users) {
+    const item = adminItem({
+      title: `${user.displayName || user.email}${user.uid === state.user?.uid ? " · You" : ""}`,
+      meta: `${user.email || "No email"} · ${user.registrationPlate || "No plate"} · ${user.carDescription || "No vehicle"}`,
+    });
+
+    const role = compactSelect(["user", "privileged", "admin"], user.role || "user");
+    role.setAttribute("aria-label", `Role for ${user.displayName || user.email}`);
+    role.disabled = user.uid === state.user?.uid;
+    role.addEventListener("change", () => updateUserAdminFields(user, { role: role.value }));
+
+    const status = compactSelect(["pending", "active", "suspended"], user.status || "pending");
+    status.setAttribute("aria-label", `Status for ${user.displayName || user.email}`);
+    status.disabled = user.uid === state.user?.uid;
+    status.addEventListener("change", () => updateUserAdminFields(user, { status: status.value }));
+
+    const reset = document.createElement("button");
+    reset.type = "button";
+    reset.className = "btn subtle small";
+    reset.textContent = "Password Reset";
+    reset.disabled = !user.email;
+    reset.addEventListener("click", async () => {
+      if (!user.email) return;
+      if (!window.confirm(`Send password reset email to ${user.email}?`)) return;
+      try {
+        await sendPasswordResetEmail(auth, user.email);
+        alert("Password reset email sent.");
+      } catch (error) {
+        alert(error?.message || "Password reset failed.");
+      }
+    });
+
+    item.actions.append(role, status, reset);
+    ui.adminUsersList.append(item.root);
+  }
+}
+
+function renderAdminSpots() {
+  if (!ui.adminSpotsGrid || !isAdminLike()) return;
+  ui.adminSpotsGrid.textContent = "";
+  const blocked = state.spots.filter((spot) => spot.isBlocked).length;
+  ui.adminSpotsSummary.textContent = `${state.spots.length} spots · ${blocked} blocked`;
+
+  for (const spot of state.spots) {
+    const card = document.createElement("article");
+    card.className = "admin-spot-card";
+    card.classList.toggle("blocked", spot.isBlocked);
+
+    const label = document.createElement("strong");
+    label.textContent = extractSpotNumber(spot.label);
+    const meta = document.createElement("span");
+    meta.className = "muted tiny";
+    meta.textContent = spot.isBlocked ? "Blocked" : spot.isAccessible ? "Accessible" : "Open";
+
+    const block = document.createElement("button");
+    block.type = "button";
+    block.className = spot.isBlocked ? "btn subtle small" : "btn danger small";
+    block.textContent = spot.isBlocked ? "Unblock" : "Block";
+    block.addEventListener("click", () => updateSpotAdminFields(spot, { isBlocked: !spot.isBlocked }));
+
+    const accessible = document.createElement("button");
+    accessible.type = "button";
+    accessible.className = "btn subtle small";
+    accessible.textContent = spot.isAccessible ? "Accessible" : "Mark Accessible";
+    accessible.addEventListener("click", () => updateSpotAdminFields(spot, { isAccessible: !spot.isAccessible }));
+
+    card.append(label, meta, block, accessible);
+    ui.adminSpotsGrid.append(card);
+  }
+}
+
+function renderAdminAnnouncements() {
+  if (!ui.adminAnnouncementsList || !isAdminLike()) return;
+  ui.adminAnnouncementsList.textContent = "";
+  if (!state.adminAnnouncements.length) {
+    ui.adminAnnouncementsList.append(textRow("No announcements."));
+    return;
+  }
+
+  for (const item of state.adminAnnouncements) {
+    const row = adminItem({
+      title: `${item.emoji || "📣"} ${item.title || "Untitled"}`,
+      meta: `${item.isActive ? "Active" : "Hidden"} · ${item.isPinned ? "Pinned" : "Not pinned"} · ${
+        item.body || "No body"
+      }`,
+    });
+    const edit = actionButton("Edit", "subtle", () => openContentModal("announcement", item));
+    const pin = actionButton(item.isPinned ? "Unpin" : "Pin", "subtle", () =>
+      saveAnnouncement({ ...item, isPinned: !item.isPinned })
+    );
+    const active = actionButton(item.isActive ? "Hide" : "Show", "subtle", () =>
+      saveAnnouncement({ ...item, isActive: !item.isActive })
+    );
+    const del = actionButton("Delete", "danger", () => deleteAnnouncement(item, true));
+    row.actions.append(edit, pin, active, del);
+    ui.adminAnnouncementsList.append(row.root);
+  }
+}
+
+function renderAdminInfoItems() {
+  if (!ui.adminInfoList || !isAdminLike()) return;
+  ui.adminInfoList.textContent = "";
+  if (!state.infoItems.length) {
+    ui.adminInfoList.append(textRow("No info cards."));
+    return;
+  }
+
+  for (const item of state.infoItems) {
+    const row = adminItem({
+      title: `${item.icon || "info.circle.fill"} ${item.title || "Untitled"}`,
+      meta: `${item.body || "No body"}${item.linkURL ? ` · ${item.linkURL}` : ""}`,
+    });
+    row.actions.append(
+      actionButton("Edit", "subtle", () => openContentModal("info", item)),
+      actionButton("Delete", "danger", () => deleteInfoItem(item))
+    );
+    ui.adminInfoList.append(row.root);
+  }
+}
+
+function adminItem({ title, meta }) {
+  const root = document.createElement("article");
+  root.className = "admin-item";
+  const main = document.createElement("div");
+  main.className = "admin-item-main";
+  const titleNode = document.createElement("p");
+  titleNode.className = "admin-item-title";
+  titleNode.textContent = title;
+  const metaNode = document.createElement("p");
+  metaNode.className = "admin-item-meta";
+  metaNode.textContent = meta;
+  main.append(titleNode, metaNode);
+  const actions = document.createElement("div");
+  actions.className = "admin-item-actions";
+  root.append(main, actions);
+  return { root, main, actions };
+}
+
+function actionButton(label, style, handler) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `btn ${style || "subtle"} small`;
+  button.textContent = label;
+  button.addEventListener("click", handler);
+  return button;
+}
+
+function compactSelect(options, value) {
+  const select = document.createElement("select");
+  for (const optionValue of options) {
+    const option = document.createElement("option");
+    option.value = optionValue;
+    option.textContent = titleCase(optionValue);
+    select.append(option);
+  }
+  select.value = value;
+  return select;
+}
+
+async function updateUserAdminFields(user, patch) {
+  if (!isAdminLike() || !user?.uid || user.uid === state.user?.uid) return;
+  try {
+    await updateDoc(doc(db, "users", user.uid), {
+      ...patch,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    alert(error?.message || "User update failed.");
+  }
+}
+
+async function updateSpotAdminFields(spot, patch) {
+  if (!isAdminLike() || !spot?.id) return;
+  try {
+    await setDoc(
+      doc(db, "parkingSpots", spot.id),
+      {
+        id: spot.id,
+        label: spot.label,
+        sortOrder: spot.sortOrder ?? 999,
+        ...patch,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (error) {
+    alert(error?.message || "Spot update failed.");
+  }
+}
+
+function openContentModal(kind, item = null) {
+  if (!isAdminLike() || !ui.adminContentModal) return;
+  state.editingContent = { kind, item };
+  const isAnnouncement = kind === "announcement";
+  ui.adminContentTitle.textContent = item ? `Edit ${isAnnouncement ? "Announcement" : "Info Card"}` : `New ${isAnnouncement ? "Announcement" : "Info Card"}`;
+  ui.adminContentIcon.value = item?.emoji || item?.icon || (isAnnouncement ? "📣" : "info.circle.fill");
+  ui.adminContentTitleInput.value = item?.title || "";
+  ui.adminContentBody.value = item?.body || "";
+  ui.adminContentImageURL.value = item?.imageURL || "";
+  ui.adminContentActive.checked = item?.isActive ?? true;
+  ui.adminContentPinned.checked = item?.isPinned ?? false;
+  ui.adminContentLinkURL.value = item?.linkURL || "";
+  ui.adminContentImageField.classList.toggle("hidden", !isAnnouncement);
+  ui.adminAnnouncementOptions.classList.toggle("hidden", !isAnnouncement);
+  ui.adminInfoLinkField.classList.toggle("hidden", isAnnouncement);
+  ui.adminContentDelete.classList.toggle("hidden", !item);
+  ui.adminContentError.textContent = "";
+  ui.adminContentModal.classList.remove("hidden");
+  ui.adminContentModal.setAttribute("aria-hidden", "false");
+}
+
+function closeContentModal() {
+  state.editingContent = null;
+  ui.adminContentModal?.classList.add("hidden");
+  ui.adminContentModal?.setAttribute("aria-hidden", "true");
+}
+
+async function saveCurrentContent(event) {
+  event.preventDefault();
+  if (!isAdminLike() || !state.editingContent) return;
+  const title = ui.adminContentTitleInput.value.trim();
+  const body = ui.adminContentBody.value.trim();
+  if (!title || !body) {
+    ui.adminContentError.textContent = "Title and body are required.";
+    return;
+  }
+
+  ui.adminContentSave.disabled = true;
+  ui.adminContentError.textContent = "";
+  try {
+    if (state.editingContent.kind === "announcement") {
+      const existing = state.editingContent.item;
+      await saveAnnouncement({
+        id: existing?.id,
+        title,
+        body,
+        emoji: ui.adminContentIcon.value.trim() || "📣",
+        createdBy: existing?.createdBy || state.user?.email || "web-admin",
+        createdAtMs: existing?.createdAtMs || Date.now(),
+        isActive: Boolean(ui.adminContentActive.checked),
+        isPinned: Boolean(ui.adminContentPinned.checked),
+        imageURL: ui.adminContentImageURL.value.trim(),
+      });
+    } else {
+      const existing = state.editingContent.item;
+      await saveInfoItem({
+        id: existing?.id,
+        icon: ui.adminContentIcon.value.trim() || "info.circle.fill",
+        title,
+        body,
+        linkURL: ui.adminContentLinkURL.value.trim(),
+        sortOrder: existing?.sortOrder ?? state.infoItems.length,
+        createdAtMs: existing?.createdAtMs || Date.now(),
+      });
+    }
+    closeContentModal();
+  } catch (error) {
+    ui.adminContentError.textContent = error?.message || "Save failed.";
+  } finally {
+    ui.adminContentSave.disabled = false;
+  }
+}
+
+async function saveAnnouncement(item) {
+  const id = item.id || doc(collection(db, "announcements")).id;
+  await setDoc(
+    doc(db, "announcements", id),
+    {
+      id,
+      title: item.title,
+      body: item.body,
+      emoji: item.emoji || "📣",
+      createdBy: item.createdBy || state.user?.email || "web-admin",
+      createdAt: Timestamp.fromDate(new Date(item.createdAtMs || Date.now())),
+      isActive: Boolean(item.isActive),
+      isPinned: Boolean(item.isPinned),
+      imageURL: item.imageURL || "",
+      textColorMode: "auto",
+      fields: [],
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+async function saveInfoItem(item) {
+  const id = item.id || doc(collection(db, "info_items")).id;
+  await setDoc(
+    doc(db, "info_items", id),
+    {
+      icon: item.icon || "info.circle.fill",
+      title: item.title,
+      body: item.body,
+      details: item.details || "",
+      fields: [],
+      linkTitle: item.linkURL ? "Open" : "",
+      linkURL: item.linkURL || "",
+      sortOrder: Number(item.sortOrder ?? 0),
+      createdAt: Timestamp.fromDate(new Date(item.createdAtMs || Date.now())),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+async function deleteCurrentContent() {
+  const item = state.editingContent?.item;
+  if (!item?.id || !isAdminLike()) return;
+  const ok = window.confirm(`Delete "${item.title || "this item"}"?`);
+  if (!ok) return;
+  try {
+    if (state.editingContent.kind === "announcement") await deleteAnnouncement(item, false);
+    else await deleteInfoItem(item, false);
+    closeContentModal();
+  } catch (error) {
+    ui.adminContentError.textContent = error?.message || "Delete failed.";
+  }
+}
+
+async function deleteAnnouncement(item, confirmFirst = true) {
+  if (!item?.id) return;
+  if (confirmFirst && !window.confirm(`Delete announcement "${item.title || "Untitled"}"?`)) return;
+  await deleteDoc(doc(db, "announcements", item.id));
+}
+
+async function deleteInfoItem(item, confirmFirst = true) {
+  if (!item?.id) return;
+  if (confirmFirst && !window.confirm(`Delete info card "${item.title || "Untitled"}"?`)) return;
+  await deleteDoc(doc(db, "info_items", item.id));
+}
+
+async function refreshAdminFromServer() {
+  if (!isAdminLike()) return;
+  try {
+    const [usersSnap, bookingsSnap, announcementsSnap, infoSnap] = await Promise.all([
+      getDocsFromServer(collection(db, "users")),
+      getDocsFromServer(collection(db, "bookings")),
+      getDocsFromServer(collection(db, "announcements")),
+      getDocsFromServer(collection(db, "info_items")),
+    ]);
+    state.users = usersSnap.docs.map((d) => parseUser(d.data(), d.id));
+    state.allBookings = bookingsSnap.docs
+      .map((d) => parseBooking(d.id, d.data()))
+      .filter(Boolean)
+      .filter(shouldKeepBookingLocally)
+      .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime());
+    state.adminAnnouncements = announcementsSnap.docs
+      .map((d) => parseAnnouncement(d.id, d.data()))
+      .filter(Boolean)
+      .sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
+    state.announcements = state.adminAnnouncements.filter((item) => item.isActive).slice(0, 12);
+    state.infoItems = infoSnap.docs
+      .map((d) => parseInfoItem(d.id, d.data()))
+      .filter(Boolean)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    recalculateDerivedBookings();
+    renderAdminDashboard();
+    renderAdminUsers();
+    renderAdminSpots();
+    renderAdminAnnouncements();
+    renderAdminInfoItems();
+    renderMyBookings();
+    renderParking();
+    renderAnnouncements();
+  } catch (error) {
+    alert(error?.message || "Admin refresh failed.");
+  }
 }
 
 function renderGreeting() {
@@ -1448,21 +1929,44 @@ function parseAnnouncement(id, data) {
     const parsed = new Date(createdAtRaw);
     if (!Number.isNaN(parsed.getTime())) createdAtMs = parsed.getTime();
   }
+  if (!createdAtMs) createdAtMs = Date.now();
   return {
     id,
     title: String(data.title ?? ""),
     body: String(data.body ?? ""),
     emoji: String(data.emoji ?? "📣"),
-    isActive: Boolean(data.isActive),
+    isActive: data.isActive !== false,
     isPinned: Boolean(data.isPinned),
     imageURL: String(data.imageURL ?? data.imageUrl ?? data.image ?? "").trim(),
+    createdBy: String(data.createdBy ?? ""),
     createdAtMs,
   };
 }
 
-function parseUser(data) {
+function parseInfoItem(id, data) {
+  const createdAtRaw = data.createdAt;
+  let createdAtMs = 0;
+  if (createdAtRaw?.toDate) createdAtMs = createdAtRaw.toDate().getTime();
+  else if (typeof createdAtRaw === "string" || typeof createdAtRaw === "number") {
+    const parsed = new Date(createdAtRaw);
+    if (!Number.isNaN(parsed.getTime())) createdAtMs = parsed.getTime();
+  }
   return {
-    uid: String(data.uid ?? ""),
+    id,
+    icon: String(data.icon ?? "info.circle.fill"),
+    title: String(data.title ?? ""),
+    body: String(data.body ?? ""),
+    details: String(data.details ?? ""),
+    linkTitle: String(data.linkTitle ?? ""),
+    linkURL: String(data.linkURL ?? ""),
+    sortOrder: Number(data.sortOrder ?? 0),
+    createdAtMs,
+  };
+}
+
+function parseUser(data, docId = "") {
+  return {
+    uid: String(data.uid ?? docId),
     email: String(data.email ?? "").toLowerCase(),
     displayName: String(data.displayName ?? ""),
     role: String(data.role ?? "user"),
@@ -1500,6 +2004,11 @@ function compareNumberString(a, b) {
   const nb = Number(b);
   if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
   return String(a).localeCompare(String(b));
+}
+
+function titleCase(value) {
+  const text = String(value || "");
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
 }
 
 function downloadCalendarForBooking(booking) {

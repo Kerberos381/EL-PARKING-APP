@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' blob: https://www.gstatic.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-src https://*.firebaseapp.com;"
+      content="default-src 'self'; script-src 'self' https://www.gstatic.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-src https://*.firebaseapp.com;"
     />
     <title>EL Parking Web</title>
     <link rel="stylesheet" href="./styles.css" />
@@ -23,6 +23,10 @@
           <label class="field">
             <span>Password</span>
             <input id="passwordInput" type="password" autocomplete="current-password" required />
+          </label>
+          <label class="field inline remember-me">
+            <input id="rememberMeInput" type="checkbox" checked />
+            <span>Keep me signed in</span>
           </label>
           <button id="loginButton" class="btn primary" type="submit">Sign In</button>
           <p id="authError" class="error" role="alert"></p>
@@ -87,6 +91,13 @@
             </div>
             <p class="muted tiny spot-grid-hint">Tap a FREE spot tile to select it.</p>
             <div id="spotsGrid" class="spot-grid"></div>
+            <section id="adminSpotInspector" class="admin-inspector hidden">
+              <div class="admin-inspector-header">
+                <h4 id="adminSpotInspectorTitle">Spot</h4>
+                <button id="adminSpotInspectorClose" class="btn subtle small" type="button">Close</button>
+              </div>
+              <div id="adminSpotInspectorList" class="stack dense"></div>
+            </section>
           </article>
 
           <article class="card">
@@ -102,11 +113,8 @@
                 />
               </label>
               <p id="selectedSpotHint" class="selection-hint muted tiny">No spot selected yet.</p>
-              <label class="field">
-                <span>Spot</span>
-                <select id="spotSelect" class="hidden-native-select" required></select>
-              </label>
-              <div class="row">
+              <select id="spotSelect" class="hidden-native-select" required></select>
+              <div class="booking-time-grid">
                 <label class="field grow">
                   <span>Date</span>
                   <input id="bookDate" type="date" required />
@@ -145,7 +153,7 @@
               <div><span id="usersPending">0</span><small>Pending</small></div>
             </div>
             <p class="muted tiny">
-              Admin features are read-only in this first web cut, to keep rollout safe.
+              Admin can inspect, edit and cancel bookings from Parking and Bookings tabs.
             </p>
           </article>
         </section>
@@ -182,8 +190,40 @@
             <p id="bookingSuccessMessage" class="muted"></p>
             <div class="modal-actions">
               <button id="bookingSuccessStay" class="btn subtle" type="button">Continue</button>
+              <button id="bookingSuccessCalendar" class="btn subtle" type="button">Add to Calendar</button>
               <button id="bookingSuccessGo" class="btn primary" type="button">Go to My Bookings</button>
             </div>
+          </article>
+        </section>
+
+        <section id="bookingEditModal" class="modal hidden" aria-hidden="true">
+          <article class="modal-card" role="dialog" aria-modal="true" aria-labelledby="bookingEditTitle">
+            <h3 id="bookingEditTitle">Edit Booking</h3>
+            <form id="bookingEditForm" class="stack">
+              <label class="field">
+                <span>Spot</span>
+                <select id="bookingEditSpot" required></select>
+              </label>
+              <div class="row">
+                <label class="field grow">
+                  <span>Date</span>
+                  <input id="bookingEditDate" type="date" required />
+                </label>
+                <label class="field grow">
+                  <span>From</span>
+                  <input id="bookingEditFrom" type="time" required />
+                </label>
+                <label class="field grow">
+                  <span>To</span>
+                  <input id="bookingEditTo" type="time" required />
+                </label>
+              </div>
+              <p id="bookingEditError" class="error" role="alert"></p>
+              <div class="modal-actions">
+                <button id="bookingEditCancel" class="btn subtle" type="button">Cancel</button>
+                <button id="bookingEditSave" class="btn primary" type="submit">Save</button>
+              </div>
+            </form>
           </article>
         </section>
       </section>
@@ -195,10 +235,13 @@
           <p class="title"></p>
           <p class="meta"></p>
         </div>
-        <button class="btn danger">Cancel</button>
+        <div class="booking-row-actions">
+          <button class="btn subtle calendar-btn" type="button">Calendar</button>
+          <button class="btn danger cancel-btn" type="button">Cancel</button>
+        </div>
       </article>
     </template>
 
-    <script type="module" src="./app-bootstrap.js"></script>
+    <script type="module" src="./app.js"></script>
   </body>
 </html>

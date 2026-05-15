@@ -86,6 +86,7 @@ h3 {
   padding: 20px;
   box-shadow: var(--shadow-soft);
   min-width: 0;
+  overflow: hidden;
 }
 
 .dark {
@@ -189,6 +190,7 @@ h3 {
   display: flex;
   gap: 10px;
   align-items: center;
+  min-width: 0;
 }
 
 .row.between {
@@ -196,7 +198,11 @@ h3 {
 }
 
 .section-head {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
+  flex-wrap: nowrap;
+  gap: 10px;
   margin-bottom: 10px;
 }
 
@@ -226,6 +232,23 @@ h3 {
   gap: 8px;
 }
 
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.remember-me input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.remember-me > span {
+  margin: 0;
+  font-size: 14px;
+}
+
 .field input,
 .field select {
   width: 100%;
@@ -236,6 +259,8 @@ h3 {
   padding: 12px 13px;
   font-size: 16px;
   min-height: 50px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .field input[readonly] {
@@ -249,6 +274,12 @@ h3 {
   border-color: #9fe2af;
 }
 
+.field input[type="date"],
+.field input[type="time"] {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .hidden-native-select {
   position: absolute !important;
   width: 1px !important;
@@ -259,6 +290,17 @@ h3 {
 
 .grow {
   flex: 1;
+  min-width: 0;
+}
+
+.booking-time-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.booking-time-grid .field {
+  min-width: 0;
 }
 
 .btn {
@@ -450,6 +492,15 @@ h3 {
   cursor: default;
 }
 
+.spot-cell[data-state="booked"].admin-clickable {
+  cursor: pointer;
+}
+
+.spot-cell[data-state="booked"].admin-clickable:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(140, 30, 30, 0.08);
+}
+
 .spot-cell[data-state="blocked"] {
   opacity: 0.7;
   background: var(--surface-strong);
@@ -482,6 +533,17 @@ h3 {
   box-shadow: 0 4px 10px rgba(34, 133, 58, 0.3);
 }
 
+.spot-cell-booking-owner {
+  margin-top: 6px;
+  color: #8a1b1b;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .spot-grid-hint {
   margin: 2px 0 10px;
 }
@@ -506,6 +568,12 @@ h3 {
   padding: 12px 14px;
 }
 
+.booking-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .booking-row .title {
   margin: 0;
   font-weight: 700;
@@ -515,6 +583,71 @@ h3 {
   margin: 3px 0 0;
   font-size: 13px;
   color: var(--subtle);
+}
+
+.admin-inspector {
+  border: 1px solid #d8e6dc;
+  background: #fbfefc;
+  border-radius: 20px;
+  padding: 14px;
+  margin-top: 12px;
+}
+
+.admin-inspector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.admin-inspector-header h4 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.admin-booking-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #e5ebf2;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 10px 12px;
+}
+
+.admin-booking-main {
+  min-width: 0;
+}
+
+.admin-booking-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-booking-meta {
+  margin: 3px 0 0;
+  color: var(--subtle);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-booking-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn.small {
+  min-height: 36px;
+  padding: 8px 12px;
+  font-size: 13px;
 }
 
 .announcement {
@@ -585,6 +718,18 @@ h3 {
   margin-top: 4px;
 }
 
+@media (max-width: 980px) {
+  .booking-time-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .spot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
 @media (max-width: 760px) {
   .app {
     padding: max(10px, env(safe-area-inset-top)) 10px calc(110px + env(safe-area-inset-bottom));
@@ -648,6 +793,20 @@ h3 {
     align-items: flex-start;
   }
 
+  .section-head {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .section-head .btn {
+    margin-left: 0;
+  }
+
+  .booking-time-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
   .field.inline {
     width: 100%;
     grid-template-columns: 1fr;
@@ -681,8 +840,21 @@ h3 {
     align-items: flex-start;
   }
 
+  .booking-row-actions {
+    width: 100%;
+  }
+
   .booking-row .btn {
     width: 100%;
+  }
+
+  .admin-booking-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .admin-booking-actions .btn {
+    flex: 1 1 120px;
   }
 
   .modal {
@@ -714,6 +886,6 @@ h3 {
   }
 
   .spot-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

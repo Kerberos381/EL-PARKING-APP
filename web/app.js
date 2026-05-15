@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
 import {
+  browserLocalPersistence,
   browserSessionPersistence,
   getAuth,
   onAuthStateChanged,
@@ -10,6 +11,7 @@ import {
 import {
   collection,
   doc,
+  getDocsFromServer,
   getDoc,
   getFirestore,
   onSnapshot,
@@ -31,11 +33,14 @@ const state = {
   profile: null,
   selectedDate: toYmd(new Date()),
   selectedSpotLabel: "",
+  selectedAdminSpotLabel: "",
+  editingBooking: null,
   spots: [],
   allBookings: [],
   dayBookings: [],
   myBookings: [],
   announcements: [],
+  lastBookedSummary: null,
   listeners: {
     allBookings: null,
     spots: null,
@@ -53,6 +58,7 @@ const ui = {
   loginButton: byId("loginButton"),
   emailInput: byId("emailInput"),
   passwordInput: byId("passwordInput"),
+  rememberMeInput: byId("rememberMeInput"),
   pendingSignOut: byId("pendingSignOut"),
   signOutButton: byId("signOutButton"),
   greetingText: byId("greetingText"),
@@ -67,6 +73,10 @@ const ui = {
   bookedCount: byId("bookedCount"),
   blockedCount: byId("blockedCount"),
   spotsGrid: byId("spotsGrid"),
+  adminSpotInspector: byId("adminSpotInspector"),
+  adminSpotInspectorTitle: byId("adminSpotInspectorTitle"),
+  adminSpotInspectorList: byId("adminSpotInspectorList"),
+  adminSpotInspectorClose: byId("adminSpotInspectorClose"),
   bookForm: byId("bookForm"),
   selectedSpotDisplay: byId("selectedSpotDisplay"),
   selectedSpotHint: byId("selectedSpotHint"),
@@ -92,7 +102,17 @@ const ui = {
   bookingSuccessModal: byId("bookingSuccessModal"),
   bookingSuccessMessage: byId("bookingSuccessMessage"),
   bookingSuccessStay: byId("bookingSuccessStay"),
+  bookingSuccessCalendar: byId("bookingSuccessCalendar"),
   bookingSuccessGo: byId("bookingSuccessGo"),
+  bookingEditModal: byId("bookingEditModal"),
+  bookingEditForm: byId("bookingEditForm"),
+  bookingEditSpot: byId("bookingEditSpot"),
+  bookingEditDate: byId("bookingEditDate"),
+  bookingEditFrom: byId("bookingEditFrom"),
+  bookingEditTo: byId("bookingEditTo"),
+  bookingEditError: byId("bookingEditError"),
+  bookingEditSave: byId("bookingEditSave"),
+  bookingEditCancel: byId("bookingEditCancel"),
   tabs: [...document.querySelectorAll(".tab")],
   tabPanels: {
     home: byId("homeTab"),
@@ -107,8 +127,6 @@ const ui = {
 let auth;
 let db;
 
-boot();
-
 const REQUIRED_FIREBASE_KEYS = [
   "apiKey",
   "authDomain",
@@ -117,6 +135,8 @@ const REQUIRED_FIREBASE_KEYS = [
   "messagingSenderId",
   "appId",
 ];
+
+const LOGIN_PERSISTENCE_KEY = "el_parking_keep_signed_in";
 
 function validateFirebaseConfig(config) {
   if (!config || typeof config !== "object") return "Firebase config is missing.";
@@ -130,6 +150,28 @@ function validateFirebaseConfig(config) {
   return "";
 }
 
+function shouldKeepSignedIn() {
+  try {
+    const saved = window.localStorage.getItem(LOGIN_PERSISTENCE_KEY);
+    if (saved === null) return true;
+    return saved === "1";
+  } catch {
+    return true;
+  }
+}
+
+function saveKeepSignedInPreference(value) {
+  try {
+    window.localStorage.setItem(LOGIN_PERSISTENCE_KEY, value ? "1" : "0");
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function currentAuthPersistence() {
+  return shouldKeepSignedIn() ? browserLocalPersistence : browserSessionPersistence;
+}
+
 async function boot() {
   ui.loginForm.addEventListener("submit", (event) => event.preventDefault(), { capture: true });
   try {
@@ -140,7 +182,7 @@ async function boot() {
     auth = getAuth(app);
     db = getFirestore(app);
     try {
-      await setPersistence(auth, browserSessionPersistence);
+      await setPersistence(auth, currentAuthPersistence());
     } catch (persistError) {
       console.warn("setPersistence failed, fallback to default:", persistError);
     }
@@ -155,6 +197,7 @@ async function boot() {
 
 function bootstrap() {
   if (ui.bookDate) ui.bookDate.value = state.selectedDate;
+  if (ui.rememberMeInput) ui.rememberMeInput.checked = shouldKeepSignedIn();
   bindEvents();
   syncBookUiState();
   onAuthStateChanged(auth, handleAuthState);
@@ -166,9 +209,18 @@ function bindEvents() {
   ui.pendingSignOut?.addEventListener("click", () => signOut(auth));
   ui.refreshHome?.addEventListener("click", () => renderAnnouncements());
   ui.refreshBookings?.addEventListener("click", () => renderMyBookings());
+  ui.rememberMeInput?.addEventListener("change", async () => {
+    saveKeepSignedInPreference(Boolean(ui.rememberMeInput.checked));
+    try {
+      await setPersistence(auth, currentAuthPersistence());
+    } catch (error) {
+      console.warn("Could not update auth persistence:", error);
+    }
+  });
 
   ui.bookDate?.addEventListener("change", () => {
     state.selectedDate = ui.bookDate.value || state.selectedDate;
+    state.selectedAdminSpotLabel = "";
     recalculateDerivedBookings();
     renderParking();
     renderDayPills();
@@ -185,7 +237,12 @@ function bindEvents() {
   ui.profileForm?.addEventListener("submit", onSaveProfile);
   ui.bookFrom?.addEventListener("change", syncBookUiState);
   ui.bookTo?.addEventListener("change", syncBookUiState);
+  ui.adminSpotInspectorClose?.addEventListener("click", closeAdminSpotInspector);
   ui.bookingSuccessStay?.addEventListener("click", hideBookingSuccessModal);
+  ui.bookingSuccessCalendar?.addEventListener("click", () => {
+    if (!state.lastBookedSummary) return;
+    downloadCalendarForBooking(state.lastBookedSummary);
+  });
   ui.bookingSuccessGo?.addEventListener("click", () => {
     hideBookingSuccessModal();
     switchTab("bookings");
@@ -194,8 +251,16 @@ function bindEvents() {
   ui.bookingSuccessModal?.addEventListener("click", (event) => {
     if (event.target === ui.bookingSuccessModal) hideBookingSuccessModal();
   });
+  ui.bookingEditCancel?.addEventListener("click", closeBookingEditModal);
+  ui.bookingEditForm?.addEventListener("submit", onSaveBookingEdit);
+  ui.bookingEditModal?.addEventListener("click", (event) => {
+    if (event.target === ui.bookingEditModal) closeBookingEditModal();
+  });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") hideBookingSuccessModal();
+    if (event.key === "Escape") {
+      hideBookingSuccessModal();
+      closeBookingEditModal();
+    }
   });
   ui.tabs.forEach((tab) => tab.addEventListener("click", () => switchTab(tab.dataset.tab)));
 }
@@ -209,7 +274,10 @@ async function handleAuthState(user) {
   state.dayBookings = [];
   state.myBookings = [];
   state.announcements = [];
+  state.lastBookedSummary = null;
   state.selectedSpotLabel = "";
+  state.selectedAdminSpotLabel = "";
+  state.editingBooking = null;
 
   if (!user) {
     showOnly("auth");
@@ -259,6 +327,8 @@ async function onLoginSubmit(event) {
 
   ui.loginButton.disabled = true;
   try {
+    saveKeepSignedInPreference(Boolean(ui.rememberMeInput?.checked));
+    await setPersistence(auth, currentAuthPersistence());
     await signInWithEmailAndPassword(auth, email, password);
   } catch (err) {
     ui.authError.textContent = friendlyAuthError(err);
@@ -314,6 +384,7 @@ function subscribeAllBookings() {
       renderHomeHero();
       renderMyBookings();
       renderParking();
+      renderAdminSpotInspector();
       renderDayPills();
     },
     () => {
@@ -323,6 +394,7 @@ function subscribeAllBookings() {
       renderHomeHero();
       renderMyBookings();
       renderParking();
+      renderAdminSpotInspector();
       renderDayPills();
     }
   );
@@ -364,6 +436,11 @@ function recalculateDerivedBookings() {
   const dayKey = state.selectedDate;
   state.dayBookings = state.allBookings.filter((booking) => toYmd(booking.bookingDate) === dayKey);
   state.myBookings = state.allBookings.filter((booking) => isBookingForCurrentUser(booking));
+}
+
+function isAdminLike() {
+  const role = (state.profile?.role || "").toLowerCase();
+  return role === "admin" || role === "privileged";
 }
 
 function renderGreeting() {
@@ -484,7 +561,20 @@ function renderSpotSelect() {
   }
 }
 
+function bookingsForSpotOnSelectedDay(spotLabel) {
+  const key = normalizedSpotKey(spotLabel);
+  return state.dayBookings
+    .filter((booking) => normalizedSpotKey(booking.spot) === key)
+    .slice()
+    .sort((a, b) => toMinutes(a.fromTime) - toMinutes(b.fromTime));
+}
+
+function bookingDisplayName(booking) {
+  return String(booking.user || booking.email || "Unknown user").trim();
+}
+
 function renderParking() {
+  const adminLike = isAdminLike();
   const blockedKeys = new Set(state.spots.filter((s) => s.isBlocked).map((s) => normalizedSpotKey(s.label)));
   const bookedKeys = new Set(state.dayBookings.map((b) => normalizedSpotKey(b.spot)));
   const usable = state.spots.filter((s) => !s.isBlocked);
@@ -497,6 +587,11 @@ function renderParking() {
   ui.freeCount.textContent = String(Math.max(usable.length - uniqueBookedUsable.size, 0));
   ui.bookedCount.textContent = String(uniqueBookedUsable.size);
   ui.blockedCount.textContent = String(state.spots.length - usable.length);
+  const hintText = adminLike
+    ? "Tap FREE to select for booking, or BOOKED to inspect who holds the spot."
+    : "Tap a FREE spot tile to select it.";
+  const hintNode = document.querySelector(".spot-grid-hint");
+  if (hintNode) hintNode.textContent = hintText;
 
   ui.spotsGrid.textContent = "";
   for (const spot of state.spots) {
@@ -505,19 +600,38 @@ function renderParking() {
     if (spot.isBlocked) stateName = "blocked";
     else if (bookedKeys.has(key)) stateName = "booked";
     const isSelectedFree = normalizedSpotKey(state.selectedSpotLabel) === key && stateName === "free";
+    const isSelectedBooked = normalizedSpotKey(state.selectedAdminSpotLabel) === key && stateName === "booked";
+    const spotBookings = stateName === "booked" ? bookingsForSpotOnSelectedDay(spot.label) : [];
+    const leadBooking = spotBookings[0];
 
     const cell = document.createElement("button");
     cell.type = "button";
     cell.className = "spot-cell";
     cell.dataset.state = stateName;
-    cell.classList.toggle("selected", isSelectedFree);
-    cell.disabled = stateName !== "free";
+    cell.classList.toggle("selected", isSelectedFree || isSelectedBooked);
+    if (stateName === "booked" && adminLike) cell.classList.add("admin-clickable");
+    cell.disabled = stateName !== "free" && !(stateName === "booked" && adminLike);
 
     const strong = document.createElement("strong");
     strong.textContent = String(extractSpotNumber(spot.label));
     const small = document.createElement("small");
-    small.textContent = stateName === "free" ? "FREE" : stateName === "booked" ? "BOOKED" : "BLOCKED";
+    if (stateName === "booked" && adminLike && leadBooking) {
+      small.textContent =
+        spotBookings.length > 1
+          ? `${spotBookings.length} BOOKINGS`
+          : `BOOKED ${leadBooking.fromTime}-${leadBooking.toTime}`;
+    } else {
+      small.textContent = stateName === "free" ? "FREE" : stateName === "booked" ? "BOOKED" : "BLOCKED";
+    }
     cell.append(strong, small);
+
+    if (stateName === "booked" && adminLike && leadBooking) {
+      const owner = document.createElement("div");
+      owner.className = "spot-cell-booking-owner";
+      owner.textContent = bookingDisplayName(leadBooking);
+      cell.append(owner);
+    }
+
     if (isSelectedFree) {
       const check = document.createElement("span");
       check.className = "spot-cell-check";
@@ -532,6 +646,13 @@ function renderParking() {
         syncBookUiState();
         scrollBookingFormIntoView();
       });
+    } else if (stateName === "booked" && adminLike) {
+      cell.addEventListener("click", () => {
+        state.selectedAdminSpotLabel = spot.label;
+        setSelectedSpot("");
+        renderParking();
+        renderAdminSpotInspector();
+      });
     }
 
     ui.spotsGrid.append(cell);
@@ -539,11 +660,14 @@ function renderParking() {
 
   ui.selectedSpotDisplay.value = state.selectedSpotLabel ? `Spot ${extractSpotNumber(state.selectedSpotLabel)}` : "";
   syncBookUiState();
+  renderAdminSpotInspector();
 }
 
 function renderMyBookings() {
   ui.myBookingsList.textContent = "";
-  const upcoming = state.myBookings
+  const adminLike = isAdminLike();
+  const source = adminLike ? state.allBookings : state.myBookings;
+  const upcoming = source
     .slice()
     .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime())
     .filter((b) => bookingEndDate(b.bookingDate, b.toTime) >= new Date());
@@ -555,17 +679,195 @@ function renderMyBookings() {
   }
 
   for (const booking of upcoming) {
+    if (adminLike) {
+      const row = document.createElement("article");
+      row.className = "admin-booking-row";
+
+      const main = document.createElement("div");
+      main.className = "admin-booking-main";
+      const title = document.createElement("p");
+      title.className = "admin-booking-title";
+      title.textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(booking.bookingDate)} · ${bookingDisplayName(
+        booking
+      )}`;
+      const meta = document.createElement("p");
+      meta.className = "admin-booking-meta";
+      meta.textContent = `${booking.fromTime} - ${booking.toTime}${booking.email ? ` · ${booking.email}` : ""}`;
+      main.append(title, meta);
+
+      const actions = document.createElement("div");
+      actions.className = "admin-booking-actions";
+      const calendar = document.createElement("button");
+      calendar.type = "button";
+      calendar.className = "btn subtle small";
+      calendar.textContent = "Calendar";
+      calendar.addEventListener("click", () => downloadCalendarForBooking(booking));
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "btn subtle small";
+      edit.textContent = "Edit";
+      edit.addEventListener("click", () => openBookingEditModal(booking));
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "btn danger small";
+      cancel.textContent = "Cancel";
+      cancel.addEventListener("click", () => cancelBooking(booking));
+      actions.append(calendar, edit, cancel);
+
+      row.append(main, actions);
+      ui.myBookingsList.append(row);
+      continue;
+    }
+
     const node = ui.bookingTemplate.content.firstElementChild.cloneNode(true);
-    node.querySelector(".title").textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(
-      booking.bookingDate
-    )}`;
+    node.querySelector(".title").textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(booking.bookingDate)}`;
     node.querySelector(".meta").textContent = `${booking.fromTime} - ${booking.toTime}`;
-    const cancel = node.querySelector("button");
-    cancel.addEventListener("click", () => cancelBooking(booking));
+    const calendarButton = node.querySelector(".calendar-btn");
+    const cancel = node.querySelector(".cancel-btn");
+    calendarButton?.addEventListener("click", () => downloadCalendarForBooking(booking));
+    cancel?.addEventListener("click", () => cancelBooking(booking));
     ui.myBookingsList.append(node);
   }
 
   renderHomeHero();
+}
+
+function renderAdminSpotInspector() {
+  if (!ui.adminSpotInspector) return;
+  if (!isAdminLike() || !state.selectedAdminSpotLabel) {
+    ui.adminSpotInspector.classList.add("hidden");
+    return;
+  }
+
+  const bookings = bookingsForSpotOnSelectedDay(state.selectedAdminSpotLabel);
+  if (!bookings.length) {
+    ui.adminSpotInspector.classList.add("hidden");
+    state.selectedAdminSpotLabel = "";
+    return;
+  }
+
+  ui.adminSpotInspector.classList.remove("hidden");
+  ui.adminSpotInspectorTitle.textContent = `Spot ${extractSpotNumber(state.selectedAdminSpotLabel)} · ${formatLongDate(dayStart(state.selectedDate))}`;
+  ui.adminSpotInspectorList.textContent = "";
+
+  for (const booking of bookings) {
+    const row = document.createElement("article");
+    row.className = "admin-booking-row";
+
+    const main = document.createElement("div");
+    main.className = "admin-booking-main";
+    const title = document.createElement("p");
+    title.className = "admin-booking-title";
+    title.textContent = bookingDisplayName(booking);
+    const meta = document.createElement("p");
+    meta.className = "admin-booking-meta";
+    meta.textContent = `${booking.fromTime} - ${booking.toTime}${booking.email ? ` · ${booking.email}` : ""}`;
+    main.append(title, meta);
+
+    const actions = document.createElement("div");
+    actions.className = "admin-booking-actions";
+    const calendar = document.createElement("button");
+    calendar.type = "button";
+    calendar.className = "btn subtle small";
+    calendar.textContent = "Calendar";
+    calendar.addEventListener("click", () => downloadCalendarForBooking(booking));
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "btn subtle small";
+    edit.textContent = "Edit";
+    edit.addEventListener("click", () => openBookingEditModal(booking));
+
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "btn danger small";
+    cancel.textContent = "Cancel";
+    cancel.addEventListener("click", () => cancelBooking(booking));
+
+    actions.append(calendar, edit, cancel);
+    row.append(main, actions);
+    ui.adminSpotInspectorList.append(row);
+  }
+}
+
+function closeAdminSpotInspector() {
+  state.selectedAdminSpotLabel = "";
+  ui.adminSpotInspector?.classList.add("hidden");
+}
+
+function openBookingEditModal(booking) {
+  if (!booking || !ui.bookingEditModal) return;
+  state.editingBooking = booking;
+  ui.bookingEditError.textContent = "";
+
+  const availableSpots = state.spots.filter((spot) => !spot.isBlocked).map((spot) => spot.label);
+  const hasCurrent = availableSpots.some((label) => normalizedSpotKey(label) === normalizedSpotKey(booking.spot));
+  if (!hasCurrent) availableSpots.unshift(booking.spot);
+
+  ui.bookingEditSpot.textContent = "";
+  for (const label of availableSpots) {
+    const option = document.createElement("option");
+    option.value = label;
+    option.textContent = label;
+    ui.bookingEditSpot.append(option);
+  }
+
+  ui.bookingEditSpot.value = booking.spot;
+  ui.bookingEditDate.value = toYmd(booking.bookingDate);
+  ui.bookingEditFrom.value = booking.fromTime;
+  ui.bookingEditTo.value = booking.toTime;
+  ui.bookingEditModal.classList.remove("hidden");
+  ui.bookingEditModal.setAttribute("aria-hidden", "false");
+}
+
+function closeBookingEditModal() {
+  state.editingBooking = null;
+  if (!ui.bookingEditModal) return;
+  ui.bookingEditModal.classList.add("hidden");
+  ui.bookingEditModal.setAttribute("aria-hidden", "true");
+}
+
+async function onSaveBookingEdit(event) {
+  event.preventDefault();
+  if (!state.editingBooking) return;
+  if (!isAdminLike()) {
+    ui.bookingEditError.textContent = "Only admin can edit bookings.";
+    return;
+  }
+
+  const booking = state.editingBooking;
+  const nextSpot = String(ui.bookingEditSpot.value || "").trim();
+  const nextDateYmd = String(ui.bookingEditDate.value || "").trim();
+  const nextFrom = String(ui.bookingEditFrom.value || "").trim();
+  const nextTo = String(ui.bookingEditTo.value || "").trim();
+
+  if (!nextSpot || !nextDateYmd || !nextFrom || !nextTo || nextFrom >= nextTo) {
+    ui.bookingEditError.textContent = "Check date and time range.";
+    return;
+  }
+
+  const isBlocked = state.spots.some(
+    (spot) => spot.isBlocked && normalizedSpotKey(spot.label) === normalizedSpotKey(nextSpot)
+  );
+  if (isBlocked) {
+    ui.bookingEditError.textContent = "Selected spot is blocked.";
+    return;
+  }
+
+  ui.bookingEditSave.disabled = true;
+  ui.bookingEditError.textContent = "";
+  try {
+    await updateBookingTransaction(booking, {
+      spot: nextSpot,
+      dateYmd: nextDateYmd,
+      fromTime: nextFrom,
+      toTime: nextTo,
+    });
+    closeBookingEditModal();
+  } catch (err) {
+    ui.bookingEditError.textContent = err?.message || "Booking update failed.";
+  } finally {
+    ui.bookingEditSave.disabled = false;
+  }
 }
 
 async function onBookSubmit(event) {
@@ -589,10 +891,29 @@ async function onBookSubmit(event) {
     enforceBookingRules(spot, dateYmd, fromTime, toTime);
     await createBookingTransaction(spot, date, dateYmd, fromTime, toTime);
     setSelectedSpot("");
+    state.lastBookedSummary = {
+      id: `new-${dateYmd}-${extractSpotNumber(spot)}`,
+      spot,
+      bookingDate: date,
+      fromTime,
+      toTime,
+    };
     ui.bookError.textContent = "";
     showBookingSuccessModal(spot, date, fromTime, toTime);
   } catch (err) {
-    ui.bookError.textContent = err?.message || "Could not create booking.";
+    const message = err?.message || "Could not create booking.";
+    const isConflict = message.toLowerCase().includes("already booked");
+    if (isConflict) {
+      ui.bookError.textContent = "Spot was booked meanwhile. Refreshing availability...";
+      try {
+        await refreshBookingsFromServer();
+      } catch (_) {
+        // keep original message below
+      }
+      ui.bookError.textContent = message;
+    } else {
+      ui.bookError.textContent = message;
+    }
   } finally {
     syncBookUiState();
   }
@@ -600,15 +921,14 @@ async function onBookSubmit(event) {
 
 function enforceBookingRules(spotLabel, dateYmd, fromTime, toTime) {
   if (fromTime >= toTime) throw new Error("Invalid time range.");
-  const role = (state.profile?.role || "").toLowerCase();
-  const isAdminLike = role === "admin" || role === "privileged";
+  const adminLike = isAdminLike();
 
   const blocked = state.spots.some(
     (spot) => spot.isBlocked && normalizedSpotKey(spot.label) === normalizedSpotKey(spotLabel)
   );
   if (blocked) throw new Error("This spot is blocked.");
 
-  if (!isAdminLike) {
+  if (!adminLike) {
     const todayStart = dayStart(toYmd(new Date()));
     const targetDate = dayStart(dateYmd);
     const advanceDays = Math.round((targetDate.getTime() - todayStart.getTime()) / 86400000);
@@ -639,8 +959,8 @@ async function createBookingTransaction(spotLabel, bookingDate, dateYmd, fromTim
   const expiresAt = addDays(bookingEndDate(bookingDate, toTime), APP_RULES.bookingRetentionDays);
 
   await runTransaction(db, async (transaction) => {
-    const lockSnap = await transaction.get(lockRef);
-    const slots = lockSnap.data()?.slots ?? [];
+    const lockState = await loadLiveLockSlots(transaction, lockRef, spotLabel, dateYmd);
+    const slots = lockState.slots;
 
     for (const slot of slots) {
       const sFrom = String(slot.from || "");
@@ -678,6 +998,91 @@ async function createBookingTransaction(spotLabel, bookingDate, dateYmd, fromTim
   });
 }
 
+async function refreshBookingsFromServer() {
+  if (!db) return;
+  const snap = await getDocsFromServer(collection(db, "bookings"));
+  const loaded = snap.docs
+    .map((d) => parseBooking(d.id, d.data()))
+    .filter(Boolean)
+    .filter(shouldKeepBookingLocally)
+    .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime());
+  state.allBookings = loaded;
+  recalculateDerivedBookings();
+  ensureSelectedSpotIsValid();
+  renderHomeHero();
+  renderMyBookings();
+  renderParking();
+  renderAdminSpotInspector();
+  renderDayPills();
+}
+
+async function updateBookingTransaction(existingBooking, next) {
+  if (!existingBooking?.id) throw new Error("Booking is missing id.");
+
+  const nextDate = dayStart(next.dateYmd);
+  const bookingRef = doc(db, "bookings", existingBooking.id);
+  const oldDayKey = toYmd(existingBooking.bookingDate);
+  const newDayKey = next.dateYmd;
+  const oldLockRef = doc(db, "spot_locks", `${existingBooking.spot}_${oldDayKey}`);
+  const newLockRef = doc(db, "spot_locks", `${next.spot}_${newDayKey}`);
+
+  await runTransaction(db, async (transaction) => {
+    const bookingSnap = await transaction.get(bookingRef);
+
+    if (!bookingSnap.exists()) throw new Error("Booking no longer exists.");
+
+    const oldLockState = await loadLiveLockSlots(
+      transaction,
+      oldLockRef,
+      existingBooking.spot,
+      oldDayKey
+    );
+    const newLockState = await loadLiveLockSlots(transaction, newLockRef, next.spot, newDayKey);
+
+    const newSlots = newLockState.slots;
+    const overlap = newSlots
+      .filter((slot) => String(slot.bookingId || "") !== existingBooking.id)
+      .some((slot) =>
+        timesOverlap(
+          next.fromTime,
+          next.toTime,
+          String(slot.from || "00:00"),
+          String(slot.to || "00:00")
+        )
+      );
+    if (overlap) throw new Error("This spot is already booked in that time range.");
+
+    const oldSlotsWithoutCurrent = oldLockState.slots.filter(
+      (slot) => String(slot.bookingId || "") !== existingBooking.id
+    );
+    transaction.set(oldLockRef, { slots: oldSlotsWithoutCurrent }, { merge: true });
+
+    const newSlotsWithoutCurrent = newSlots.filter(
+      (slot) => String(slot.bookingId || "") !== existingBooking.id
+    );
+    transaction.set(
+      newLockRef,
+      {
+        slots: [...newSlotsWithoutCurrent, { from: next.fromTime, to: next.toTime, bookingId: existingBooking.id }],
+      },
+      { merge: true }
+    );
+
+    const spotDoc = state.spots.find((spot) => normalizedSpotKey(spot.label) === normalizedSpotKey(next.spot));
+    const expiresAt = addDays(bookingEndDate(nextDate, next.toTime), APP_RULES.bookingRetentionDays);
+
+    transaction.update(bookingRef, {
+      spot: next.spot,
+      spotID: spotDoc?.id || extractSpotNumber(next.spot),
+      fromTime: next.fromTime,
+      toTime: next.toTime,
+      bookingDate: Timestamp.fromDate(nextDate),
+      expiresAt: Timestamp.fromDate(expiresAt),
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
 async function cancelBooking(booking) {
   if (!state.user || !state.profile) return;
   const ok = window.confirm(
@@ -687,9 +1092,8 @@ async function cancelBooking(booking) {
 
   try {
     const myEmail = String(state.user.email || "").trim().toLowerCase();
-    const role = (state.profile.role || "").toLowerCase();
     const ownerEmail = String(booking.email || "").trim().toLowerCase();
-    if (myEmail !== ownerEmail && role !== "admin" && role !== "privileged") {
+    if (myEmail !== ownerEmail && !isAdminLike()) {
       throw new Error("You can cancel only your own bookings.");
     }
 
@@ -698,17 +1102,45 @@ async function cancelBooking(booking) {
     const bookingRef = doc(db, "bookings", booking.id);
 
     await runTransaction(db, async (transaction) => {
-      const lockSnap = await transaction.get(lockRef);
-      if (lockSnap.exists()) {
-        const slots = lockSnap.data()?.slots ?? [];
-        const updated = slots.filter((slot) => String(slot.bookingId || "") !== booking.id);
-        transaction.set(lockRef, { slots: updated }, { merge: true });
-      }
+      const lockState = await loadLiveLockSlots(transaction, lockRef, booking.spot, bookingDateKey);
+      const updated = lockState.slots.filter((slot) => String(slot.bookingId || "") !== booking.id);
+      transaction.set(lockRef, { slots: updated }, { merge: true });
       transaction.delete(bookingRef);
     });
   } catch (err) {
     alert(err?.message || "Cancel failed.");
   }
+}
+
+async function loadLiveLockSlots(transaction, lockRef, spotLabel, dateYmd) {
+  const lockSnap = await transaction.get(lockRef);
+  const rawSlots = lockSnap.data()?.slots ?? [];
+  const normalizedRequestedSpot = normalizedSpotKey(spotLabel);
+  const liveSlots = [];
+
+  for (const raw of rawSlots) {
+    const bookingId = String(raw?.bookingId || "").trim();
+    if (!bookingId) continue;
+
+    const from = String(raw?.from || "").trim();
+    const to = String(raw?.to || "").trim();
+    if (!from || !to) continue;
+
+    const bookingRef = doc(db, "bookings", bookingId);
+    const bookingSnap = await transaction.get(bookingRef);
+    if (!bookingSnap.exists()) continue;
+
+    const parsed = parseBooking(bookingId, bookingSnap.data());
+    if (!parsed) continue;
+
+    const sameDay = toYmd(parsed.bookingDate) === dateYmd;
+    const sameSpot = normalizedSpotKey(parsed.spot) === normalizedRequestedSpot;
+    if (!sameDay || !sameSpot) continue;
+
+    liveSlots.push({ from: parsed.fromTime, to: parsed.toTime, bookingId });
+  }
+
+  return { slots: liveSlots };
 }
 
 async function onSaveProfile(event) {
@@ -752,6 +1184,7 @@ function hydrateProfileForm() {
 
 function switchTab(tab) {
   if (!tab) return;
+  if (tab !== "parking") closeAdminSpotInspector();
   for (const [name, panel] of Object.entries(ui.tabPanels)) {
     panel.classList.toggle("hidden", name !== tab);
   }
@@ -911,15 +1344,12 @@ function bookingEndDate(date, toTime) {
 }
 
 function parseBooking(id, data) {
-  let bookingDate = new Date();
-  const raw = data.bookingDate;
-  if (raw?.toDate) bookingDate = raw.toDate();
-  else if (typeof raw === "string") bookingDate = parseBookingDateString(raw);
-  else if (typeof raw === "number") bookingDate = new Date(raw);
-
+  const rawDate = data.bookingDate ?? data.date ?? data.booking_day ?? data.bookingDateString;
+  const bookingDate = parseDateLike(rawDate);
   if (!(bookingDate instanceof Date) || Number.isNaN(bookingDate.getTime())) return null;
 
-  const spot = String(data.spot ?? data.spotLabel ?? data.spotId ?? "");
+  const rawSpot = data.spot ?? data.spotLabel ?? data.spotId ?? data.spotID ?? data.spotNumber ?? data.spotNo ?? "";
+  const spot = normalizeSpotLabel(rawSpot);
   if (!spot) return null;
 
   const email = String(data.email ?? data.userEmail ?? data.bookedForEmail ?? data.ownerEmail ?? "")
@@ -937,10 +1367,48 @@ function parseBooking(id, data) {
 }
 
 function parseBookingDateString(value) {
+  if (!value) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+
+  const czechLike = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+  if (czechLike) {
+    const d = Number(czechLike[1]);
+    const m = Number(czechLike[2]);
+    const y = Number(czechLike[3]);
+    if (Number.isFinite(y) && Number.isFinite(m) && Number.isFinite(d)) {
+      return new Date(y, m - 1, d, 0, 0, 0, 0);
+    }
+  }
+
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return dayStart(value);
   }
   return new Date(value);
+}
+
+function parseDateLike(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value?.toDate === "function") return value.toDate();
+  if (typeof value === "number") return new Date(value);
+  if (typeof value === "string") return parseBookingDateString(value);
+  if (typeof value === "object") {
+    const seconds = Number(value.seconds ?? value._seconds);
+    const nanos = Number(value.nanoseconds ?? value._nanoseconds ?? 0);
+    if (Number.isFinite(seconds)) {
+      const millis = seconds * 1000 + (Number.isFinite(nanos) ? Math.floor(nanos / 1_000_000) : 0);
+      return new Date(millis);
+    }
+  }
+  return null;
+}
+
+function normalizeSpotLabel(raw) {
+  const value = String(raw ?? "").trim();
+  if (!value) return "";
+  if (/^\d+$/.test(value)) return `Parking ${value}`;
+  return value;
 }
 
 function isBookingForCurrentUser(booking) {
@@ -1034,6 +1502,85 @@ function compareNumberString(a, b) {
   return String(a).localeCompare(String(b));
 }
 
+function downloadCalendarForBooking(booking) {
+  if (!booking?.bookingDate || !booking?.fromTime || !booking?.toTime) return;
+
+  const startsAt = combineDateAndTime(booking.bookingDate, booking.fromTime);
+  const endsAt = combineDateAndTime(booking.bookingDate, booking.toTime);
+  if (!startsAt || !endsAt) return;
+
+  const spotLabel = `Spot ${extractSpotNumber(booking.spot)}`;
+  const bookingDateText = formatLongDate(booking.bookingDate);
+  const uid = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const title = `EL Parking - ${spotLabel}`;
+  const description = `${spotLabel} booked on ${bookingDateText}, ${booking.fromTime}-${booking.toTime}.`;
+  const location = "Rohanske nabrezi 721/39, Praha";
+
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//EL Parking//Booking Calendar//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${escapeIcsText(uid)}@elparking.app`,
+    `DTSTAMP:${toIcsUtc(new Date())}`,
+    `DTSTART:${toIcsUtc(startsAt)}`,
+    `DTEND:${toIcsUtc(endsAt)}`,
+    `SUMMARY:${escapeIcsText(title)}`,
+    `DESCRIPTION:${escapeIcsText(description)}`,
+    `LOCATION:${escapeIcsText(location)}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const fileName = `el-parking-${extractSpotNumber(booking.spot)}-${toYmd(booking.bookingDate)}.ics`;
+  const downloadUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = fileName;
+  link.rel = "noopener";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+}
+
+function combineDateAndTime(date, time) {
+  const [hour, minute] = String(time || "")
+    .split(":")
+    .map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    hour,
+    minute,
+    0,
+    0
+  );
+}
+
+function toIcsUtc(date) {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  const hh = String(date.getUTCHours()).padStart(2, "0");
+  const mm = String(date.getUTCMinutes()).padStart(2, "0");
+  const ss = String(date.getUTCSeconds()).padStart(2, "0");
+  return `${y}${m}${d}T${hh}${mm}${ss}Z`;
+}
+
+function escapeIcsText(value) {
+  return String(value ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+}
+
 function friendlyAuthError(err) {
   const code = err?.code || "";
   if (code.includes("invalid-credential")) return "Invalid email or password.";
@@ -1041,3 +1588,5 @@ function friendlyAuthError(err) {
   if (code.includes("network-request-failed")) return "Network error. Check connection.";
   return "Sign in failed.";
 }
+
+boot();

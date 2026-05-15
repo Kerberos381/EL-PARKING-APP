@@ -24,6 +24,10 @@
             <span>Password</span>
             <input id="passwordInput" type="password" autocomplete="current-password" required />
           </label>
+          <label class="field inline remember-me">
+            <input id="rememberMeInput" type="checkbox" checked />
+            <span>Keep me signed in</span>
+          </label>
           <button id="loginButton" class="btn primary" type="submit">Sign In</button>
           <p id="authError" class="error" role="alert"></p>
         </form>
@@ -109,11 +113,8 @@
                 />
               </label>
               <p id="selectedSpotHint" class="selection-hint muted tiny">No spot selected yet.</p>
-              <label class="field">
-                <span>Spot</span>
-                <select id="spotSelect" class="hidden-native-select" required></select>
-              </label>
-              <div class="row">
+              <select id="spotSelect" class="hidden-native-select" required></select>
+              <div class="booking-time-grid">
                 <label class="field grow">
                   <span>Date</span>
                   <input id="bookDate" type="date" required />
@@ -189,6 +190,7 @@
             <p id="bookingSuccessMessage" class="muted"></p>
             <div class="modal-actions">
               <button id="bookingSuccessStay" class="btn subtle" type="button">Continue</button>
+              <button id="bookingSuccessCalendar" class="btn subtle" type="button">Add to Calendar</button>
               <button id="bookingSuccessGo" class="btn primary" type="button">Go to My Bookings</button>
             </div>
           </article>
@@ -233,7 +235,10 @@
           <p class="title"></p>
           <p class="meta"></p>
         </div>
-        <button class="btn danger">Cancel</button>
+        <div class="booking-row-actions">
+          <button class="btn subtle calendar-btn" type="button">Calendar</button>
+          <button class="btn danger cancel-btn" type="button">Cancel</button>
+        </div>
       </article>
     </template>
 

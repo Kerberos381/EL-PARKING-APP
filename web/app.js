@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
 import {
+  browserLocalPersistence,
   browserSessionPersistence,
   getAuth,
   onAuthStateChanged,
@@ -39,6 +40,7 @@ const state = {
   dayBookings: [],
   myBookings: [],
   announcements: [],
+  lastBookedSummary: null,
   listeners: {
     allBookings: null,
     spots: null,
@@ -56,6 +58,7 @@ const ui = {
   loginButton: byId("loginButton"),
   emailInput: byId("emailInput"),
   passwordInput: byId("passwordInput"),
+  rememberMeInput: byId("rememberMeInput"),
   pendingSignOut: byId("pendingSignOut"),
   signOutButton: byId("signOutButton"),
   greetingText: byId("greetingText"),
@@ -99,6 +102,7 @@ const ui = {
   bookingSuccessModal: byId("bookingSuccessModal"),
   bookingSuccessMessage: byId("bookingSuccessMessage"),
   bookingSuccessStay: byId("bookingSuccessStay"),
+  bookingSuccessCalendar: byId("bookingSuccessCalendar"),
   bookingSuccessGo: byId("bookingSuccessGo"),
   bookingEditModal: byId("bookingEditModal"),
   bookingEditForm: byId("bookingEditForm"),
@@ -132,6 +136,8 @@ const REQUIRED_FIREBASE_KEYS = [
   "appId",
 ];
 
+const LOGIN_PERSISTENCE_KEY = "el_parking_keep_signed_in";
+
 function validateFirebaseConfig(config) {
   if (!config || typeof config !== "object") return "Firebase config is missing.";
   for (const key of REQUIRED_FIREBASE_KEYS) {
@@ -144,6 +150,28 @@ function validateFirebaseConfig(config) {
   return "";
 }
 
+function shouldKeepSignedIn() {
+  try {
+    const saved = window.localStorage.getItem(LOGIN_PERSISTENCE_KEY);
+    if (saved === null) return true;
+    return saved === "1";
+  } catch {
+    return true;
+  }
+}
+
+function saveKeepSignedInPreference(value) {
+  try {
+    window.localStorage.setItem(LOGIN_PERSISTENCE_KEY, value ? "1" : "0");
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function currentAuthPersistence() {
+  return shouldKeepSignedIn() ? browserLocalPersistence : browserSessionPersistence;
+}
+
 async function boot() {
   ui.loginForm.addEventListener("submit", (event) => event.preventDefault(), { capture: true });
   try {
@@ -154,7 +182,7 @@ async function boot() {
     auth = getAuth(app);
     db = getFirestore(app);
     try {
-      await setPersistence(auth, browserSessionPersistence);
+      await setPersistence(auth, currentAuthPersistence());
     } catch (persistError) {
       console.warn("setPersistence failed, fallback to default:", persistError);
     }
@@ -169,6 +197,7 @@ async function boot() {
 
 function bootstrap() {
   if (ui.bookDate) ui.bookDate.value = state.selectedDate;
+  if (ui.rememberMeInput) ui.rememberMeInput.checked = shouldKeepSignedIn();
   bindEvents();
   syncBookUiState();
   onAuthStateChanged(auth, handleAuthState);
@@ -180,6 +209,14 @@ function bindEvents() {
   ui.pendingSignOut?.addEventListener("click", () => signOut(auth));
   ui.refreshHome?.addEventListener("click", () => renderAnnouncements());
   ui.refreshBookings?.addEventListener("click", () => renderMyBookings());
+  ui.rememberMeInput?.addEventListener("change", async () => {
+    saveKeepSignedInPreference(Boolean(ui.rememberMeInput.checked));
+    try {
+      await setPersistence(auth, currentAuthPersistence());
+    } catch (error) {
+      console.warn("Could not update auth persistence:", error);
+    }
+  });
 
   ui.bookDate?.addEventListener("change", () => {
     state.selectedDate = ui.bookDate.value || state.selectedDate;
@@ -202,6 +239,10 @@ function bindEvents() {
   ui.bookTo?.addEventListener("change", syncBookUiState);
   ui.adminSpotInspectorClose?.addEventListener("click", closeAdminSpotInspector);
   ui.bookingSuccessStay?.addEventListener("click", hideBookingSuccessModal);
+  ui.bookingSuccessCalendar?.addEventListener("click", () => {
+    if (!state.lastBookedSummary) return;
+    downloadCalendarForBooking(state.lastBookedSummary);
+  });
   ui.bookingSuccessGo?.addEventListener("click", () => {
     hideBookingSuccessModal();
     switchTab("bookings");
@@ -233,6 +274,7 @@ async function handleAuthState(user) {
   state.dayBookings = [];
   state.myBookings = [];
   state.announcements = [];
+  state.lastBookedSummary = null;
   state.selectedSpotLabel = "";
   state.selectedAdminSpotLabel = "";
   state.editingBooking = null;
@@ -285,6 +327,8 @@ async function onLoginSubmit(event) {
 
   ui.loginButton.disabled = true;
   try {
+    saveKeepSignedInPreference(Boolean(ui.rememberMeInput?.checked));
+    await setPersistence(auth, currentAuthPersistence());
     await signInWithEmailAndPassword(auth, email, password);
   } catch (err) {
     ui.authError.textContent = friendlyAuthError(err);
@@ -653,6 +697,11 @@ function renderMyBookings() {
 
       const actions = document.createElement("div");
       actions.className = "admin-booking-actions";
+      const calendar = document.createElement("button");
+      calendar.type = "button";
+      calendar.className = "btn subtle small";
+      calendar.textContent = "Calendar";
+      calendar.addEventListener("click", () => downloadCalendarForBooking(booking));
       const edit = document.createElement("button");
       edit.type = "button";
       edit.className = "btn subtle small";
@@ -663,7 +712,7 @@ function renderMyBookings() {
       cancel.className = "btn danger small";
       cancel.textContent = "Cancel";
       cancel.addEventListener("click", () => cancelBooking(booking));
-      actions.append(edit, cancel);
+      actions.append(calendar, edit, cancel);
 
       row.append(main, actions);
       ui.myBookingsList.append(row);
@@ -673,9 +722,10 @@ function renderMyBookings() {
     const node = ui.bookingTemplate.content.firstElementChild.cloneNode(true);
     node.querySelector(".title").textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(booking.bookingDate)}`;
     node.querySelector(".meta").textContent = `${booking.fromTime} - ${booking.toTime}`;
-    const cancel = node.querySelector("button");
-    cancel.textContent = "Cancel";
-    cancel.addEventListener("click", () => cancelBooking(booking));
+    const calendarButton = node.querySelector(".calendar-btn");
+    const cancel = node.querySelector(".cancel-btn");
+    calendarButton?.addEventListener("click", () => downloadCalendarForBooking(booking));
+    cancel?.addEventListener("click", () => cancelBooking(booking));
     ui.myBookingsList.append(node);
   }
 
@@ -716,6 +766,11 @@ function renderAdminSpotInspector() {
 
     const actions = document.createElement("div");
     actions.className = "admin-booking-actions";
+    const calendar = document.createElement("button");
+    calendar.type = "button";
+    calendar.className = "btn subtle small";
+    calendar.textContent = "Calendar";
+    calendar.addEventListener("click", () => downloadCalendarForBooking(booking));
     const edit = document.createElement("button");
     edit.type = "button";
     edit.className = "btn subtle small";
@@ -728,7 +783,7 @@ function renderAdminSpotInspector() {
     cancel.textContent = "Cancel";
     cancel.addEventListener("click", () => cancelBooking(booking));
 
-    actions.append(edit, cancel);
+    actions.append(calendar, edit, cancel);
     row.append(main, actions);
     ui.adminSpotInspectorList.append(row);
   }
@@ -836,6 +891,13 @@ async function onBookSubmit(event) {
     enforceBookingRules(spot, dateYmd, fromTime, toTime);
     await createBookingTransaction(spot, date, dateYmd, fromTime, toTime);
     setSelectedSpot("");
+    state.lastBookedSummary = {
+      id: `new-${dateYmd}-${extractSpotNumber(spot)}`,
+      spot,
+      bookingDate: date,
+      fromTime,
+      toTime,
+    };
     ui.bookError.textContent = "";
     showBookingSuccessModal(spot, date, fromTime, toTime);
   } catch (err) {
@@ -1438,6 +1500,85 @@ function compareNumberString(a, b) {
   const nb = Number(b);
   if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
   return String(a).localeCompare(String(b));
+}
+
+function downloadCalendarForBooking(booking) {
+  if (!booking?.bookingDate || !booking?.fromTime || !booking?.toTime) return;
+
+  const startsAt = combineDateAndTime(booking.bookingDate, booking.fromTime);
+  const endsAt = combineDateAndTime(booking.bookingDate, booking.toTime);
+  if (!startsAt || !endsAt) return;
+
+  const spotLabel = `Spot ${extractSpotNumber(booking.spot)}`;
+  const bookingDateText = formatLongDate(booking.bookingDate);
+  const uid = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const title = `EL Parking - ${spotLabel}`;
+  const description = `${spotLabel} booked on ${bookingDateText}, ${booking.fromTime}-${booking.toTime}.`;
+  const location = "Rohanske nabrezi 721/39, Praha";
+
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//EL Parking//Booking Calendar//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${escapeIcsText(uid)}@elparking.app`,
+    `DTSTAMP:${toIcsUtc(new Date())}`,
+    `DTSTART:${toIcsUtc(startsAt)}`,
+    `DTEND:${toIcsUtc(endsAt)}`,
+    `SUMMARY:${escapeIcsText(title)}`,
+    `DESCRIPTION:${escapeIcsText(description)}`,
+    `LOCATION:${escapeIcsText(location)}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const fileName = `el-parking-${extractSpotNumber(booking.spot)}-${toYmd(booking.bookingDate)}.ics`;
+  const downloadUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = fileName;
+  link.rel = "noopener";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+}
+
+function combineDateAndTime(date, time) {
+  const [hour, minute] = String(time || "")
+    .split(":")
+    .map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    hour,
+    minute,
+    0,
+    0
+  );
+}
+
+function toIcsUtc(date) {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  const hh = String(date.getUTCHours()).padStart(2, "0");
+  const mm = String(date.getUTCMinutes()).padStart(2, "0");
+  const ss = String(date.getUTCSeconds()).padStart(2, "0");
+  return `${y}${m}${d}T${hh}${mm}${ss}Z`;
+}
+
+function escapeIcsText(value) {
+  return String(value ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
 }
 
 function friendlyAuthError(err) {

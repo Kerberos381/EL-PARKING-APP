@@ -5,7 +5,11 @@
 
 import SwiftUI
 import FirebaseCore
+import FirebaseAuth
+import FirebaseFirestore
+import FirebaseMessaging
 import UIKit
+import UserNotifications
 
 private enum FirebaseBootstrap {
     static func configureIfNeeded() {
@@ -16,7 +20,7 @@ private enum FirebaseBootstrap {
 
 // MARK: - AppDelegate (configures Firebase before any StateObjects are created)
 
-class AppDelegate: NSObject, UIApplicationDelegate {
+class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate {
     private(set) var pendingQuickActionType: String?
 
     func application(
@@ -25,6 +29,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     ) -> Bool {
         FirebaseBootstrap.configureIfNeeded()
         application.shortcutItems = AppQuickAction.shortcutItems
+        Messaging.messaging().delegate = self
+        registerForRemoteNotificationsIfAuthorized(application)
 
         // iOS 26 deprecates LaunchOptionsKey.shortcutItem in favor of scene connection options.
         // Keep backward-compatible cold-launch support by reading the raw launch option key.
@@ -35,6 +41,20 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             return false
         }
         return true
+    }
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        Messaging.messaging().apnsToken = deviceToken
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        print("APNs registration failed: \(error.localizedDescription)")
     }
 
     func application(
@@ -52,6 +72,47 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func consumePendingQuickActionType() -> String? {
         defer { pendingQuickActionType = nil }
         return pendingQuickActionType
+    }
+
+    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        guard let token = fcmToken?.trimmingCharacters(in: .whitespacesAndNewlines), !token.isEmpty else { return }
+        upsertFCMToken(token)
+    }
+
+    func syncMessagingTokenToCurrentUser() {
+        Messaging.messaging().token { [weak self] token, error in
+            guard error == nil,
+                  let token = token?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !token.isEmpty else { return }
+            self?.upsertFCMToken(token)
+        }
+    }
+
+    private func registerForRemoteNotificationsIfAuthorized(_ application: UIApplication) {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            switch settings.authorizationStatus {
+            case .authorized, .provisional, .ephemeral:
+                DispatchQueue.main.async {
+                    application.registerForRemoteNotifications()
+                }
+            default:
+                break
+            }
+        }
+    }
+
+    private func upsertFCMToken(_ token: String) {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        let payload: [String: Any] = [
+            "fcmTokens": FieldValue.arrayUnion([token]),
+            "lastFCMToken": token,
+            "fcmTokenUpdatedAt": FieldValue.serverTimestamp()
+        ]
+        Firestore.firestore().collection("users").document(uid).setData(payload, merge: true) { error in
+            if let error {
+                print("FCM token sync failed: \(error.localizedDescription)")
+            }
+        }
     }
 }
 
@@ -241,9 +302,12 @@ struct ParkKingApp: App {
                             plate:   user.registrationPlate,
                             car:     user.carDescription,
                             color:   user.carColor,
-                            carType: user.carType
+                            carType: user.carType,
+                            vehicleMiniaturePresetID: user.vehicleMiniaturePresetID,
+                            preferredVocative: user.preferredVocative
                         )
                         pushManager.startListening(for: user.uid)
+                        appDelegate.syncMessagingTokenToCurrentUser()
                         proximityReminderManager.configure(with: bookingManager)
                     } else if user == nil {
                         bookingManager.clearUser()

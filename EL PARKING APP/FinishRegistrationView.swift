@@ -19,6 +19,7 @@ struct FinishRegistrationView: View {
     @State private var selectedColor  = AppConfig.carColors[0].hex
     @State private var selectedMake   = ""
     @State private var selectedModel  = ""
+    @State private var selectedPresetID: String = ""
     @State private var showVehiclePresetSheet = false
     @State private var showVehicleColorPicker = false
     @State private var newPassword      = ""
@@ -32,7 +33,10 @@ struct FinishRegistrationView: View {
     @FocusState private var focusedField: Field?
 
     private var selectedVehiclePreset: VehicleMiniaturePreset? {
-        VehicleMiniaturePreset.matching(description: car, carType: carType)
+        if !selectedPresetID.isEmpty {
+            return VehicleMiniaturePreset.all.first { $0.id == selectedPresetID }
+        }
+        return VehicleMiniaturePreset.matching(description: car, carType: carType)
     }
 
     var body: some View {
@@ -80,10 +84,15 @@ struct FinishRegistrationView: View {
                             VStack(spacing: 8) {
                                 Menu {
                                     ForEach(CarData.makes, id: \.self) { make in
-                                        Button(make) {
+                                        Button {
                                             selectedMake = make
                                             selectedModel = ""
                                             car = make
+                                        } label: {
+                                            HStack(spacing: 8) {
+                                                CarMakerLogoBadge(make: make, size: 18)
+                                                Text(make)
+                                            }
                                         }
                                     }
                                 } label: {
@@ -91,7 +100,8 @@ struct FinishRegistrationView: View {
                                         icon: "building.2.crop.circle",
                                         title: lang.language == .czech ? "Značka" : "Make",
                                         value: selectedMake.isEmpty ? (lang.language == .czech ? "Vyberte značku" : "Choose make") : selectedMake,
-                                        isPlaceholder: selectedMake.isEmpty
+                                        isPlaceholder: selectedMake.isEmpty,
+                                        makerLogo: selectedMake.isEmpty ? nil : selectedMake
                                     )
                                 }
                                 .buttonStyle(ScaleButtonStyle())
@@ -134,22 +144,11 @@ struct FinishRegistrationView: View {
                                     Haptics.selection()
                                     showVehiclePresetSheet = true
                                 } label: {
-                                    HStack(spacing: 10) {
-                                        Image(systemName: "sparkles")
-                                            .font(.system(size: 12, weight: .semibold))
-                                            .foregroundStyle(AppConfig.subtleGray)
-                                        Text(selectedVehiclePreset?.title ?? "Choose Icon")
-                                            .font(.subheadline.weight(.medium))
-                                            .foregroundStyle(AppConfig.darkText)
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption.weight(.semibold))
-                                            .foregroundStyle(AppConfig.subtleGray)
-                                    }
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 10)
-                                    .background(AppConfig.surfaceLow)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    iconPickerRow(
+                                        title: lang.language == .czech ? "Ikona" : "Icon",
+                                        value: selectedVehiclePreset?.title ?? "Choose Icon",
+                                        isPlaceholder: selectedVehiclePreset == nil
+                                    )
                                 }
                                 .buttonStyle(ScaleButtonStyle())
                             }
@@ -157,23 +156,21 @@ struct FinishRegistrationView: View {
                             VehicleMiniatureView(
                                 carType: carType,
                                 colorHex: selectedColor,
-                                description: car
+                                description: car,
+                                presetID: selectedPresetID.isEmpty ? nil : selectedPresetID
                             )
-                            .frame(width: 118, height: 64)
+                            .frame(width: 148, height: 82)
                             .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 12)
-                            .background(AppConfig.surfaceLow)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                             DisclosureGroup(isExpanded: $showVehicleColorPicker) {
                                 colorGridWithCustom(selected: $selectedColor)
                                     .padding(.top, 8)
                             } label: {
-                                HStack(spacing: 8) {
+                                HStack(spacing: 14) {
                                     Image(systemName: "paintpalette")
-                                        .font(.system(size: 12, weight: .semibold))
+                                        .font(.system(size: 15, weight: .semibold))
                                         .foregroundStyle(AppConfig.subtleGray)
+                                        .frame(width: 24)
                                     Text(L10n.carColor)
                                         .font(.subheadline.weight(.medium))
                                         .foregroundStyle(AppConfig.darkText)
@@ -182,10 +179,9 @@ struct FinishRegistrationView: View {
                                 }
                             }
                             .tint(AppConfig.darkText)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .background(AppConfig.surfaceLow)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 15)
+                            .appGlassField()
                         }
                     }
 
@@ -264,8 +260,11 @@ struct FinishRegistrationView: View {
                 VehicleMiniaturePresetPickerSheet(
                     title: "Choose Vehicle Icon",
                     selectedColorHex: selectedColor,
-                    selectedPresetID: selectedVehiclePreset?.id
+                    selectedPresetID: selectedVehiclePreset?.id,
+                    selectedMake: selectedMake,
+                    selectedModel: selectedModel
                 ) { preset in
+                    selectedPresetID = preset.id
                     car = preset.searchDescription
                     carType = ""
                     syncMakeModelFromCar()
@@ -303,6 +302,7 @@ struct FinishRegistrationView: View {
                 car:         car,
                 color:       selectedColor,
                 carType:     carType,
+                vehicleMiniaturePresetID: selectedPresetID,
                 newPassword: newPassword
             )
             await MainActor.run {
@@ -356,11 +356,50 @@ struct FinishRegistrationView: View {
         }
     }
 
-    private func makeModelPickerRow(icon: String, title: String, value: String, isPlaceholder: Bool) -> some View {
-        HStack(spacing: 10) {
+    private func makeModelPickerRow(
+        icon: String,
+        title: String,
+        value: String,
+        isPlaceholder: Bool,
+        makerLogo: String? = nil
+    ) -> some View {
+        HStack(spacing: 14) {
             Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(AppConfig.subtleGray)
-                .frame(width: 20)
+                .frame(width: 24)
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(AppConfig.darkText)
+            Spacer()
+            HStack(spacing: 8) {
+                if let makerLogo, !isPlaceholder {
+                    CarMakerLogoBadge(make: makerLogo, size: 19)
+                }
+                Text(value)
+                    .font(.subheadline)
+                    .foregroundStyle(isPlaceholder ? AppConfig.subtleGray : AppConfig.darkText)
+                    .lineLimit(1)
+            }
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 15)
+        .appGlassField()
+    }
+
+    private func iconPickerRow(
+        title: String,
+        value: String,
+        isPlaceholder: Bool
+    ) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(AppConfig.subtleGray)
+                .frame(width: 24)
             Text(title)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(AppConfig.darkText)
@@ -370,10 +409,11 @@ struct FinishRegistrationView: View {
                 .foregroundStyle(isPlaceholder ? AppConfig.subtleGray : AppConfig.darkText)
                 .lineLimit(1)
             Image(systemName: "chevron.up.chevron.down")
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
         }
-        .padding(14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 15)
         .appGlassField()
     }
 
@@ -484,6 +524,7 @@ struct FinishRegistrationView: View {
             }
         }
         .padding(14)
+        .contentShape(RoundedRectangle(cornerRadius: 14))
         .appGlassField()
     }
 
@@ -527,10 +568,13 @@ struct FinishRegistrationView: View {
                 Image(systemName: showSecure.wrappedValue ? "eye.slash" : "eye")
                     .foregroundStyle(AppConfig.subtleGray)
                     .font(.system(size: 15))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
+        .contentShape(RoundedRectangle(cornerRadius: 14))
         .appGlassField()
     }
 }

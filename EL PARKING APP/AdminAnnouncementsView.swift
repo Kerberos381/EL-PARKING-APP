@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import PhotosUI
+import FirebaseFirestore
 
 // MARK: - List View
 
@@ -138,17 +140,36 @@ struct AdminAnnouncementsView: View {
 
                     if let exp = item.expiresAt {
                         HStack(spacing: 3) {
-                            Image(systemName: item.isExpired ? "clock.badge.xmark" : "timer")
+                            Image(systemName: item.isExpired ? "clock.badge.xmark" : item.isExpiringSoon ? "exclamationmark.triangle.fill" : "timer")
                                 .font(.system(size: 9, weight: .bold))
                             if item.isExpired {
                                 Text(L10n.expired)
                                     .font(.caption2)
+                            } else if let days = item.daysUntilExpiry, days <= 7 {
+                                Text("\(days)d left")
+                                    .font(.caption2.weight(.semibold))
                             } else {
                                 Text(exp, style: .date)
                                     .font(.caption2)
                             }
                         }
-                        .foregroundStyle(item.isExpired ? AppConfig.spotOccupied : .orange)
+                        .foregroundStyle(item.isExpired ? AppConfig.spotOccupied : item.isExpiringSoon ? .red : .orange)
+
+                        if item.isExpiringSoon || item.isExpired {
+                            Button {
+                                Haptics.action()
+                                Task { await announcementsManager.renewExpiry(item) }
+                            } label: {
+                                Text("Renew")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(AppConfig.accentFg)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+                        }
                     }
                 }
             }
@@ -296,12 +317,38 @@ struct ComposeAnnouncementSheet: View {
     @State private var emoji         = "📢"
     @State private var isActive      = true
     @State private var isPinned      = false
-    @State private var hasExpiry     = false
-    @State private var expiryDate    = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+    @State private var hasExpiry     = true
+    @State private var expiryDate    = Calendar.current.date(byAdding: .day, value: 30, to: Date()) ?? Date()
     @State private var contactFields: [ContactField] = []
     @State private var isSaving      = false
+    @State private var selectedColor: String?
+    @State private var selectedTextColorMode: AnnouncementTextColorMode = .auto
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var selectedImageData: Data?
+    @State private var existingImageURL: String?
+    @State private var existingImageBase64: String?
+    @State private var imageUploadErrorMessage: String?
+    @State private var showImageUploadSection = false
 
-    private let emojiPresets = ["📢", "ℹ️", "🚧", "🎉", "⚠️", "🔧", "🅿️", "🚗", "📅", "🔔", "🌟", "❗"]
+    private let emojiPresets = [
+        "📢", "ℹ️", "🚧", "🎉", "⚠️", "🔧", "🅿️", "🚗", "🚙", "🚘", "🛑", "❗",
+        "📅", "🗓️", "⏰", "🕒", "🔔", "✅", "📌", "📍", "🛠️", "⚙️", "🧭", "📣",
+        "🔒", "🔓", "🚨", "🧹", "🧾", "💡", "🌟", "🎊"
+    ]
+
+    private let colorPresets: [(name: String, hex: String)] = [
+        ("Default",  ""),
+        ("Slate",    "#2D3142"),
+        ("Ocean",    "#1A5276"),
+        ("Forest",   "#1E6B3A"),
+        ("Wine",     "#7D1128"),
+        ("Purple",   "#5B2C8C"),
+        ("Sunset",   "#C44B25"),
+        ("Amber",    "#B8860B"),
+        ("Midnight", "#141A2E"),
+        ("Teal",     "#006D6F"),
+        ("Rose",     "#C44569"),
+    ]
 
     private var isValid: Bool { !title.trimmingCharacters(in: .whitespaces).isEmpty }
 
@@ -334,6 +381,207 @@ struct ComposeAnnouncementSheet: View {
                                     }
                                 }
                                 .padding(.vertical, 2)
+                            }
+                        }
+
+                        // Card Color
+                        editorCard {
+                            sectionLabel("Card Color")
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 10) {
+                                    ForEach(colorPresets, id: \.hex) { preset in
+                                        Button {
+                                            selectedColor = preset.hex.isEmpty ? nil : preset.hex
+                                        } label: {
+                                            let isSelected = (selectedColor ?? "") == preset.hex || (selectedColor == nil && preset.hex.isEmpty)
+                                            ZStack {
+                                                if preset.hex.isEmpty {
+                                                    RoundedRectangle(cornerRadius: 14)
+                                                        .fill(
+                                                            LinearGradient(
+                                                                colors: [Color(red: 0.15, green: 0.15, blue: 0.25), Color(red: 0.3, green: 0.3, blue: 0.45)],
+                                                                startPoint: .topLeading,
+                                                                endPoint: .bottomTrailing
+                                                            )
+                                                        )
+                                                        .frame(width: 52, height: 52)
+                                                    Text("Auto")
+                                                        .font(.system(size: 9, weight: .bold))
+                                                        .foregroundStyle(.white.opacity(0.7))
+                                                } else {
+                                                    RoundedRectangle(cornerRadius: 14)
+                                                        .fill(Color(hex: preset.hex))
+                                                        .frame(width: 52, height: 52)
+                                                }
+                                            }
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 14)
+                                                    .stroke(isSelected ? AppConfig.darkText.opacity(0.5) : Color.clear, lineWidth: 2.5)
+                                            )
+                                            .overlay(alignment: .bottomTrailing) {
+                                                if isSelected {
+                                                    Image(systemName: "checkmark.circle.fill")
+                                                        .font(.system(size: 16))
+                                                        .foregroundStyle(.white)
+                                                        .background(Circle().fill(AppConfig.accentFg).frame(width: 15, height: 15))
+                                                        .offset(x: 3, y: 3)
+                                                }
+                                            }
+                                        }
+                                        .buttonStyle(ScaleButtonStyle())
+                                    }
+                                }
+                                .padding(.vertical, 2)
+                            }
+                        }
+
+                        // Text Color
+                        editorCard {
+                            sectionLabel("Text Color")
+                            Picker("Text Color", selection: $selectedTextColorMode) {
+                                ForEach(AnnouncementTextColorMode.allCases, id: \.self) { mode in
+                                    Text(mode.title).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+
+                            Text("Auto adapts for readability. Use White/Black to force a style.")
+                                .font(.caption2)
+                                .foregroundStyle(AppConfig.subtleGray.opacity(0.7))
+                        }
+
+                        // Card Image (subtle / secondary)
+                        editorCard {
+                            sectionLabel("Card Image (optional)")
+                            DisclosureGroup(isExpanded: $showImageUploadSection) {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    HStack(spacing: 12) {
+                                        if let imageData = selectedImageData,
+                                           let uiImage = UIImage(data: imageData) {
+                                            Image(uiImage: uiImage)
+                                                .resizable()
+                                                .scaledToFill()
+                                            .frame(width: 80, height: 80)
+                                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                                            .overlay(alignment: .topTrailing) {
+                                                Button {
+                                                    withAnimation {
+                                                        selectedImageData = nil
+                                                        selectedPhotoItem = nil
+                                                        existingImageURL = nil
+                                                        existingImageBase64 = nil
+                                                    }
+                                                } label: {
+                                                    Image(systemName: "xmark.circle.fill")
+                                                        .font(.system(size: 20))
+                                                        .foregroundStyle(.white, .black.opacity(0.5))
+                                                }
+                                                .offset(x: 6, y: -6)
+                                            }
+                                        } else if existingImageURL != nil {
+                                            AsyncImage(url: URL(string: existingImageURL!)) { phase in
+                                                if let img = phase.image {
+                                                    img.resizable()
+                                                        .scaledToFill()
+                                                    .frame(width: 80, height: 80)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                                                } else {
+                                                    RoundedRectangle(cornerRadius: 14)
+                                                        .fill(AppConfig.surfaceLow)
+                                                        .frame(width: 80, height: 80)
+                                                        .overlay(ProgressView())
+                                                }
+                                            }
+                                            .overlay(alignment: .topTrailing) {
+                                                Button {
+                                                    withAnimation { existingImageURL = nil; existingImageBase64 = nil }
+                                                } label: {
+                                                    Image(systemName: "xmark.circle.fill")
+                                                        .font(.system(size: 20))
+                                                        .foregroundStyle(.white, .black.opacity(0.5))
+                                                }
+                                                .offset(x: 6, y: -6)
+                                            }
+                                        } else if let base64 = existingImageBase64,
+                                                  let data = Data(base64Encoded: base64),
+                                                  let uiImage = UIImage(data: data) {
+                                            Image(uiImage: uiImage)
+                                                .resizable()
+                                                .scaledToFill()
+                                            .frame(width: 80, height: 80)
+                                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                                            .overlay(alignment: .topTrailing) {
+                                                Button {
+                                                    withAnimation { existingImageURL = nil; existingImageBase64 = nil }
+                                                } label: {
+                                                    Image(systemName: "xmark.circle.fill")
+                                                        .font(.system(size: 20))
+                                                        .foregroundStyle(.white, .black.opacity(0.5))
+                                                }
+                                                .offset(x: 6, y: -6)
+                                            }
+                                        }
+
+                                        PhotosPicker(
+                                            selection: $selectedPhotoItem,
+                                            matching: .images,
+                                            photoLibrary: .shared()
+                                        ) {
+                                            Label(selectedImageData != nil || existingImageURL != nil || existingImageBase64 != nil ? "Change Photo" : "Choose Photo", systemImage: "photo.on.rectangle.angled")
+                                                .font(.footnote.weight(.semibold))
+                                                .foregroundStyle(AppConfig.subtleGray)
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 9)
+                                                .background(AppConfig.surfaceLow)
+                                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        }
+                                    }
+                                    .onChange(of: selectedPhotoItem) { _, newItem in
+                                        guard let newItem else { return }
+                                        Task {
+                                            if let data = try? await newItem.loadTransferable(type: Data.self) {
+                                                // Keep announcement images visually faithful.
+                                                // Only apply light compression for very large files.
+                                                if let uiImage = UIImage(data: data) {
+                                                    let preparedData: Data
+                                                    if data.count > 4_000_000 {
+                                                        preparedData = uiImage.jpegData(compressionQuality: 0.9) ?? data
+                                                    } else {
+                                                        preparedData = uiImage.jpegData(compressionQuality: 0.98) ?? data
+                                                    }
+                                                    selectedImageData = preparedData
+                                                    existingImageURL = nil
+                                                    existingImageBase64 = nil
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Text("Secondary option. Prefer default icons for regular announcements.")
+                                        .font(.caption2)
+                                        .foregroundStyle(AppConfig.subtleGray.opacity(0.7))
+                                }
+                                .padding(.top, 8)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "photo.badge.plus")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(AppConfig.subtleGray)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Use custom photo")
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(AppConfig.darkText)
+                                        Text("Hidden by default to keep posts consistent")
+                                            .font(.caption2)
+                                            .foregroundStyle(AppConfig.subtleGray.opacity(0.7))
+                                    }
+                                    Spacer()
+                                    if selectedImageData != nil || existingImageURL != nil || existingImageBase64 != nil {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 14))
+                                            .foregroundStyle(AppConfig.accentFg)
+                                    }
+                                }
                             }
                         }
 
@@ -480,13 +728,31 @@ struct ComposeAnnouncementSheet: View {
                 isActive      = item.isActive
                 isPinned      = item.isPinned
                 hasExpiry     = item.expiresAt != nil
-                expiryDate    = item.expiresAt ?? Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+                expiryDate    = item.expiresAt ?? Calendar.current.date(byAdding: .day, value: 30, to: Date()) ?? Date()
                 contactFields = item.fields
+                selectedColor = item.backgroundColorHex
+                selectedTextColorMode = AnnouncementTextColorMode(rawValue: item.textColorMode) ?? .auto
+                existingImageURL = item.imageURL
+                existingImageBase64 = item.imageBase64
+                showImageUploadSection = item.imageURL != nil || item.imageBase64 != nil
             }
         }
         .presentationDragIndicator(.visible)
         .presentationDetents([.large])
         .presentationCornerRadius(26)
+        .alert(
+            "Image Upload Failed",
+            isPresented: Binding(
+                get: { imageUploadErrorMessage != nil },
+                set: { show in if !show { imageUploadErrorMessage = nil } }
+            ),
+            actions: {
+                Button("OK", role: .cancel) { }
+            },
+            message: {
+                Text(imageUploadErrorMessage ?? "Please try again.")
+            }
+        )
     }
 
     // MARK: - Save
@@ -510,17 +776,67 @@ struct ComposeAnnouncementSheet: View {
             updated.isPinned  = isPinned
             updated.expiresAt = hasExpiry ? expiryDate : nil
             updated.fields    = trimmedFields
+            updated.backgroundColorHex = selectedColor
+            updated.textColorMode = selectedTextColorMode.rawValue
+
+            if let imageData = selectedImageData {
+                if let url = await announcementsManager.uploadImage(imageData, for: existing.id) {
+                    updated.imageURL = url
+                    updated.imageBase64 = nil
+                } else if let inlineImage = announcementsManager.firestoreInlineImageBase64(from: imageData) {
+                    updated.imageURL = nil
+                    updated.imageBase64 = inlineImage
+                } else {
+                    imageUploadErrorMessage = announcementsManager.userFacingImageUploadError()
+                    return
+                }
+            } else if existingImageURL == nil && existingImageBase64 == nil &&
+                        (existing.imageURL != nil || existing.imageBase64 != nil) {
+                if existing.imageURL != nil {
+                    await announcementsManager.deleteImage(for: existing.id)
+                }
+                updated.imageURL = nil
+                updated.imageBase64 = nil
+            }
+
             await announcementsManager.save(updated)
         } else {
-            await announcementsManager.create(
-                title:     title.trimmingCharacters(in: .whitespaces),
-                body:      message.trimmingCharacters(in: .whitespaces),
-                emoji:     emoji,
-                isPinned:  isPinned,
+            let newID = UUID().uuidString
+            var imageURL: String?
+            var imageBase64: String?
+            if let imageData = selectedImageData {
+                if let url = await announcementsManager.uploadImage(imageData, for: newID) {
+                    imageURL = url
+                } else if let inlineImage = announcementsManager.firestoreInlineImageBase64(from: imageData) {
+                    imageBase64 = inlineImage
+                } else {
+                    imageUploadErrorMessage = announcementsManager.userFacingImageUploadError()
+                    return
+                }
+            }
+
+            let item = Announcement(
+                id: newID,
+                title: title.trimmingCharacters(in: .whitespaces),
+                body: message.trimmingCharacters(in: .whitespaces),
+                emoji: emoji,
                 createdBy: authManager.currentUser?.email ?? "",
+                createdAt: Date(),
+                isActive: true,
+                isPinned: isPinned,
                 expiresAt: hasExpiry ? expiryDate : nil,
-                fields:    trimmedFields
+                fields: trimmedFields,
+                backgroundColorHex: selectedColor,
+                imageURL: imageURL,
+                imageBase64: imageBase64,
+                textColorMode: selectedTextColorMode.rawValue
             )
+            do {
+                try await Firestore.firestore().collection("announcements").document(newID).setData(item.toFirestore())
+                PushNotificationManager.broadcast(title: "\(emoji) \(title.trimmingCharacters(in: .whitespaces))", body: message.trimmingCharacters(in: .whitespaces))
+            } catch {
+                print("AnnouncementsManager create error: \(error.localizedDescription)")
+            }
         }
         dismiss()
     }
@@ -542,11 +858,12 @@ struct ComposeAnnouncementSheet: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10)
                         .fill(AppConfig.surfaceHigh)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                     Image(systemName: field.wrappedValue.type.icon)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
+                .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
 
@@ -554,10 +871,11 @@ struct ComposeAnnouncementSheet: View {
                 TextField(field.wrappedValue.type.defaultLabel, text: field.label)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(AppConfig.subtleGray)
-                    .padding(8)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 10)
                     .background(AppConfig.pageBg)
+                    .contentShape(RoundedRectangle(cornerRadius: 10))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .frame(height: 34)
 
                 TextField("Value", text: field.value)
                     .keyboardType(field.wrappedValue.type == .phone ? .phonePad :
@@ -569,10 +887,11 @@ struct ComposeAnnouncementSheet: View {
                     .autocorrectionDisabled(
                         field.wrappedValue.type == .email || field.wrappedValue.type == .website
                     )
-                    .padding(8)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 10)
                     .background(AppConfig.pageBg)
+                    .contentShape(RoundedRectangle(cornerRadius: 10))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .frame(height: 38)
             }
 
             Button {
@@ -582,6 +901,8 @@ struct ComposeAnnouncementSheet: View {
                 Image(systemName: "minus.circle")
                     .font(.system(size: 20))
                     .foregroundStyle(AppConfig.spotOccupied.opacity(0.7))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
         }

@@ -252,6 +252,9 @@ struct OverviewView: View {
         let isSelected = Calendar.current.isDate(selectedDate, inSameDayAs: date)
         let isToday = offset == 0
         let dayNum = Calendar.current.component(.day, from: date)
+        let innerWidth: CGFloat = 56
+        let innerHeight: CGFloat = 64
+        let pillRadius: CGFloat = 16
         let dayName: String = {
             if isToday { return L10n.today }
             return date.formatShortDayOfWeek()
@@ -264,16 +267,20 @@ struct OverviewView: View {
                 activeFilter = nil
             }
         } label: {
-            VStack(spacing: 4) {
-                Text(dayName)
-                    .font(.system(size: 11, weight: .semibold))
-                Text("\(dayNum)")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
+            ZStack {
+                RoundedRectangle(cornerRadius: pillRadius, style: .continuous)
+                    .fill(isSelected ? AppConfig.pillSelected : AppConfig.cardBg)
+                    .frame(width: innerWidth, height: innerHeight)
+
+                VStack(spacing: 4) {
+                    Text(dayName)
+                        .font(.system(size: 11, weight: .semibold))
+                    Text("\(dayNum)")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                }
+                .foregroundStyle(isSelected ? .white : AppConfig.darkText)
+                .frame(width: innerWidth, height: innerHeight)
             }
-            .foregroundStyle(isSelected ? .white : AppConfig.darkText)
-            .frame(width: 56, height: 64)
-            .background(isSelected ? AppConfig.pillSelected : AppConfig.cardBg)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
             .shadow(color: .black.opacity(isSelected ? 0.15 : 0.04), radius: 6, y: 2)
         }
         .buttonStyle(ScaleButtonStyle())
@@ -284,7 +291,7 @@ struct OverviewView: View {
     private var statsBar: some View {
         HStack(spacing: 8) {
             let total = bookingManager.parkingSpots.count
-            let booked = Set(allBookingsForDate.map(\.spot)).count
+            let booked = Set(allBookingsForDate.map { bookingManager.normalizedSpotKey($0.spot) }).count
             let blocked = AppConfig.blockedSpotIDs.count
             let free = max(0, total - booked - blocked)
 
@@ -397,7 +404,7 @@ struct OverviewView: View {
     // MARK: - Bookings List (Admin-enhanced)
 
     private var bookingsList: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: "list.bullet.rectangle")
                     .foregroundStyle(AppConfig.subtleGray)
@@ -414,6 +421,7 @@ struct OverviewView: View {
                     .background(AppConfig.subtleGray.opacity(0.1))
                     .clipShape(Capsule())
             }
+            .padding(.horizontal, 4)
 
             if visibleBookings.isEmpty {
                 HStack {
@@ -435,34 +443,28 @@ struct OverviewView: View {
                 }
             }
         }
-        .padding(18)
-        .background(AppConfig.cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
         .padding(.horizontal)
     }
 
     private func adminBookingRow(_ booking: Booking) -> some View {
         let isMine = booking.email == bookingManager.currentUserEmail
         let isProtectedAdminBooking = isProtectedAdminBooking(booking)
+        let canCancel = bookingManager.canCancelBooking(booking)
 
-        return HStack(spacing: 12) {
-            // Person avatar circle
+        let card = HStack(spacing: 14) {
             ZStack {
                 Circle()
                     .fill(isMine ? AppConfig.accent.opacity(0.2) : AppConfig.surfaceHigh)
-                    .frame(width: 44, height: 44)
-
+                    .frame(width: 40, height: 40)
                 Text(userInitials(booking.user))
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(isMine ? AppConfig.onAccent : AppConfig.subtleGray)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(isMine ? AppConfig.darkText : AppConfig.subtleGray)
             }
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(booking.user)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AppConfig.darkText)
                         .lineLimit(1)
 
@@ -479,49 +481,53 @@ struct OverviewView: View {
                     }
                 }
 
-                HStack(spacing: 8) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "car")
-                            .font(.system(size: 9))
-                        Text(booking.spotNumber)
-                            .font(.caption)
-                            .fontWeight(.bold)
-                    }
-                    .foregroundStyle(AppConfig.subtleGray)
-
+                HStack(spacing: 6) {
                     Text("\(booking.fromTime) – \(booking.toTime)")
-                        .font(.caption)
+                        .font(.system(.caption2, design: .monospaced).weight(.semibold))
                         .foregroundStyle(AppConfig.subtleGray)
-                }
 
-                if isAdmin {
-                    let appUser = usersByEmailLowercased[booking.email.lowercased()]
-                    let vehicleParts = [
-                        appUser?.registrationPlate ?? "",
-                        appUser?.carDescription ?? "",
-                        appUser?.carType ?? ""
-                    ].filter { !$0.isEmpty }
-                    if !vehicleParts.isEmpty {
-                        Text(vehicleParts.prefix(2).joined(separator: " · "))
-                            .font(.caption2)
-                            .foregroundStyle(AppConfig.subtleGray.opacity(0.65))
-                            .lineLimit(1)
+                    if isAdmin {
+                        let appUser = usersByEmailLowercased[booking.email.lowercased()]
+                        let plate = appUser?.registrationPlate ?? ""
+                        if !plate.isEmpty {
+                            Text("·")
+                                .font(.caption2)
+                                .foregroundStyle(AppConfig.subtleGray.opacity(0.4))
+                            Text(plate)
+                                .font(.system(.caption2, design: .monospaced).weight(.medium))
+                                .foregroundStyle(AppConfig.subtleGray.opacity(0.65))
+                                .lineLimit(1)
+                        }
                     }
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 0)
 
-            // Spot badge
             Text(booking.spotNumber)
-                .font(.system(size: 18, weight: .black, design: .rounded))
+                .font(.system(size: 20, weight: .black, design: .rounded))
                 .foregroundStyle(AppConfig.darkText)
-                .frame(width: 42, height: 42)
+                .frame(width: 44, height: 44)
                 .background(isMine ? AppConfig.surfaceHigh : AppConfig.surfaceLow)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
 
-            if bookingManager.canCancelBooking(booking) {
-                Button {
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(AppConfig.subtleGray.opacity(0.4))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(AppConfig.cardBg)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .contentShape(RoundedRectangle(cornerRadius: 16))
+        .onTapGesture {
+            Haptics.selection()
+            spotBookingDetail = booking
+        }
+
+        return Group {
+            if canCancel {
+                card.swipeToCancel(cornerRadius: 16) {
                     if isProtectedAdminBooking {
                         Haptics.impact(.rigid)
                         showProtectedAdminAlert = true
@@ -530,21 +536,14 @@ struct OverviewView: View {
                         adminCancelTarget = booking
                         showAdminCancelAlert = true
                     } else {
-                        Haptics.selection()
+                        Haptics.destructive()
                         bookingToCancel = booking
                         showCancelAlert = true
                     }
-                } label: {
-                    Image(systemName: "xmark.circle")
-                        .font(.body)
-                        .foregroundStyle(AppConfig.spotOccupied.opacity(0.6))
                 }
-                .buttonStyle(ScaleButtonStyle())
+            } else {
+                card
             }
-        }
-        .padding(.vertical, 6)
-        .onTapGesture {
-            spotBookingDetail = booking
         }
     }
 

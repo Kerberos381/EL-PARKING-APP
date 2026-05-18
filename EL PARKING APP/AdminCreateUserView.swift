@@ -462,6 +462,7 @@ struct AdminCreateUserView: View {
                 .foregroundStyle(.primary)
         }
         .padding(14)
+        .contentShape(RoundedRectangle(cornerRadius: 14))
         .background(AppConfig.surfaceLow)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(AppConfig.outlineVariant.opacity(0.4), lineWidth: 1))

@@ -23,12 +23,16 @@ final class EL_PARKING_APPUITests: XCTestCase {
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testLaunchShowsInitialSurface() throws {
         let app = XCUIApplication()
         app.launch()
+        XCTAssertEqual(app.state, .runningForeground)
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        let hasNavigation = app.navigationBars.firstMatch.waitForExistence(timeout: 3)
+        let hasTabBar = app.tabBars.firstMatch.waitForExistence(timeout: 3)
+        let hasTextField = app.textFields.firstMatch.waitForExistence(timeout: 3)
+        let hasSecureField = app.secureTextFields.firstMatch.waitForExistence(timeout: 3)
+        XCTAssertTrue(hasNavigation || hasTabBar || hasTextField || hasSecureField)
     }
 
     @MainActor

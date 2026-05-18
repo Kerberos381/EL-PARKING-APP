@@ -78,6 +78,14 @@ class AuthManager: ObservableObject {
     private func loadUserProfile(uid: String) async {
         do {
             let doc = try await db.collection("users").document(uid).getDocument()
+            #if DEBUG
+            if let data = doc.data() {
+                let warnings = FirestoreSchemaValidator.userWarnings(data: data, docID: doc.documentID)
+                if !warnings.isEmpty {
+                    print("AuthManager user schema warnings (\(warnings.count)):\n- \(warnings.joined(separator: "\n- "))")
+                }
+            }
+            #endif
             guard let data = doc.data(), var user = AppUser.fromFirestore(data) else {
                 authState = .unauthenticated
                 return
@@ -146,6 +154,14 @@ class AuthManager: ObservableObject {
         usersListener = db.collection("users")
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self, let snapshot, error == nil else { return }
+                #if DEBUG
+                let warnings = snapshot.documents.flatMap {
+                    FirestoreSchemaValidator.userWarnings(data: $0.data(), docID: $0.documentID)
+                }
+                if !warnings.isEmpty {
+                    print("AuthManager users listener schema warnings (\(warnings.count)):\n- \(warnings.prefix(10).joined(separator: "\n- "))")
+                }
+                #endif
                 let users = snapshot.documents
                     .compactMap { AppUser.fromFirestore($0.data()) }
                     .sorted { $0.displayName < $1.displayName }
@@ -285,6 +301,7 @@ class AuthManager: ObservableObject {
             hasher.combine(user.carDescription)
             hasher.combine(user.carColor)
             hasher.combine(user.carType)
+            hasher.combine(user.preferredVocative)
             hasher.combine(user.strikes)
             hasher.combine(user.suspensionCount)
             hasher.combine(user.suspendedAt?.timeIntervalSinceReferenceDate)
@@ -295,13 +312,24 @@ class AuthManager: ObservableObject {
 
     // MARK: - Update Profile
 
-    func updateProfile(displayName: String, plate: String, carDescription: String, carColor: String = "", carType: String = "") async {
+    func updateProfile(
+        displayName: String,
+        plate: String,
+        carDescription: String,
+        carColor: String = "",
+        carType: String = "",
+        vehicleMiniaturePresetID: String = "",
+        preferredVocative: String = ""
+    ) async {
         guard let uid = currentUser?.uid else { return }
         do {
+            let trimmedVocative = preferredVocative.trimmingCharacters(in: .whitespacesAndNewlines)
             var update: [String: Any] = [
                 "displayName":       displayName,
                 "registrationPlate": plate,
-                "carDescription":    carDescription
+                "carDescription":    carDescription,
+                "vehicleMiniaturePresetID": vehicleMiniaturePresetID,
+                "preferredVocative": trimmedVocative
             ]
             if !carColor.isEmpty { update["carColor"] = carColor }
             if !carType.isEmpty  { update["carType"]  = carType  }
@@ -309,6 +337,8 @@ class AuthManager: ObservableObject {
             currentUser?.displayName       = displayName
             currentUser?.registrationPlate = plate
             currentUser?.carDescription    = carDescription
+            currentUser?.vehicleMiniaturePresetID = vehicleMiniaturePresetID
+            currentUser?.preferredVocative = trimmedVocative
             if !carColor.isEmpty { currentUser?.carColor = carColor }
             if !carType.isEmpty  { currentUser?.carType  = carType  }
         } catch {
@@ -318,7 +348,7 @@ class AuthManager: ObservableObject {
 
     // MARK: - Finish Registration (admin-created accounts)
 
-    func finishRegistration(plate: String, car: String, color: String, carType: String = "", newPassword: String?) async {
+    func finishRegistration(plate: String, car: String, color: String, carType: String = "", vehicleMiniaturePresetID: String = "", newPassword: String?) async {
         guard let firebaseUser = Auth.auth().currentUser,
               let uid = currentUser?.uid else { return }
 
@@ -340,6 +370,7 @@ class AuthManager: ObservableObject {
                 "carDescription":          car.trimmingCharacters(in: .whitespaces),
                 "carColor":                color,
                 "carType":                 carType,
+                "vehicleMiniaturePresetID": vehicleMiniaturePresetID,
                 "inviteAccepted":          true,
                 "needsFinishRegistration": false,
                 "activatedAt":             Timestamp(date: Date())
@@ -845,7 +876,7 @@ class AuthManager: ObservableObject {
     // MARK: - Admin: Delete User
 
     /// Updates a user's vehicle info (admin only).
-    func adminUpdateUserVehicle(_ user: AppUser, plate: String, car: String, color: String, carType: String = "") async {
+    func adminUpdateUserVehicle(_ user: AppUser, plate: String, car: String, color: String, carType: String = "", vehicleMiniaturePresetID: String = "") async {
         let trimmedPlate    = plate.trimmingCharacters(in: .whitespaces).uppercased()
         let trimmedCar      = car.trimmingCharacters(in: .whitespaces)
         let trimmedColor    = color.trimmingCharacters(in: .whitespaces)
@@ -855,7 +886,8 @@ class AuthManager: ObservableObject {
                 "registrationPlate": trimmedPlate,
                 "carDescription":    trimmedCar,
                 "carColor":          trimmedColor,
-                "carType":           trimmedCarType
+                "carType":           trimmedCarType,
+                "vehicleMiniaturePresetID": vehicleMiniaturePresetID
             ])
             AuditLogger.log(
                 action: "admin_update_vehicle",

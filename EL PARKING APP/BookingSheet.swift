@@ -536,6 +536,9 @@ struct BookingSheet: View {
 
     private func quickDateButton(date: Date, offset: Int) -> some View {
         let isSelected = Calendar.current.isDate(bookingDate, inSameDayAs: date)
+        let innerWidth: CGFloat = 78
+        let innerHeight: CGFloat = 58
+        let pillRadius: CGFloat = 14
         let label: String = {
             switch offset {
             case 0: return L10n.today
@@ -560,17 +563,23 @@ struct BookingSheet: View {
                 }
             }
         } label: {
-            VStack(spacing: 3) {
-                Text(label)
-                    .font(.system(size: 11, weight: .semibold))
-                Text("\(Calendar.current.component(.day, from: date))")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+            ZStack {
+                RoundedRectangle(cornerRadius: pillRadius, style: .continuous)
+                    .fill(isSelected ? AppConfig.pillSelected : AppConfig.surfaceLow)
+                    .frame(width: innerWidth, height: innerHeight)
+
+                VStack(spacing: 3) {
+                    Text(label)
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                    Text("\(Calendar.current.component(.day, from: date))")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                }
+                .foregroundStyle(isSelected ? .white : AppConfig.subtleGray)
+                .frame(width: innerWidth, height: innerHeight)
             }
-            .foregroundStyle(isSelected ? .white : AppConfig.subtleGray)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(isSelected ? AppConfig.pillSelected : AppConfig.surfaceLow)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .shadow(color: .black.opacity(isSelected ? 0.10 : 0.03), radius: 5, y: 2)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -794,6 +803,7 @@ struct BookingSheet: View {
                         .submitLabel(.next)
                 }
                 .padding()
+                .contentShape(RoundedRectangle(cornerRadius: 14))
                 .background(AppConfig.surfaceLow)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
 
@@ -810,6 +820,7 @@ struct BookingSheet: View {
                         .submitLabel(.done)
                 }
                 .padding()
+                .contentShape(RoundedRectangle(cornerRadius: 14))
                 .background(AppConfig.surfaceLow)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
             }
@@ -1050,16 +1061,14 @@ struct BookingSheet: View {
                         .buttonStyle(ScaleButtonStyle())
                     }
 
-                    // Done — card lands into My Bookings
                     Button { landCard() } label: {
-                        Text(isForOthersToggle && !isEditing ? L10n.done : "Got it!")
+                        Text(L10n.done)
                             .font(.body.bold())
-                            .foregroundStyle(isForOthersToggle && !isEditing ? AppConfig.subtleGray : AppConfig.onAccent)
+                            .foregroundStyle(isForOthersToggle && !isEditing ? AppConfig.darkText : AppConfig.onAccent)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(isForOthersToggle && !isEditing ? Color.clear : AppConfig.accent)
+                            .background(isForOthersToggle && !isEditing ? AppConfig.surfaceHigh : AppConfig.accent)
                             .clipShape(Capsule())
-                            .shadow(color: (isForOthersToggle && !isEditing) ? .clear : AppConfig.accent.opacity(0.35), radius: 12, y: 4)
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }

@@ -112,8 +112,13 @@ struct L10n {
     static var navigate:       String { isCzech ? "Navigovat"           : "Navigate" }
     static var bookedBy:       String { isCzech ? "Rezervováno:"        : "Booked by" }
 
-    static func helloGreeting(_ name: String) -> String {
-        isCzech ? "Ahoj, \(name)" : "Hello, \(name)"
+    static func helloGreeting(_ name: String, preferredVocative: String = "") -> String {
+        if isCzech {
+            let manual = preferredVocative.trimmingCharacters(in: .whitespacesAndNewlines)
+            let finalName = manual.isEmpty ? CzechVocative.inflect(firstName: name) : manual
+            return "Ahoj, \(finalName)"
+        }
+        return "Hello, \(name)"
     }
 
     static func spotsAvailable(_ count: Int) -> String {
@@ -327,6 +332,13 @@ struct L10n {
     static var notifications:    String { isCzech ? "Oznámení"          : "Notifications" }
     static var vehicle:          String { isCzech ? "Vozidlo"           : "My Vehicle" }
     static var account:          String { isCzech ? "Účet"              : "Account" }
+    static var greetingName:     String { isCzech ? "Oslovení"          : "Greeting name" }
+    static var greetingNameHint: String { isCzech ? "např. Katko, Jane" : "e.g. Kate, John" }
+    static var greetingNameHelp: String {
+        isCzech
+            ? "Automaticky se zkusí použít 5. pád. Tady můžeš oslovení ručně upravit."
+            : "Used in the home greeting. You can set a custom form."
+    }
     static var bookingRules:     String { isCzech ? "Pravidla rezervací": "Booking Rules" }
     static var statistics:       String { isCzech ? "Statistiky"        : "Statistics" }
     static var data:             String { isCzech ? "Data"              : "Data" }
@@ -439,6 +451,7 @@ struct L10n {
     static var password:         String { isCzech ? "Heslo"               : "Password" }
     static var confirmPassword:  String { isCzech ? "Potvrdit heslo"      : "Confirm Password" }
     static var forgotPassword:   String { isCzech ? "Zapomenuté heslo?"   : "Forgot password?" }
+    static var privacyPolicy:    String { isCzech ? "Zásady ochrany soukromí" : "Privacy Policy" }
     static var passwordsMismatch:String { isCzech ? "Hesla se neshodují"  : "Passwords do not match" }
     static var alreadyHaveAccount:String{ isCzech ? "Již máte účet?"      : "Already have an account?" }
     static var noAccountYet:     String { isCzech ? "Nemáte účet?"        : "Don't have an account?" }

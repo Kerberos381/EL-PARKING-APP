@@ -17,10 +17,6 @@
 	</array>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>We send you reminders about your parking bookings and notify you of any changes.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>We use your location to remind you about your booked parking spot when you get close to the destination.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>We use your location in the background to remind you about your booked parking spot when you get close to the destination.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

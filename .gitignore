@@ -64,3 +64,6 @@ __MACOSX/
 .vscode/
 *.swp
 *~
+
+# Web local Firebase config (public keys, but keep per-environment local)
+web/firebase-config.js

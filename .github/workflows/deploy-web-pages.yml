@@ -32,6 +32,7 @@ jobs:
           FIREBASE_WEB_CONFIG_JSON: ${{ secrets.FIREBASE_WEB_CONFIG_JSON }}
         run: |
           test -n "$FIREBASE_WEB_CONFIG_JSON" || (echo "Missing FIREBASE_WEB_CONFIG_JSON secret" && exit 1)
+          node -e 'const cfg = JSON.parse(process.env.FIREBASE_WEB_CONFIG_JSON); const required = ["apiKey","authDomain","projectId","storageBucket","messagingSenderId","appId"]; for (const k of required) { if (!cfg[k] || String(cfg[k]).includes("REPLACE_ME") || String(cfg[k]).includes("TVUJ_NOVY_KEY")) { throw new Error(`Invalid FIREBASE_WEB_CONFIG_JSON key: ${k}`); } }'
           printf 'export const firebaseConfig = %s;\n' "$FIREBASE_WEB_CONFIG_JSON" > web/firebase-config.js
 
       - name: Setup Pages

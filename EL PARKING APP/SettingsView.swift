@@ -38,11 +38,14 @@ struct SettingsView: View {
 
     // Vehicle save state
     private enum VehicleSaveState { case idle, saving, saved }
+    private enum ProfileSaveState { case idle, saving, saved }
     @State private var vehicleSaveState: VehicleSaveState = .idle
+    @State private var profileSaveState: ProfileSaveState = .idle
     @State private var lastSavedPlate:   String = ""
     @State private var lastSavedCar:     String = ""
     @State private var lastSavedColor:   String = ""
     @State private var lastSavedCarType: String = ""
+    @State private var lastSavedPreferredVocative: String = ""
     @State private var selectedVehicleMake = ""
     @State private var selectedVehicleModel = ""
     @State private var showCustomPicker  = false  // notification custom time picker
@@ -66,6 +69,11 @@ struct SettingsView: View {
         bookingManager.carType           != lastSavedCarType
     }
 
+    private var profileIsDirty: Bool {
+        bookingManager.preferredVocative.trimmingCharacters(in: .whitespacesAndNewlines)
+            != lastSavedPreferredVocative.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private var theme: AppTheme {
         AppTheme(rawValue: themeRaw) ?? .system
     }
@@ -75,7 +83,10 @@ struct SettingsView: View {
     }
 
     private var selectedVehiclePreset: VehicleMiniaturePreset? {
-        VehicleMiniaturePreset.matching(
+        if !bookingManager.vehicleMiniaturePresetID.isEmpty {
+            return VehicleMiniaturePreset.all.first { $0.id == bookingManager.vehicleMiniaturePresetID }
+        }
+        return VehicleMiniaturePreset.matching(
             description: bookingManager.carDescription,
             carType: bookingManager.carType
         )
@@ -191,6 +202,7 @@ struct SettingsView: View {
                 lastSavedCar     = bookingManager.carDescription
                 lastSavedColor   = bookingManager.carColor
                 lastSavedCarType = bookingManager.carType
+                lastSavedPreferredVocative = bookingManager.preferredVocative
                 syncVehicleMakeModelFromDescription()
                 refreshBiometricState()
             }
@@ -237,8 +249,11 @@ struct SettingsView: View {
                 VehicleMiniaturePresetPickerSheet(
                     title: "Choose Vehicle Icon",
                     selectedColorHex: selectedVehicleColorHex,
-                    selectedPresetID: selectedVehiclePreset?.id
+                    selectedPresetID: selectedVehiclePreset?.id,
+                    selectedMake: selectedVehicleMake,
+                    selectedModel: selectedVehicleModel
                 ) { preset in
+                    bookingManager.vehicleMiniaturePresetID = preset.id
                     bookingManager.carDescription = preset.searchDescription
                     bookingManager.carType = ""
                     syncVehicleMakeModelFromDescription()
@@ -300,14 +315,7 @@ struct SettingsView: View {
     private var profileCard: some View {
         VStack(spacing: 0) {
             HStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(AppConfig.surfaceLow)
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 30, weight: .medium))
-                        .foregroundStyle(AppConfig.subtleGray)
-                }
-                .frame(width: 72, height: 72)
+                profileIdentityBadge
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(bookingManager.currentUserName)
@@ -386,6 +394,44 @@ struct SettingsView: View {
         if bookingManager.isAdmin { return L10n.administrator }
         if bookingManager.isPrivileged { return L10n.privilegedUser }
         return "User"
+    }
+
+    private var profileInitials: String {
+        let words = bookingManager.currentUserName
+            .split(whereSeparator: \.isWhitespace)
+            .map(String.init)
+        if words.count >= 2 {
+            let first = words[0].prefix(1).uppercased()
+            let second = words[1].prefix(1).uppercased()
+            return "\(first)\(second)"
+        }
+        return String(bookingManager.currentUserName.prefix(2)).uppercased()
+    }
+
+    @ViewBuilder
+    private var profileIdentityBadge: some View {
+        if VehicleMiniatureView.hasSpecificMiniature(
+            carType: bookingManager.carType,
+            description: bookingManager.carDescription,
+            presetID: bookingManager.vehicleMiniaturePresetID.isEmpty ? nil : bookingManager.vehicleMiniaturePresetID
+        ) {
+            VehicleMiniatureView(
+                carType: bookingManager.carType,
+                colorHex: bookingManager.carColor,
+                description: bookingManager.carDescription,
+                presetID: bookingManager.vehicleMiniaturePresetID.isEmpty ? nil : bookingManager.vehicleMiniaturePresetID
+            )
+            .frame(width: 86, height: 52)
+        } else {
+            ZStack {
+                Circle()
+                    .fill(AppConfig.surfaceLow)
+                Text(profileInitials)
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(AppConfig.subtleGray)
+            }
+            .frame(width: 72, height: 72)
+        }
     }
 
     private func toggleBiometric() {
@@ -618,164 +664,159 @@ struct SettingsView: View {
 
     private var carInfoSection: some View {
         settingsSection(title: L10n.vehicle, icon: "car.fill", iconTint: .green) {
-            VStack(spacing: 14) {
+            VStack(spacing: 16) {
+                VStack(spacing: 12) {
+                    VehicleMiniatureView(
+                        carType: bookingManager.carType,
+                        colorHex: selectedVehicleColorHex,
+                        description: bookingManager.carDescription,
+                        presetID: bookingManager.vehicleMiniaturePresetID.isEmpty ? nil : bookingManager.vehicleMiniaturePresetID
+                    )
+                    .frame(width: 228, height: 116)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
-                // Car make + model
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L10n.carDescription.uppercased())
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1.1)
-                        .foregroundStyle(AppConfig.subtleGray)
-                        .padding(.leading, 2)
-
-                    VStack(spacing: 8) {
-                        Menu {
-                            ForEach(CarData.makes, id: \.self) { make in
-                                Button(make) {
-                                    selectedVehicleMake = make
-                                    selectedVehicleModel = ""
-                                    bookingManager.carDescription = make
-                                }
-                            }
-                        } label: {
-                            makeModelPickerRow(
-                                icon: "building.2.crop.circle",
-                                title: langManager.language == .czech ? "Značka" : "Make",
-                                value: selectedVehicleMake.isEmpty ? (langManager.language == .czech ? "Vyberte značku" : "Choose make") : selectedVehicleMake,
-                                isPlaceholder: selectedVehicleMake.isEmpty
-                            )
-                        }
-                        .buttonStyle(ScaleButtonStyle())
-
-                        Menu {
-                            if selectedVehicleMake.isEmpty {
-                                Button(langManager.language == .czech ? "Nejprve vyberte značku" : "Select make first") {}
-                                    .disabled(true)
-                            } else {
-                                ForEach(CarData.models(for: selectedVehicleMake), id: \.self) { model in
-                                    Button(model) {
-                                        selectedVehicleModel = model
-                                        bookingManager.carDescription = CarData.compose(make: selectedVehicleMake, model: model)
-                                    }
-                                }
-                            }
-                        } label: {
-                            makeModelPickerRow(
-                                icon: "car.side",
-                                title: langManager.language == .czech ? "Model" : "Model",
-                                value: selectedVehicleModel.isEmpty ? (langManager.language == .czech ? "Vyberte model" : "Choose model") : selectedVehicleModel,
-                                isPlaceholder: selectedVehicleModel.isEmpty
-                            )
-                        }
-                        .buttonStyle(ScaleButtonStyle())
+                    VStack(spacing: 3) {
+                        Text(selectedVehicleModel.isEmpty ? (langManager.language == .czech ? "Přidejte vozidlo" : "Add a Vehicle") : selectedVehicleModel)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(AppConfig.darkText)
+                        Text(langManager.language == .czech ? "Správa modelu, SPZ a miniatury vozu" : "Manage model, license plate and vehicle miniature")
+                            .font(.system(size: 13))
+                            .foregroundStyle(AppConfig.subtleGray)
                     }
                 }
-
-                // Registration plate
-                inputField(
-                    icon: "rectangle.and.text.magnifyingglass",
-                    label: L10n.regPlate,
-                    placeholder: L10n.regPlatePlaceholder,
-                    text: $bookingManager.registrationPlate,
-                    capitalization: .characters
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity)
+                .background(AppConfig.surfaceLow)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(AppConfig.outlineVariant.opacity(0.3), lineWidth: 1)
                 )
 
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "car.side")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(AppConfig.subtleGray)
-                        Text("VEHICLE ICON")
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(1.1)
-                            .foregroundStyle(AppConfig.subtleGray)
+                VStack(spacing: 10) {
+                    Menu {
+                        ForEach(CarData.makes, id: \.self) { make in
+                            Button {
+                                selectedVehicleMake = make
+                                selectedVehicleModel = ""
+                                bookingManager.carDescription = make
+                            } label: {
+                                HStack(spacing: 8) {
+                                    CarMakerLogoBadge(make: make, size: 18)
+                                    Text(make)
+                                }
+                            }
+                        }
+                    } label: {
+                        makeModelPickerRow(
+                            icon: "building.2.crop.circle",
+                            title: langManager.language == .czech ? "Značka" : "Make",
+                            value: selectedVehicleMake.isEmpty ? (langManager.language == .czech ? "Vyberte značku" : "Choose make") : selectedVehicleMake,
+                            isPlaceholder: selectedVehicleMake.isEmpty,
+                            makerLogo: selectedVehicleMake.isEmpty ? nil : selectedVehicleMake
+                        )
                     }
+                    .buttonStyle(ScaleButtonStyle())
 
+                    Menu {
+                        if selectedVehicleMake.isEmpty {
+                            Button(langManager.language == .czech ? "Nejprve vyberte značku" : "Select make first") {}
+                                .disabled(true)
+                        } else {
+                            ForEach(CarData.models(for: selectedVehicleMake), id: \.self) { model in
+                                Button(model) {
+                                    selectedVehicleModel = model
+                                    bookingManager.carDescription = CarData.compose(make: selectedVehicleMake, model: model)
+                                }
+                            }
+                        }
+                    } label: {
+                        makeModelPickerRow(
+                            icon: "car.side",
+                            title: langManager.language == .czech ? "Model" : "Model",
+                            value: selectedVehicleModel.isEmpty ? (langManager.language == .czech ? "Vyberte model" : "Choose model") : selectedVehicleModel,
+                            isPlaceholder: selectedVehicleModel.isEmpty
+                        )
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+
+                    inputField(
+                        icon: "number",
+                        label: L10n.regPlate,
+                        placeholder: L10n.regPlatePlaceholder,
+                        text: $bookingManager.registrationPlate,
+                        capitalization: .characters
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
                     Button {
                         Haptics.selection()
                         showVehiclePresetSheet = true
                     } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(AppConfig.subtleGray)
-                            Text(selectedVehiclePreset?.title ?? "Choose Icon")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(AppConfig.darkText)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(AppConfig.subtleGray)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(AppConfig.surfaceLow)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        iconPickerRow(
+                            title: langManager.language == .czech ? "Ikona" : "Icon",
+                            value: selectedVehiclePreset?.title ?? "Choose Icon",
+                            isPlaceholder: selectedVehiclePreset == nil
+                        )
                     }
                     .buttonStyle(ScaleButtonStyle())
 
-                    VehicleMiniatureView(
-                        carType: bookingManager.carType,
-                        colorHex: selectedVehicleColorHex,
-                        description: bookingManager.carDescription
-                    )
-                    .frame(width: 118, height: 64)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 12)
-                    .background(AppConfig.surfaceLow)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                }
-
-                DisclosureGroup(isExpanded: $showVehicleColorPicker) {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 38))], spacing: 8) {
-                        ForEach(AppConfig.carColors, id: \.hex) { color in
-                            let isSelected = selectedVehicleColorHex == color.hex
-                            Button {
-                                withAnimation(.quick) { bookingManager.carColor = color.hex }
-                            } label: {
-                                ZStack {
-                                    Circle().fill(Color(hex: color.hex)).frame(width: 30, height: 30)
-                                        .overlay(Circle().stroke(
-                                            isSelected ? AppConfig.accentFg.opacity(0.85) : AppConfig.outlineVariant.opacity(0.4),
-                                            lineWidth: isSelected ? 2 : 1
-                                        ))
-                                    if isSelected {
-                                        Image(systemName: "checkmark")
-                                            .font(.system(size: 9, weight: .bold))
-                                            .foregroundStyle(
-                                                color.hex == "#FFFFFF" || color.hex == "#F9A825" ? Color.black : Color.white
-                                            )
+                    DisclosureGroup(isExpanded: $showVehicleColorPicker) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 38))], spacing: 8) {
+                            ForEach(AppConfig.carColors, id: \.hex) { color in
+                                let isSelected = selectedVehicleColorHex == color.hex
+                                Button {
+                                    withAnimation(.quick) { bookingManager.carColor = color.hex }
+                                } label: {
+                                    ZStack {
+                                        Circle().fill(Color(hex: color.hex)).frame(width: 30, height: 30)
+                                            .overlay(Circle().stroke(
+                                                isSelected ? AppConfig.accentFg.opacity(0.85) : AppConfig.outlineVariant.opacity(0.4),
+                                                lineWidth: isSelected ? 2 : 1
+                                            ))
+                                        if isSelected {
+                                            Image(systemName: "checkmark")
+                                                .font(.system(size: 9, weight: .bold))
+                                                .foregroundStyle(
+                                                    color.hex == "#FFFFFF" || color.hex == "#F9A825" ? Color.black : Color.white
+                                                )
+                                        }
                                     }
                                 }
+                                .buttonStyle(ScaleButtonStyle())
                             }
-                            .buttonStyle(ScaleButtonStyle())
                         }
-
-                    }
-                    .padding(.top, 8)
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "paintpalette")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(AppConfig.subtleGray)
-                        Text(L10n.carColor)
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(AppConfig.darkText)
-                        Spacer()
-                        let colorHex = selectedVehicleColorHex
-                        if let match = AppConfig.carColors.first(where: { $0.hex == colorHex }) {
-                            Text(match.name)
-                                .font(.caption)
+                        .padding(.top, 8)
+                    } label: {
+                        HStack(spacing: 14) {
+                            Image(systemName: "paintpalette")
+                                .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(AppConfig.subtleGray)
+                                .frame(width: 24)
+                            Text(L10n.carColor)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(AppConfig.darkText)
+                            Spacer()
+                            let colorHex = selectedVehicleColorHex
+                            if let match = AppConfig.carColors.first(where: { $0.hex == colorHex }) {
+                                Text(match.name)
+                                    .font(.caption)
+                                    .foregroundStyle(AppConfig.subtleGray)
+                            }
                         }
                     }
+                    .tint(AppConfig.darkText)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 15)
+                    .background(AppConfig.surfaceLow)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(AppConfig.outlineVariant.opacity(0.35), lineWidth: 1)
+                    )
                 }
-                .tint(AppConfig.darkText)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(AppConfig.surfaceLow)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 // Save row
                 HStack(spacing: 10) {
@@ -833,7 +874,9 @@ struct SettingsView: View {
                 plate:          bookingManager.registrationPlate,
                 carDescription: bookingManager.carDescription,
                 carColor:       bookingManager.carColor,
-                carType:        bookingManager.carType
+                carType:        bookingManager.carType,
+                vehicleMiniaturePresetID: bookingManager.vehicleMiniaturePresetID,
+                preferredVocative: bookingManager.preferredVocative
             )
             withAnimation(.standard) {
                 vehicleSaveState   = .saved
@@ -841,9 +884,34 @@ struct SettingsView: View {
                 lastSavedCar       = bookingManager.carDescription
                 lastSavedColor     = bookingManager.carColor
                 lastSavedCarType   = bookingManager.carType
+                lastSavedPreferredVocative = bookingManager.preferredVocative
             }
             try? await Task.sleep(for: .seconds(2))
             withAnimation(.standard) { vehicleSaveState = .idle }
+        }
+    }
+
+    private func saveGreetingName() {
+        profileSaveState = .saving
+        bookingManager.preferredVocative = bookingManager.preferredVocative
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        bookingManager.saveUserProfile()
+        Task {
+            await authManager.updateProfile(
+                displayName: bookingManager.currentUserName,
+                plate: bookingManager.registrationPlate,
+                carDescription: bookingManager.carDescription,
+                carColor: bookingManager.carColor,
+                carType: bookingManager.carType,
+                vehicleMiniaturePresetID: bookingManager.vehicleMiniaturePresetID,
+                preferredVocative: bookingManager.preferredVocative
+            )
+            withAnimation(.standard) {
+                lastSavedPreferredVocative = bookingManager.preferredVocative
+                profileSaveState = .saved
+            }
+            try? await Task.sleep(for: .seconds(1.4))
+            withAnimation(.standard) { profileSaveState = .idle }
         }
     }
 
@@ -999,6 +1067,40 @@ struct SettingsView: View {
                     icon: "envelope.fill",
                     tint: .blue
                 )
+                Divider().overlay(AppConfig.separatorSoft)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    inputField(
+                        icon: "text.quote",
+                        label: L10n.greetingName,
+                        placeholder: L10n.greetingNameHint,
+                        text: $bookingManager.preferredVocative,
+                        capitalization: .words
+                    )
+                    Text(L10n.greetingNameHelp)
+                        .font(.caption)
+                        .foregroundStyle(AppConfig.subtleGray)
+                        .padding(.horizontal, 4)
+                }
+                .padding(.vertical, 12)
+
+                Divider().overlay(AppConfig.separatorSoft)
+
+                Button {
+                    saveGreetingName()
+                } label: {
+                    settingsActionRow(
+                        title: profileSaveState == .saving
+                            ? L10n.saving
+                            : (profileSaveState == .saved ? L10n.saved : L10n.save),
+                        icon: profileSaveState == .saved ? "checkmark.circle.fill" : "square.and.arrow.down.fill",
+                        tint: profileSaveState == .saved ? AppConfig.activeGreen : AppConfig.accent,
+                        textTint: profileSaveState == .saved ? AppConfig.activeGreen : AppConfig.darkText
+                    )
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .disabled(profileSaveState == .saving || !profileIsDirty)
+
                 Divider().overlay(AppConfig.separatorSoft)
 
                 Button {
@@ -1209,7 +1311,7 @@ struct SettingsView: View {
                 .font(SettingsType.footerBrand)
                 .tracking(2)
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.4))
-            Text("EL Parking v1.0")
+            Text("EL Parking v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")")
                 .font(SettingsType.footerVersion)
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.3))
         }
@@ -1286,10 +1388,7 @@ struct SettingsView: View {
         textTint: Color? = nil,
         emphasizeDestructive: Bool = false
     ) -> some View {
-        let rowBackground: Color = emphasizeDestructive
-            ? AppConfig.spotOccupied.opacity(0.03)
-            : Color.clear
-
+        _ = emphasizeDestructive
         return HStack(spacing: SettingsSpace.md) {
             settingsIconTile(icon: icon, tint: tint, size: 28, iconSize: 13)
 
@@ -1303,17 +1402,58 @@ struct SettingsView: View {
                 .font(SettingsType.rowChevron)
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.7))
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
         .padding(.vertical, 12)
-        .background(rowBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .background(Color.clear)
     }
 
-    private func makeModelPickerRow(icon: String, title: String, value: String, isPlaceholder: Bool) -> some View {
-        HStack(spacing: 10) {
+    private func makeModelPickerRow(
+        icon: String,
+        title: String,
+        value: String,
+        isPlaceholder: Bool,
+        makerLogo: String? = nil
+    ) -> some View {
+        HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(AppConfig.subtleGray)
-                .frame(width: 18)
+                .frame(width: 24)
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(AppConfig.darkText)
+            Spacer()
+            HStack(spacing: 8) {
+                if let makerLogo, !isPlaceholder {
+                    CarMakerLogoBadge(make: makerLogo, size: 19)
+                }
+                Text(value)
+                    .font(.subheadline)
+                    .foregroundStyle(isPlaceholder ? AppConfig.subtleGray : AppConfig.darkText)
+                    .lineLimit(1)
+            }
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 15)
+        .background(AppConfig.surfaceLow)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppConfig.outlineVariant.opacity(0.35), lineWidth: 1))
+    }
+
+    private func iconPickerRow(
+        title: String,
+        value: String,
+        isPlaceholder: Bool
+    ) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(AppConfig.subtleGray)
+                .frame(width: 24)
             Text(title)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(AppConfig.darkText)
@@ -1323,14 +1463,14 @@ struct SettingsView: View {
                 .foregroundStyle(isPlaceholder ? AppConfig.subtleGray : AppConfig.darkText)
                 .lineLimit(1)
             Image(systemName: "chevron.up.chevron.down")
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 15)
         .background(AppConfig.surfaceLow)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppConfig.outlineVariant.opacity(0.35), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppConfig.outlineVariant.opacity(0.35), lineWidth: 1))
     }
 
     private func syncVehicleMakeModelFromDescription() {
@@ -1578,10 +1718,13 @@ private struct ChangePasswordSheet: View {
                 Image(systemName: show.wrappedValue ? "eye.slash" : "eye")
                     .foregroundStyle(AppConfig.subtleGray)
                     .font(.system(size: 14))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
+        .contentShape(RoundedRectangle(cornerRadius: 14))
     }
 
     private func submit() async {

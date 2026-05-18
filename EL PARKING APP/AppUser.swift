@@ -86,6 +86,9 @@ struct AppUser: Identifiable, Codable, Equatable {
     var carDescription: String
     var carColor: String          // hex string e.g. "#CC3333", empty = unset
     var carType:  String          // CarBodyType rawValue, empty = unset
+    var vehicleMiniaturePresetID: String = ""
+    /// Optional manual vocative override for Czech greeting (e.g. "Katko", "Jane").
+    var preferredVocative: String = ""
     var createdAt: Date
     var rejectionReason: String?
     /// True when the user has passed the invite/access gate for app data.
@@ -137,6 +140,8 @@ struct AppUser: Identifiable, Codable, Equatable {
             "carDescription":           carDescription,
             "carColor":                 carColor,
             "carType":                  carType,
+            "vehicleMiniaturePresetID": vehicleMiniaturePresetID,
+            "preferredVocative":        preferredVocative,
             "createdAt":                Timestamp(date: createdAt),
             "inviteAccepted":           inviteAccepted,
             "needsFinishRegistration":  needsFinishRegistration
@@ -184,6 +189,10 @@ struct AppUser: Identifiable, Codable, Equatable {
             carDescription:          data["carDescription"]    as? String ?? "",
             carColor:                data["carColor"]          as? String ?? "",
             carType:                 data["carType"]           as? String ?? "",
+            vehicleMiniaturePresetID: (data["vehicleMiniaturePresetID"] as? String)
+                ?? (data["vehiclePresetId"] as? String)
+                ?? "",
+            preferredVocative:       data["preferredVocative"] as? String ?? "",
             createdAt:               createdAt,
             rejectionReason:         rejectionReason,
             inviteAccepted:          data["inviteAccepted"] as? Bool ?? true,

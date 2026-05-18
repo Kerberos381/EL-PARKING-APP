@@ -48,10 +48,14 @@ struct LoginView: View {
                 VStack(spacing: 36) {
                     logoSection
 
-                    if showBiometricButton && !showEmailForm {
-                        biometricCard
-                    } else {
-                        formCard
+                    VStack(spacing: 14) {
+                        if showBiometricButton && !showEmailForm {
+                            biometricCard
+                        } else {
+                            formCard
+                        }
+
+                        privacyPolicyLink
                     }
                 }
                 .padding(.bottom, 60)
@@ -317,6 +321,18 @@ struct LoginView: View {
         .padding(.horizontal, 20)
     }
 
+    private var privacyPolicyLink: some View {
+        Link(destination: AppConfig.privacyPolicyURL) {
+            HStack(spacing: 6) {
+                Image(systemName: "hand.raised")
+                    .font(.system(size: 13, weight: .semibold))
+                Text(L10n.privacyPolicy)
+                    .font(.footnote.weight(.medium))
+            }
+            .foregroundStyle(.white.opacity(0.45))
+        }
+    }
+
     // MARK: - Form Validation
 
     private var isEmailFormatValid: Bool {
@@ -356,6 +372,7 @@ struct LoginView: View {
                 .onSubmit { onSubmit?() }
         }
         .padding(14)
+        .contentShape(RoundedRectangle(cornerRadius: 14))
         .appGlassField()
     }
 
@@ -384,10 +401,13 @@ struct LoginView: View {
                 Image(systemName: showPassword ? "eye.slash" : "eye")
                     .foregroundStyle(.white.opacity(0.35))
                     .font(.system(size: 15))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
+        .contentShape(RoundedRectangle(cornerRadius: 14))
         .appGlassField()
     }
 }

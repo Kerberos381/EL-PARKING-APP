@@ -13,6 +13,7 @@ struct AdminUsersView: View {
     @EnvironmentObject var bookingManager: BookingManager
     @ObservedObject private var lang = LanguageManager.shared
 
+    @AppStorage("adminUsersLayoutGrid") private var useGridLayout = false
     @State private var selectedFilter: UserStatus? = nil
     @State private var isLoading       = false
 
@@ -27,8 +28,11 @@ struct AdminUsersView: View {
     @State private var editCar          = ""
     @State private var editCarType      = ""
     @State private var editColor        = AppConfig.carColors.first?.hex ?? ""
-    @State private var editPickerColor  = Color.red
-    @State private var editCarSuggestions: [String] = []
+    @State private var editPresetID     = ""
+    @State private var editSelectedMake = ""
+    @State private var editSelectedModel = ""
+    @State private var showEditVehiclePresetSheet = false
+    @State private var showEditVehicleColorPicker = false
     @State private var userToSuspend: AppUser?
     @State private var showSuspendAlert  = false
     @State private var selectedRole: UserRole = .user
@@ -105,8 +109,12 @@ struct AdminUsersView: View {
                 } else if filteredUsers.isEmpty {
                     emptyState
                 } else {
-                    userList
+                    userGrid
                 }
+                // Classic list layout (kept for reference):
+                // } else {
+                //     userList
+                // }
             }
 
             // Bulk action bar (floats above content)
@@ -120,8 +128,8 @@ struct AdminUsersView: View {
             .navigationTitle(L10n.userManagement)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                if selectedFilter == .pending && !pendingUsers.isEmpty {
-                    ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    if selectedFilter == .pending && !pendingUsers.isEmpty {
                         Button {
                             Haptics.impact(.rigid)
                             withAnimation(.standard) {
@@ -319,6 +327,114 @@ struct AdminUsersView: View {
             Haptics.selection()
             await refresh()
         }
+    }
+
+    // MARK: - User Grid
+
+    private var userGrid: some View {
+        ScrollView(showsIndicators: false) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                ForEach(filteredUsers) { user in
+                    userGridCard(user)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            Haptics.selection()
+                            userDetailSheetUser = user
+                        }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 100)
+        }
+        .refreshable {
+            Haptics.selection()
+            await refresh()
+        }
+    }
+
+    private func userGridCard(_ user: AppUser) -> some View {
+        let isMe = user.uid == authManager.currentUser?.uid
+        let hasSpecificMini = VehicleMiniatureView.hasSpecificMiniature(
+            carType: user.carType,
+            description: user.carDescription,
+            presetID: user.vehicleMiniaturePresetID.isEmpty ? nil : user.vehicleMiniaturePresetID
+        )
+
+        return VStack(spacing: 10) {
+            if hasSpecificMini {
+                VehicleMiniatureView(
+                    carType: user.carType,
+                    colorHex: user.carColor,
+                    description: user.carDescription,
+                    presetID: user.vehicleMiniaturePresetID.isEmpty ? nil : user.vehicleMiniaturePresetID
+                )
+                .frame(width: 100, height: 56)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+            } else {
+                UserAvatarView(user: user, size: 56, showStroke: true)
+                    .padding(.top, 4)
+            }
+
+            VStack(spacing: 3) {
+                HStack(spacing: 4) {
+                    Text(user.displayName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppConfig.darkText)
+                        .lineLimit(1)
+                    if isMe {
+                        Text(L10n.you)
+                            .font(.system(size: 8, weight: .bold)).tracking(0.8)
+                            .foregroundStyle(AppConfig.darkText)
+                            .padding(.horizontal, 4).padding(.vertical, 2)
+                            .background(AppConfig.surfaceHigh)
+                            .clipShape(Capsule())
+                    }
+                }
+
+                if !user.registrationPlate.isEmpty {
+                    Text(user.registrationPlate)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(AppConfig.subtleGray)
+                        .lineLimit(1)
+                }
+            }
+
+            HStack(spacing: 4) {
+                gridStatusDot(user.status)
+                gridRoleBadge(user.role)
+                if user.strikes > 0 {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity)
+        .background(AppConfig.cardBg)
+        .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
+        .shadow(color: .black.opacity(0.03), radius: 7, y: 2)
+    }
+
+    private func gridStatusDot(_ status: UserStatus) -> some View {
+        let color: Color = {
+            switch status {
+            case .pending:   return .orange
+            case .active:    return AppConfig.activeGreen
+            case .suspended: return AppConfig.spotOccupied
+            }
+        }()
+        return Circle()
+            .fill(color)
+            .frame(width: 7, height: 7)
+    }
+
+    private func gridRoleBadge(_ role: UserRole) -> some View {
+        Text(role.displayName)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(AppConfig.subtleGray)
     }
 
     private var usersSkeletonList: some View {
@@ -547,7 +663,8 @@ struct AdminUsersView: View {
                     VehicleMiniatureView(
                         carType: user.carType,
                         colorHex: user.carColor,
-                        description: user.carDescription
+                        description: user.carDescription,
+                        presetID: user.vehicleMiniaturePresetID.isEmpty ? nil : user.vehicleMiniaturePresetID
                     )
                     .frame(width: 42, height: 24)
                     Text(vehicleSummary(for: user))
@@ -690,9 +807,16 @@ struct AdminUsersView: View {
             Menu {
                 Section(L10n.changeRole) {
                     ForEach(UserRole.allCases, id: \.rawValue) { role in
-                        Button { Task { await authManager.updateUserRole(user, role: role) } } label: {
-                            neutralMenuLabel(role.displayName, systemImage: roleIcon(role))
+                        Button { applyRoleChange(for: user, to: role) } label: {
+                            HStack {
+                                neutralMenuLabel(role.displayName, systemImage: roleIcon(role))
+                                Spacer()
+                                if user.role == role {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
                         }
+                        .disabled(user.role == role)
                     }
                 }
                 Section {
@@ -701,7 +825,6 @@ struct AdminUsersView: View {
                         editCar         = user.carDescription
                         editCarType     = user.carType
                         editColor       = normalizedCarColor(for: user)
-                        editPickerColor = AppConfig.carColors.map(\.hex).contains(user.carColor) ? .red : Color(hex: user.carColor)
                         userToEditVehicle = user
                     } label: { neutralMenuLabel(L10n.editVehicle, systemImage: "car.side.fill") }
                 }
@@ -760,7 +883,6 @@ struct AdminUsersView: View {
                     editCar         = user.carDescription
                     editCarType     = user.carType
                     editColor       = normalizedCarColor(for: user)
-                    editPickerColor = AppConfig.carColors.map(\.hex).contains(user.carColor) ? .red : Color(hex: user.carColor)
                     userToEditVehicle = user
                 } label: { neutralMenuLabel(L10n.editVehicle, systemImage: "car.side.fill") }
                 Button(role: .destructive) {
@@ -801,76 +923,141 @@ struct AdminUsersView: View {
             .foregroundStyle(.secondary)
     }
 
+    private func applyRoleChange(for user: AppUser, to role: UserRole) {
+        guard user.role != role else {
+            Haptics.selection()
+            return
+        }
+
+        if var openUser = userDetailSheetUser, openUser.uid == user.uid {
+            openUser.role = role
+            userDetailSheetUser = openUser
+        }
+
+        Task {
+            await authManager.updateUserRole(user, role: role)
+            Haptics.notify(.success)
+            ToastManager.shared.show("Role updated to \(role.displayName)", style: .success)
+
+            if let refreshed = authManager.allUsers.first(where: { $0.uid == user.uid }) {
+                userDetailSheetUser = refreshed
+            }
+        }
+    }
+
     // MARK: - User Detail Sheet
 
     private func userDetailSheet(user: AppUser) -> some View {
-        NavigationStack {
+        let liveUser = authManager.allUsers.first(where: { $0.uid == user.uid }) ?? user
+        let parsedVehicle = CarData.splitMakeModel(liveUser.carDescription)
+        let hasVehicle = !liveUser.registrationPlate.isEmpty || !liveUser.carDescription.isEmpty || !liveUser.carColor.isEmpty || !liveUser.carType.isEmpty
+        let hasSpecificMiniature = VehicleMiniatureView.hasSpecificMiniature(
+            carType: liveUser.carType,
+            description: liveUser.carDescription,
+            presetID: liveUser.vehicleMiniaturePresetID.isEmpty ? nil : liveUser.vehicleMiniaturePresetID
+        )
+        let vehiclePrimary = {
+            let composed = [parsedVehicle.make, parsedVehicle.model]
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+            if !composed.isEmpty { return composed }
+            return liveUser.carDescription
+        }()
+        return NavigationStack {
             ZStack {
                 AppConfig.pageBg.ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 14) {
-                        VStack(spacing: 12) {
-                            UserAvatarView(user: user, size: 72, showStroke: true)
-                            Text(user.displayName)
-                                .font(.title3.weight(.bold))
-                                .foregroundStyle(AppConfig.darkText)
-                            Text(user.email)
-                                .font(.subheadline)
-                                .foregroundStyle(AppConfig.subtleGray)
+                    VStack(spacing: 18) {
+                        VStack(spacing: 16) {
+                            if hasSpecificMiniature {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                        .fill(AppConfig.surfaceLow)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                                .stroke(AppConfig.separatorSoft, lineWidth: 1)
+                                        )
+                                    VehicleMiniatureView(
+                                        carType: liveUser.carType,
+                                        colorHex: liveUser.carColor,
+                                        description: liveUser.carDescription,
+                                        presetID: liveUser.vehicleMiniaturePresetID.isEmpty ? nil : liveUser.vehicleMiniaturePresetID
+                                    )
+                                    .frame(width: 252, height: 140)
+                                }
+                                .frame(height: 160)
+                            } else {
+                                UserAvatarView(user: liveUser, size: 88, showStroke: true)
+                            }
+
+                            VStack(spacing: 4) {
+                                Text(liveUser.displayName)
+                                    .font(.title3.weight(.bold))
+                                    .foregroundStyle(AppConfig.darkText)
+                                Text(liveUser.email)
+                                    .font(.subheadline)
+                                    .foregroundStyle(AppConfig.subtleGray)
+                            }
+
                             HStack(spacing: 8) {
-                                statusBadge(user.status)
-                                roleBadge(user.role)
-                                if user.strikes > 0 || user.suspensionCount > 0 {
-                                    strikeBadge(user)
+                                statusBadge(liveUser.status)
+                                roleBadge(liveUser.role)
+                                if liveUser.strikes > 0 || liveUser.suspensionCount > 0 {
+                                    strikeBadge(liveUser)
                                 }
                             }
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(18)
+                        .padding(20)
                         .background(AppConfig.cardBg)
                         .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
-                        .shadow(color: .black.opacity(0.03), radius: 7, y: 2)
 
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("User Info")
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Vehicle")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(AppConfig.subtleGray)
-                            if !user.registrationPlate.isEmpty || !user.carDescription.isEmpty || !user.carColor.isEmpty || !user.carType.isEmpty {
-                                HStack(spacing: 10) {
-                                    VehicleMiniatureView(
-                                        carType: user.carType,
-                                        colorHex: user.carColor,
-                                        description: user.carDescription
-                                    )
-                                    .frame(width: 54, height: 30)
-                                    Text(vehicleSummary(for: user))
-                                        .font(.subheadline)
-                                        .foregroundStyle(AppConfig.darkText)
-                                        .lineLimit(2)
-                                    Spacer()
-                                }
+
+                            if hasVehicle {
+                                keyValueRow(label: "Model", value: vehiclePrimary)
+                                Divider().overlay(AppConfig.separatorSoft)
+                                keyValueRow(label: "Plate", value: liveUser.registrationPlate)
+                                Divider().overlay(AppConfig.separatorSoft)
+                                keyValueRow(label: "Color", value: vehicleColorName(for: liveUser))
+                            } else {
+                                Text("No vehicle details")
+                                    .font(.subheadline)
+                                    .foregroundStyle(AppConfig.subtleGray)
                             }
-                            detailInfoRow(icon: "calendar", title: "Created", value: user.createdAt.formatted(date: .abbreviated, time: .omitted))
-                            detailInfoRow(icon: "envelope.fill", title: "Email", value: user.email)
                         }
                         .padding(16)
                         .background(AppConfig.cardBg)
                         .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
-                        .shadow(color: .black.opacity(0.03), radius: 7, y: 2)
 
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Account")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(AppConfig.subtleGray)
+                            keyValueRow(label: "Created", value: liveUser.createdAt.formatted(date: .abbreviated, time: .omitted))
+                            Divider().overlay(AppConfig.separatorSoft)
+                            keyValueRow(label: "Email", value: liveUser.email, allowMultilineValue: true)
+                        }
+                        .padding(16)
+                        .background(AppConfig.cardBg)
+                        .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
+
+                        VStack(alignment: .leading, spacing: 12) {
                             Text("Actions")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(AppConfig.subtleGray)
 
-                            if user.status == .pending {
+                            if liveUser.status == .pending {
                                 detailActionButton(title: L10n.reviewRequest, icon: "person.badge.checkmark") {
                                     userDetailSheetUser = nil
                                     DispatchQueue.main.async {
                                         selectedRole = .user
                                         rejectionReasonText = ""
-                                        userToActivate = user
+                                        userToActivate = liveUser
                                     }
                                 }
                             }
@@ -878,12 +1065,11 @@ struct AdminUsersView: View {
                             detailActionButton(title: L10n.editVehicle, icon: "car.side.fill") {
                                 userDetailSheetUser = nil
                                 DispatchQueue.main.async {
-                                    editPlate = user.registrationPlate
-                                    editCar = user.carDescription
-                                    editCarType = user.carType
-                                    editColor = normalizedCarColor(for: user)
-                                    editPickerColor = AppConfig.carColors.map(\.hex).contains(user.carColor) ? .red : Color(hex: user.carColor)
-                                    userToEditVehicle = user
+                                    editPlate = liveUser.registrationPlate
+                                    editCar = liveUser.carDescription
+                                    editCarType = liveUser.carType
+                                    editColor = normalizedCarColor(for: liveUser)
+                                    userToEditVehicle = liveUser
                                 }
                             }
 
@@ -891,17 +1077,24 @@ struct AdminUsersView: View {
                                 userDetailSheetUser = nil
                                 DispatchQueue.main.async {
                                     strikeReason = ""
-                                    userToStrike = user
+                                    userToStrike = liveUser
                                 }
                             }
 
                             Menu {
                                 ForEach(UserRole.allCases, id: \.rawValue) { role in
                                     Button {
-                                        Task { await authManager.updateUserRole(user, role: role) }
+                                        applyRoleChange(for: liveUser, to: role)
                                     } label: {
-                                        Label(role.displayName, systemImage: roleIcon(role))
+                                        HStack {
+                                            Label(role.displayName, systemImage: roleIcon(role))
+                                            Spacer()
+                                            if liveUser.role == role {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
                                     }
+                                    .disabled(liveUser.role == role)
                                 }
                             } label: {
                                 HStack(spacing: 10) {
@@ -909,7 +1102,7 @@ struct AdminUsersView: View {
                                     Text(L10n.changeRole)
                                         .font(.subheadline.weight(.semibold))
                                     Spacer()
-                                    Text(user.role.displayName)
+                                    Text(liveUser.role.displayName)
                                         .font(.caption.weight(.semibold))
                                         .foregroundStyle(AppConfig.subtleGray)
                                     Image(systemName: "chevron.right")
@@ -924,25 +1117,25 @@ struct AdminUsersView: View {
                             }
                             .buttonStyle(ScaleButtonStyle())
 
-                            if user.status == .suspended {
+                            if liveUser.status == .suspended {
                                 detailActionButton(title: "Clear Suspension", icon: "arrow.uturn.up.circle.fill") {
-                                    Task { await authManager.adminRestoreUser(user) }
+                                    Task { await authManager.adminRestoreUser(liveUser) }
                                 }
                             } else {
                                 detailActionButton(title: L10n.suspend, icon: "person.badge.minus", isDestructive: true) {
                                     userDetailSheetUser = nil
                                     DispatchQueue.main.async {
-                                        userToSuspend = user
+                                        userToSuspend = liveUser
                                         showSuspendAlert = true
                                     }
                                 }
                             }
 
-                            if user.uid != authManager.currentUser?.uid {
+                            if liveUser.uid != authManager.currentUser?.uid {
                                 detailActionButton(title: L10n.deleteUser, icon: "trash.fill", isDestructive: true) {
                                     userDetailSheetUser = nil
                                     DispatchQueue.main.async {
-                                        userToDelete = user
+                                        userToDelete = liveUser
                                         showDeleteAlert = true
                                     }
                                 }
@@ -951,14 +1144,13 @@ struct AdminUsersView: View {
                         .padding(16)
                         .background(AppConfig.cardBg)
                         .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
-                        .shadow(color: .black.opacity(0.03), radius: 7, y: 2)
                     }
                     .padding(.horizontal)
-                    .padding(.top, 10)
+                    .padding(.top, 12)
                     .padding(.bottom, 24)
                 }
             }
-            .navigationTitle(user.displayName)
+            .navigationTitle(liveUser.displayName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -971,53 +1163,53 @@ struct AdminUsersView: View {
         .presentationDragIndicator(.visible)
     }
 
-    private func detailInfoRow(icon: String, title: String, value: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .semibold))
+    private func keyValueRow(label: String, value: String, allowMultilineValue: Bool = false) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(label)
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray)
-                .frame(width: 22, height: 22)
-                .background(AppConfig.surfaceLow)
-                .clipShape(RoundedRectangle(cornerRadius: 7))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 7)
-                        .stroke(AppConfig.separatorSoft, lineWidth: 1)
-                )
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.caption2)
-                    .foregroundStyle(AppConfig.subtleGray)
-                Text(value.isEmpty ? "—" : value)
-                    .font(.subheadline)
-                    .foregroundStyle(AppConfig.darkText)
-            }
-            Spacer()
+            Spacer(minLength: 8)
+            Text(value.isEmpty ? "—" : value)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(AppConfig.darkText)
+                .multilineTextAlignment(.trailing)
+                .lineLimit(allowMultilineValue ? 2 : 1)
+                .truncationMode(.tail)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 2)
+    }
+
+    private func vehicleColorName(for user: AppUser) -> String {
+        if let named = AppConfig.carColors.first(where: { $0.hex == user.carColor })?.name {
+            return named
+        }
+        return user.carColor
     }
 
     private func detailActionButton(title: String, icon: String, isDestructive: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
-                    .frame(width: 22, height: 22)
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 28, height: 28)
                     .background(isDestructive ? AppConfig.spotOccupied.opacity(0.1) : AppConfig.surfaceLow)
-                    .clipShape(RoundedRectangle(cornerRadius: 7))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 7)
+                        RoundedRectangle(cornerRadius: 8)
                             .stroke(isDestructive ? AppConfig.spotOccupied.opacity(0.25) : AppConfig.separatorSoft, lineWidth: 1)
                     )
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                Spacer()
+                Spacer(minLength: 0)
             }
             .foregroundStyle(isDestructive ? AppConfig.spotOccupied : AppConfig.darkText)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
             .background(isDestructive ? AppConfig.spotOccupied.opacity(0.10) : AppConfig.surfaceLow)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 14)
                     .stroke(isDestructive ? AppConfig.spotOccupied.opacity(0.25) : AppConfig.separatorSoft, lineWidth: 1)
             )
         }
@@ -1532,7 +1724,17 @@ struct AdminUsersView: View {
 
                     // User header
                     HStack(spacing: 14) {
-                        UserAvatarView(user: user, size: 52)
+                        if VehicleMiniatureView.hasSpecificMiniature(carType: editCarType, description: editCar, presetID: editPresetID.isEmpty ? nil : editPresetID) {
+                            VehicleMiniatureView(
+                                carType: editCarType,
+                                colorHex: editColor,
+                                description: editCar,
+                                presetID: editPresetID.isEmpty ? nil : editPresetID
+                            )
+                            .frame(width: 90, height: 54)
+                        } else {
+                            UserAvatarView(user: user, size: 52)
+                        }
                         VStack(alignment: .leading, spacing: 2) {
                             Text(user.displayName).font(.headline).foregroundStyle(AppConfig.darkText)
                             Text(user.email).font(.caption).foregroundStyle(AppConfig.subtleGray)
@@ -1543,50 +1745,58 @@ struct AdminUsersView: View {
                     .background(AppConfig.cardBg)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
 
-                    // Car make + model with suggestions
+                    // Car make + model
                     VStack(alignment: .leading, spacing: 8) {
                         Text(L10n.carModel)
                             .font(.caption).fontWeight(.semibold).tracking(1.2)
                             .foregroundStyle(AppConfig.subtleGray)
-                        VStack(alignment: .leading, spacing: 0) {
-                            TextField("e.g. Škoda Octavia", text: $editCar)
-                                .autocorrectionDisabled()
-                                .padding(14)
-                                .background(AppConfig.cardBg)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .onChange(of: editCar) { _, val in
-                                    withAnimation(.quick) {
-                                        editCarSuggestions = CarData.filter(val)
-                                    }
-                                }
-                            if !editCarSuggestions.isEmpty {
-                                VStack(spacing: 0) {
-                                    ForEach(Array(editCarSuggestions.enumerated()), id: \.offset) { idx, suggestion in
-                                        Button {
-                                            withAnimation(.quick) {
-                                                editCar = suggestion
-                                                editCarSuggestions = []
-                                            }
-                                        } label: {
-                                            HStack(spacing: 10) {
-                                                Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(AppConfig.subtleGray)
-                                                Text(suggestion).font(.subheadline).foregroundStyle(AppConfig.darkText)
-                                                Spacer()
-                                            }
-                                            .padding(.horizontal, 14).padding(.vertical, 10)
+                        VStack(spacing: 8) {
+                            Menu {
+                                ForEach(CarData.makes, id: \.self) { make in
+                                    Button {
+                                        editSelectedMake = make
+                                        editSelectedModel = ""
+                                        editCar = make
+                                    } label: {
+                                        HStack(spacing: 8) {
+                                            CarMakerLogoBadge(make: make, size: 18)
+                                            Text(make)
                                         }
-                                        .buttonStyle(ScaleButtonStyle())
-                                        if idx < editCarSuggestions.count - 1 { Divider().padding(.horizontal, 14) }
                                     }
                                 }
-                                .background(AppConfig.surfaceLow)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .shadow(color: .black.opacity(0.06), radius: 6, y: 3)
-                                .padding(.top, 4)
-                                .transition(.opacity.combined(with: .move(edge: .top)))
+                            } label: {
+                                makeModelPickerRow(
+                                    icon: "building.2.crop.circle",
+                                    title: lang.language == .czech ? "Značka" : "Make",
+                                    value: editSelectedMake.isEmpty ? (lang.language == .czech ? "Vyberte značku" : "Choose make") : editSelectedMake,
+                                    isPlaceholder: editSelectedMake.isEmpty,
+                                    makerLogo: editSelectedMake.isEmpty ? nil : editSelectedMake
+                                )
                             }
+                            .buttonStyle(ScaleButtonStyle())
+
+                            Menu {
+                                if editSelectedMake.isEmpty {
+                                    Button(lang.language == .czech ? "Nejprve vyberte značku" : "Select make first") {}
+                                        .disabled(true)
+                                } else {
+                                    ForEach(CarData.models(for: editSelectedMake), id: \.self) { model in
+                                        Button(model) {
+                                            editSelectedModel = model
+                                            editCar = CarData.compose(make: editSelectedMake, model: model)
+                                        }
+                                    }
+                                }
+                            } label: {
+                                makeModelPickerRow(
+                                    icon: "car.side",
+                                    title: lang.language == .czech ? "Model" : "Model",
+                                    value: editSelectedModel.isEmpty ? (lang.language == .czech ? "Vyberte model" : "Choose model") : editSelectedModel,
+                                    isPlaceholder: editSelectedModel.isEmpty
+                                )
+                            }
+                            .buttonStyle(ScaleButtonStyle())
                         }
-                        .animation(.quick, value: editCarSuggestions.isEmpty)
                     }
 
                     // Registration plate
@@ -1603,71 +1813,37 @@ struct AdminUsersView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
 
-                    // Body type chips
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(L10n.carBodyType)
+                        Text("VEHICLE ICON")
                             .font(.caption).fontWeight(.semibold).tracking(1.2)
                             .foregroundStyle(AppConfig.subtleGray)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(CarBodyType.allCases) { bodyType in
-                                    let isSelected = editCarType == bodyType.rawValue
-                                    Button {
-                                        withAnimation(.quick) {
-                                            editCarType = isSelected ? "" : bodyType.rawValue
-                                        }
-                                    } label: {
-                                        HStack(spacing: 5) {
-                                            Image(systemName: bodyType.icon).font(.system(size: 12, weight: .semibold))
-                                            Text(bodyType.label).font(.system(size: 13, weight: .semibold))
-                                        }
-                                        .foregroundStyle(isSelected ? AppConfig.onAccent : AppConfig.subtleGray)
-                                        .padding(.horizontal, 13).padding(.vertical, 8)
-                                        .background(isSelected ? AppConfig.accent : AppConfig.surfaceLow)
-                                        .clipShape(Capsule())
-                                        .overlay(Capsule().stroke(
-                                            isSelected ? AppConfig.accentFg.opacity(0.3) : AppConfig.outlineVariant.opacity(0.4),
-                                            lineWidth: 1
-                                        ))
-                                    }
-                                    .buttonStyle(ScaleButtonStyle())
-                                }
-                            }
-                            .padding(.vertical, 2)
+                        Button {
+                            Haptics.selection()
+                            showEditVehiclePresetSheet = true
+                        } label: {
+                            let editPreset: VehicleMiniaturePreset? = {
+                                if !editPresetID.isEmpty { return VehicleMiniaturePreset.all.first { $0.id == editPresetID } }
+                                return VehicleMiniaturePreset.matching(description: editCar, carType: editCarType)
+                            }()
+                            iconPickerRow(
+                                title: lang.language == .czech ? "Ikona" : "Icon",
+                                value: editPreset?.title ?? "Choose Icon",
+                                isPlaceholder: editPreset == nil
+                            )
                         }
+                        .buttonStyle(ScaleButtonStyle())
                     }
 
                     VehicleMiniatureView(
                         carType: editCarType,
                         colorHex: editColor,
-                        description: editCar
+                        description: editCar,
+                        presetID: editPresetID.isEmpty ? nil : editPresetID
                     )
-                    .frame(width: 82, height: 46)
+                    .frame(width: 148, height: 82)
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 2)
 
-                    // Color picker
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text(L10n.carColor)
-                                .font(.caption).fontWeight(.semibold).tracking(1.2)
-                                .foregroundStyle(AppConfig.subtleGray)
-                            Spacer()
-                            if let color = AppConfig.carColors.first(where: { $0.hex == editColor }) {
-                                HStack(spacing: 6) {
-                                    Circle().fill(Color(hex: color.hex)).frame(width: 14, height: 14)
-                                        .overlay(Circle().stroke(AppConfig.outlineVariant.opacity(0.5), lineWidth: 1))
-                                    Text(color.name).font(.caption.weight(.semibold)).foregroundStyle(AppConfig.darkText)
-                                }
-                            } else if !editColor.isEmpty {
-                                HStack(spacing: 6) {
-                                    Circle().fill(Color(hex: editColor)).frame(width: 14, height: 14)
-                                        .overlay(Circle().stroke(AppConfig.outlineVariant.opacity(0.5), lineWidth: 1))
-                                    Text(L10n.carColorCustom).font(.caption.weight(.semibold)).foregroundStyle(AppConfig.darkText)
-                                }
-                            }
-                        }
-
+                    DisclosureGroup(isExpanded: $showEditVehicleColorPicker) {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 36))], spacing: 10) {
                             ForEach(AppConfig.carColors, id: \.hex) { color in
                                 let isSelected = editColor == color.hex
@@ -1686,20 +1862,32 @@ struct AdminUsersView: View {
                                 .buttonStyle(ScaleButtonStyle())
                             }
 
-                            VehicleCustomColorButton(
-                                selectedHex: $editColor,
-                                pickerColor: $editPickerColor,
-                                size: 28,
-                                selectedStrokeWidth: 3,
-                                checkmarkSize: 10,
-                                plusSize: 13,
-                                unselectedStroke: AppConfig.outlineVariant.opacity(0.5)
-                            )
                         }
-                        .padding(14)
-                        .background(AppConfig.cardBg)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.top, 8)
+                    } label: {
+                        HStack(spacing: 14) {
+                            Image(systemName: "paintpalette")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(AppConfig.subtleGray)
+                                .frame(width: 24)
+                            Text(L10n.carColor)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(AppConfig.darkText)
+                            Spacer()
+                            if let color = AppConfig.carColors.first(where: { $0.hex == editColor }) {
+                                Text(color.name).font(.caption).foregroundStyle(AppConfig.subtleGray)
+                            }
+                        }
                     }
+                    .tint(AppConfig.darkText)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 15)
+                    .background(AppConfig.surfaceLow)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(AppConfig.outlineVariant.opacity(0.35), lineWidth: 1)
+                    )
 
                 }
                 .padding(20)
@@ -1716,20 +1904,36 @@ struct AdminUsersView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(L10n.save) {
-                        let plate   = editPlate
-                        let car     = editCar
-                        let color   = editColor
-                        let carType = editCarType
+                        let plate    = editPlate
+                        let car      = editCar
+                        let color    = editColor
+                        let carType  = editCarType
+                        let presetID = editPresetID
                         userToEditVehicle = nil
-                        editCarSuggestions = []
-                        Task { await authManager.adminUpdateUserVehicle(user, plate: plate, car: car, color: color, carType: carType) }
+                        Task { await authManager.adminUpdateUserVehicle(user, plate: plate, car: car, color: color, carType: carType, vehicleMiniaturePresetID: presetID) }
                     }
                     .fontWeight(.semibold)
                     .foregroundStyle(AppConfig.accentFg)
                 }
             }
             .onAppear {
+                editPresetID = user.vehicleMiniaturePresetID
                 editColor = normalizedCarColor(for: user)
+                syncEditVehicleMakeModelFromDescription()
+                showEditVehicleColorPicker = false
+            }
+            .sheet(isPresented: $showEditVehiclePresetSheet) {
+                VehicleMiniaturePresetPickerSheet(
+                    title: "Choose Vehicle Icon",
+                    selectedColorHex: editColor,
+                    selectedPresetID: editPresetID.isEmpty ? VehicleMiniaturePreset.matching(description: editCar, carType: editCarType)?.id : editPresetID,
+                    selectedMake: editSelectedMake,
+                    selectedModel: editSelectedModel
+                ) { preset in
+                    editPresetID = preset.id
+                    editCar = preset.searchDescription
+                    editCarType = ""
+                }
             }
         }
         .presentationDetents([.medium, .large])
@@ -1741,6 +1945,77 @@ struct AdminUsersView: View {
             return user.carColor
         }
         return AppConfig.carColors.first?.hex ?? ""
+    }
+
+    private func makeModelPickerRow(
+        icon: String,
+        title: String,
+        value: String,
+        isPlaceholder: Bool,
+        makerLogo: String? = nil
+    ) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(AppConfig.subtleGray)
+                .frame(width: 24)
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(AppConfig.darkText)
+            Spacer()
+            HStack(spacing: 8) {
+                if let makerLogo, !isPlaceholder {
+                    CarMakerLogoBadge(make: makerLogo, size: 19)
+                }
+                Text(value)
+                    .font(.subheadline)
+                    .foregroundStyle(isPlaceholder ? AppConfig.subtleGray : AppConfig.darkText)
+                    .lineLimit(1)
+            }
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 15)
+        .background(AppConfig.surfaceLow)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppConfig.outlineVariant.opacity(0.35), lineWidth: 1))
+    }
+
+    private func iconPickerRow(
+        title: String,
+        value: String,
+        isPlaceholder: Bool
+    ) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(AppConfig.subtleGray)
+                .frame(width: 24)
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(AppConfig.darkText)
+            Spacer()
+            Text(value)
+                .font(.subheadline)
+                .foregroundStyle(isPlaceholder ? AppConfig.subtleGray : AppConfig.darkText)
+                .lineLimit(1)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 15)
+        .background(AppConfig.surfaceLow)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppConfig.outlineVariant.opacity(0.35), lineWidth: 1))
+    }
+
+    private func syncEditVehicleMakeModelFromDescription() {
+        let parsed = CarData.splitMakeModel(editCar)
+        editSelectedMake = parsed.make
+        editSelectedModel = parsed.model
     }
 
     private func vehicleSummary(for user: AppUser) -> String {

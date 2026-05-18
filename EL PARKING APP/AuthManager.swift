@@ -44,6 +44,7 @@ class AuthManager: ObservableObject {
     private var stateListener: AuthStateDidChangeListenerHandle?
     private var usersListener: ListenerRegistration?
     private lazy var db = Firestore.firestore()
+    private var lastAllUsersSignature: Int?
 
     // MARK: - Init
 
@@ -77,6 +78,14 @@ class AuthManager: ObservableObject {
     private func loadUserProfile(uid: String) async {
         do {
             let doc = try await db.collection("users").document(uid).getDocument()
+            #if DEBUG
+            if let data = doc.data() {
+                let warnings = FirestoreSchemaValidator.userWarnings(data: data, docID: doc.documentID)
+                if !warnings.isEmpty {
+                    print("AuthManager user schema warnings (\(warnings.count)):\n- \(warnings.joined(separator: "\n- "))")
+                }
+            }
+            #endif
             guard let data = doc.data(), var user = AppUser.fromFirestore(data) else {
                 authState = .unauthenticated
                 return
@@ -122,14 +131,16 @@ class AuthManager: ObservableObject {
             updated.status = .active
             try? await db.collection("users").document(user.uid).updateData([
                 "role":   UserRole.admin.rawValue,
-                "status": UserStatus.active.rawValue
+                "status": UserStatus.active.rawValue,
+                "inviteAccepted": true
             ])
         } else if AppConfig.seedPrivilegedEmails.contains(email) && user.role == .user {
             updated.role = .privileged
             updated.status = .active
             try? await db.collection("users").document(user.uid).updateData([
                 "role":   UserRole.privileged.rawValue,
-                "status": UserStatus.active.rawValue
+                "status": UserStatus.active.rawValue,
+                "inviteAccepted": true
             ])
         }
 
@@ -143,9 +154,22 @@ class AuthManager: ObservableObject {
         usersListener = db.collection("users")
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self, let snapshot, error == nil else { return }
-                let users = snapshot.documents.compactMap { AppUser.fromFirestore($0.data()) }
+                #if DEBUG
+                let warnings = snapshot.documents.flatMap {
+                    FirestoreSchemaValidator.userWarnings(data: $0.data(), docID: $0.documentID)
+                }
+                if !warnings.isEmpty {
+                    print("AuthManager users listener schema warnings (\(warnings.count)):\n- \(warnings.prefix(10).joined(separator: "\n- "))")
+                }
+                #endif
+                let users = snapshot.documents
+                    .compactMap { AppUser.fromFirestore($0.data()) }
+                    .sorted { $0.displayName < $1.displayName }
                 Task { @MainActor in
-                    self.allUsers = users.sorted { $0.displayName < $1.displayName }
+                    let signature = self.usersSignature(users)
+                    guard signature != self.lastAllUsersSignature else { return }
+                    self.lastAllUsersSignature = signature
+                    self.allUsers = users
                 }
             }
     }
@@ -181,6 +205,7 @@ class AuthManager: ObservableObject {
                 carType:                 "",
                 createdAt:               Date(),
                 rejectionReason:         nil,
+                inviteAccepted:          false,
                 needsFinishRegistration: false,
                 activatedAt:             nil
             )
@@ -255,6 +280,7 @@ class AuthManager: ObservableObject {
         try? Auth.auth().signOut()
         usersListener?.remove()
         usersListener = nil
+        lastAllUsersSignature = nil
         currentUser   = nil
         allUsers      = []
         // pendingCount is computed from allUsers — no explicit reset needed
@@ -262,15 +288,48 @@ class AuthManager: ObservableObject {
         // Note: we keep Keychain credentials so Face ID sign-in still works next time
     }
 
+    private func usersSignature(_ users: [AppUser]) -> Int {
+        var hasher = Hasher()
+        hasher.combine(users.count)
+        for user in users {
+            hasher.combine(user.uid)
+            hasher.combine(user.email)
+            hasher.combine(user.displayName)
+            hasher.combine(user.role.rawValue)
+            hasher.combine(user.status.rawValue)
+            hasher.combine(user.registrationPlate)
+            hasher.combine(user.carDescription)
+            hasher.combine(user.carColor)
+            hasher.combine(user.carType)
+            hasher.combine(user.preferredVocative)
+            hasher.combine(user.strikes)
+            hasher.combine(user.suspensionCount)
+            hasher.combine(user.suspendedAt?.timeIntervalSinceReferenceDate)
+            hasher.combine(user.lastStrikeAt?.timeIntervalSinceReferenceDate)
+        }
+        return hasher.finalize()
+    }
+
     // MARK: - Update Profile
 
-    func updateProfile(displayName: String, plate: String, carDescription: String, carColor: String = "", carType: String = "") async {
+    func updateProfile(
+        displayName: String,
+        plate: String,
+        carDescription: String,
+        carColor: String = "",
+        carType: String = "",
+        vehicleMiniaturePresetID: String = "",
+        preferredVocative: String = ""
+    ) async {
         guard let uid = currentUser?.uid else { return }
         do {
+            let trimmedVocative = preferredVocative.trimmingCharacters(in: .whitespacesAndNewlines)
             var update: [String: Any] = [
                 "displayName":       displayName,
                 "registrationPlate": plate,
-                "carDescription":    carDescription
+                "carDescription":    carDescription,
+                "vehicleMiniaturePresetID": vehicleMiniaturePresetID,
+                "preferredVocative": trimmedVocative
             ]
             if !carColor.isEmpty { update["carColor"] = carColor }
             if !carType.isEmpty  { update["carType"]  = carType  }
@@ -278,6 +337,8 @@ class AuthManager: ObservableObject {
             currentUser?.displayName       = displayName
             currentUser?.registrationPlate = plate
             currentUser?.carDescription    = carDescription
+            currentUser?.vehicleMiniaturePresetID = vehicleMiniaturePresetID
+            currentUser?.preferredVocative = trimmedVocative
             if !carColor.isEmpty { currentUser?.carColor = carColor }
             if !carType.isEmpty  { currentUser?.carType  = carType  }
         } catch {
@@ -287,7 +348,7 @@ class AuthManager: ObservableObject {
 
     // MARK: - Finish Registration (admin-created accounts)
 
-    func finishRegistration(plate: String, car: String, color: String, carType: String = "", newPassword: String?) async {
+    func finishRegistration(plate: String, car: String, color: String, carType: String = "", vehicleMiniaturePresetID: String = "", newPassword: String?) async {
         guard let firebaseUser = Auth.auth().currentUser,
               let uid = currentUser?.uid else { return }
 
@@ -309,6 +370,8 @@ class AuthManager: ObservableObject {
                 "carDescription":          car.trimmingCharacters(in: .whitespaces),
                 "carColor":                color,
                 "carType":                 carType,
+                "vehicleMiniaturePresetID": vehicleMiniaturePresetID,
+                "inviteAccepted":          true,
                 "needsFinishRegistration": false,
                 "activatedAt":             Timestamp(date: Date())
             ])
@@ -402,6 +465,7 @@ class AuthManager: ObservableObject {
                 carType:                 "",
                 createdAt:               Date(),
                 rejectionReason:         nil,
+                inviteAccepted:          true,
                 needsFinishRegistration: true,
                 activatedAt:             nil
             )
@@ -480,7 +544,8 @@ class AuthManager: ObservableObject {
         do {
             try await db.collection("users").document(user.uid).updateData([
                 "status": UserStatus.active.rawValue,
-                "role":   role.rawValue
+                "role":   role.rawValue,
+                "inviteAccepted": true
             ])
             AuditLogger.log(
                 action: "activate_user",
@@ -524,7 +589,8 @@ class AuthManager: ObservableObject {
         do {
             try await db.collection("users").document(user.uid).updateData([
                 "status":  UserStatus.active.rawValue,
-                "strikes": 0
+                "strikes": 0,
+                "inviteAccepted": true
             ])
             PushNotificationManager.sendToUser(
                 email: user.email,
@@ -611,7 +677,8 @@ class AuthManager: ObservableObject {
         do {
             try await db.collection("users").document(user.uid).updateData([
                 "status":  UserStatus.active.rawValue,
-                "strikes": 0
+                "strikes": 0,
+                "inviteAccepted": true
             ])
             PushNotificationManager.sendToUser(
                 email: user.email,
@@ -809,7 +876,7 @@ class AuthManager: ObservableObject {
     // MARK: - Admin: Delete User
 
     /// Updates a user's vehicle info (admin only).
-    func adminUpdateUserVehicle(_ user: AppUser, plate: String, car: String, color: String, carType: String = "") async {
+    func adminUpdateUserVehicle(_ user: AppUser, plate: String, car: String, color: String, carType: String = "", vehicleMiniaturePresetID: String = "") async {
         let trimmedPlate    = plate.trimmingCharacters(in: .whitespaces).uppercased()
         let trimmedCar      = car.trimmingCharacters(in: .whitespaces)
         let trimmedColor    = color.trimmingCharacters(in: .whitespaces)
@@ -819,7 +886,8 @@ class AuthManager: ObservableObject {
                 "registrationPlate": trimmedPlate,
                 "carDescription":    trimmedCar,
                 "carColor":          trimmedColor,
-                "carType":           trimmedCarType
+                "carType":           trimmedCarType,
+                "vehicleMiniaturePresetID": vehicleMiniaturePresetID
             ])
             AuditLogger.log(
                 action: "admin_update_vehicle",

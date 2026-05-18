@@ -6,6 +6,20 @@
 import Foundation
 import FirebaseFirestore
 
+enum AnnouncementTextColorMode: String, CaseIterable {
+    case auto
+    case light
+    case dark
+
+    var title: String {
+        switch self {
+        case .auto: return "Auto"
+        case .light: return "White"
+        case .dark: return "Black"
+        }
+    }
+}
+
 struct Announcement: Identifiable, Equatable {
     var id: String
     var title: String
@@ -17,10 +31,24 @@ struct Announcement: Identifiable, Equatable {
     var isPinned: Bool
     var expiresAt: Date?          // nil = never expires
     var fields: [ContactField]    // structured contact / info fields
+    var backgroundColorHex: String?
+    var imageURL: String?
+    var imageBase64: String?
+    var textColorMode: String = AnnouncementTextColorMode.auto.rawValue
 
     var isExpired: Bool {
         guard let exp = expiresAt else { return false }
         return exp < Date()
+    }
+
+    var daysUntilExpiry: Int? {
+        guard let exp = expiresAt else { return nil }
+        return Calendar.current.dateComponents([.day], from: Date(), to: exp).day
+    }
+
+    var isExpiringSoon: Bool {
+        guard let days = daysUntilExpiry else { return false }
+        return days >= 0 && days <= 7
     }
 
     static func == (lhs: Announcement, rhs: Announcement) -> Bool {
@@ -39,8 +67,11 @@ struct Announcement: Identifiable, Equatable {
             "isPinned":  isPinned,
             "fields":    fields.map { $0.toDict() }
         ]
-        // Always write the field so edits that remove an expiry actually clear it in Firestore
         dict["expiresAt"] = expiresAt.map { Timestamp(date: $0) } ?? NSNull()
+        dict["backgroundColorHex"] = backgroundColorHex ?? NSNull()
+        dict["imageURL"] = imageURL ?? NSNull()
+        dict["imageBase64"] = imageBase64 ?? NSNull()
+        dict["textColorMode"] = textColorMode
         return dict
     }
 
@@ -63,7 +94,11 @@ struct Announcement: Identifiable, Equatable {
             isActive:  (data["isActive"] as? Bool) ?? true,
             isPinned:  (data["isPinned"] as? Bool) ?? false,
             expiresAt: (data["expiresAt"] as? Timestamp)?.dateValue(),
-            fields:    rawFields.compactMap { ContactField.fromDict($0) }
+            fields:    rawFields.compactMap { ContactField.fromDict($0) },
+            backgroundColorHex: data["backgroundColorHex"] as? String,
+            imageURL:  data["imageURL"] as? String,
+            imageBase64: data["imageBase64"] as? String,
+            textColorMode: (data["textColorMode"] as? String) ?? AnnouncementTextColorMode.auto.rawValue
         )
     }
 }

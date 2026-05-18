@@ -103,6 +103,7 @@ struct MyBookingsView: View {
 
     @State private var bookingToCancel:        Booking?
     @State private var cancelGroupBookings:    [Booking]?
+    @State private var cancelAnchorGroupID:    String?
     @State private var showingCancelAlert      = false
     @State private var showingGroupCancelAlert = false
     @State private var showCancelSuccess       = false
@@ -189,12 +190,8 @@ struct MyBookingsView: View {
     // MARK: - Body
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                AppConfig.pageBg.ignoresSafeArea()
-
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 16) {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 16) {
 
                         // ── Segmented toggle ──────────────────────────────
                         segmentedToggle
@@ -285,13 +282,13 @@ struct MyBookingsView: View {
 
                     Spacer().frame(height: 80)
                 }
+                .padding(.vertical)
+                .animation(.standard, value: bookingManager.bookings.count)
             }
-            .padding(.vertical)
-            .animation(.standard, value: bookingManager.bookings.count)
-        }
-            .scrollEdgeEffectStyle(.soft, for: .top)
-            .navigationTitle(L10n.myBookings)
-            .navigationBarTitleDisplayMode(.large)
+        .background(AppConfig.pageBg)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .navigationTitle(L10n.myBookings)
+        .navigationBarTitleDisplayMode(.large)
             // Single-booking edit — item-based avoids blank-sheet race
             .sheet(item: $bookingToEdit) { booking in
                 BookingSheet(
@@ -301,40 +298,6 @@ struct MyBookingsView: View {
                     editingBooking: booking
                 )
                 .environmentObject(bookingManager)
-            }
-            .confirmationDialog(L10n.cancelBooking, isPresented: $showingCancelAlert, titleVisibility: .visible) {
-                Button(L10n.cancelBooking, role: .destructive) {
-                    if let b = bookingToCancel {
-                        Haptics.destructive()
-                        let info = (spotNumber: b.spotNumber, date: b.naturalDate,
-                                    from: b.fromTime, to: b.toTime)
-                        Task {
-                            let error = await bookingManager.cancelBooking(b)
-                            if error == nil {
-                                Haptics.notify(.success)
-                                cancelledBooking = info
-                                withAnimation(.easeIn(duration: 0.2)) { showCancelSuccess = true }
-                                ToastManager.shared.showUndo(
-                                    message: "Spot \(b.spotNumber) cancelled"
-                                ) {
-                                    Task {
-                                        try? await bookingManager.createBooking(
-                                            spotID: b.spotNumber, spotLabel: b.spot,
-                                            userEmail: b.email, userName: b.user,
-                                            dateFrom: b.date, dateTo: b.date,
-                                            timeFrom: b.fromTime, timeTo: b.toTime
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                Button(L10n.keep, role: .cancel) {}
-            } message: {
-                if let b = bookingToCancel {
-                    Text(L10n.cancelSingleMessage(spot: b.spotNumber, date: b.naturalDate))
-                }
             }
             .overlay {
                 if showCancelSuccess, let info = cancelledBooking {
@@ -348,31 +311,12 @@ struct MyBookingsView: View {
                     }
                 }
             }
-            .confirmationDialog(L10n.cancelEntireRange, isPresented: $showingGroupCancelAlert, titleVisibility: .visible) {
-                Button(L10n.cancelAllDays, role: .destructive) {
-                    if let group = cancelGroupBookings {
-                        Haptics.destructive()
-                        Task { for b in group { await bookingManager.cancelBooking(b) } }
-                    }
-                }
-                Button(L10n.keep, role: .cancel) {}
-            } message: {
-                if let group = cancelGroupBookings,
-                   let first = group.sorted(by: { $0.date < $1.date }).first,
-                   let last  = group.sorted(by: { $0.date < $1.date }).last {
-                    Text(L10n.cancelRangeMessage(count: group.count, name: first.user,
-                                                  spot: first.spotNumber,
-                                                  from: first.date.formatNaturalShort(),
-                                                  to: last.date.formatNaturalShort()))
-                }
-            }
                 .refreshable {
                     await bookingManager.refreshData()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .deviceDidShake)) { _ in
                     ToastManager.shared.performUndo()
                 }
-        }
     }
 
     // MARK: - Section header
@@ -626,6 +570,36 @@ struct MyBookingsView: View {
                 ? Color(red: 0.2, green: 0.4, blue: 1.0).opacity(0.12)
                 : Color.black.opacity(0.08),
                 radius: 12, y: 4)
+        .confirmationDialog(L10n.cancelBooking, isPresented: singleCancelPresentedBinding(for: group), titleVisibility: .visible) {
+            Button(L10n.cancelBooking, role: .destructive) {
+                confirmSingleCancel()
+            }
+            Button(L10n.keep, role: .cancel) {}
+        } message: {
+            if let b = bookingToCancel {
+                Text(L10n.cancelSingleMessage(spot: b.spotNumber, date: b.naturalDate))
+            }
+        }
+        .confirmationDialog(L10n.cancelEntireRange, isPresented: rangeCancelPresentedBinding(for: group), titleVisibility: .visible) {
+            Button(L10n.cancelAllDays, role: .destructive) {
+                confirmRangeCancel()
+            }
+            Button(L10n.keep, role: .cancel) {}
+        } message: {
+            if let group = cancelGroupBookings,
+               let first = group.sorted(by: { $0.date < $1.date }).first,
+               let last  = group.sorted(by: { $0.date < $1.date }).last {
+                Text(
+                    L10n.cancelRangeMessage(
+                        count: group.count,
+                        name: first.user,
+                        spot: first.spotNumber,
+                        from: first.date.formatNaturalShort(),
+                        to: last.date.formatNaturalShort()
+                    )
+                )
+            }
+        }
     }
 
     // MARK: - Action button helper
@@ -799,68 +773,116 @@ private struct EmptyStateCard: View {
 
 // MARK: - SwipeToCancelModifier
 
-private struct SwipeToCancelModifier: ViewModifier {
+struct SwipeToCancelModifier: ViewModifier {
     let onCancel: () -> Void
+    var cornerRadius: CGFloat = 16
+
     @State private var offset: CGFloat = 0
-    @State private var activated = false
-    private let threshold: CGFloat = 72
+    @State private var isOpen = false
+    @State private var didSnap = false
+
+    private let actionWidth: CGFloat = 80
+    private let fullSwipeThreshold: CGFloat = 200
 
     func body(content: Content) -> some View {
         ZStack(alignment: .trailing) {
-            // Red reveal background
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: cornerRadius)
                 .fill(AppConfig.spotOccupied)
                 .overlay(alignment: .trailing) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .bold))
+                    Button {
+                        Haptics.destructive()
+                        withAnimation(.easeInOut(duration: 0.25)) { offset = -500 }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            offset = 0; isOpen = false; didSnap = false
+                            onCancel()
+                        }
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: "trash.fill")
+                                .font(.system(size: 17, weight: .semibold))
+                            Text("Cancel")
+                                .font(.system(size: 10, weight: .semibold))
+                        }
                         .foregroundStyle(.white)
-                        .padding(.trailing, 22)
+                        .frame(width: actionWidth)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
-                .opacity(offset < -8 ? 1 : 0)
+                .opacity(offset < -4 ? 1 : 0)
 
             content
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .fill(AppConfig.spotOccupied.opacity(activated ? 0.15 : 0))
-                        .allowsHitTesting(false)
-                )
-                .scaleEffect(activated ? 0.97 : 1.0, anchor: .leading)
-                .animation(.quick, value: activated)
                 .offset(x: offset)
                 .gesture(
-                    DragGesture(minimumDistance: 15, coordinateSpace: .local)
+                    DragGesture(minimumDistance: 12, coordinateSpace: .local)
                         .onChanged { v in
                             let h = v.translation.width
                             let vert = abs(v.translation.height)
-                            guard h < 0, abs(h) > vert * 1.1 else { return }
-                            offset = max(h * 0.65, -120)
-                            if !activated && offset < -threshold {
-                                activated = true
-                                Haptics.selection()
+                            guard abs(h) > vert * 0.8 else { return }
+
+                            let base = isOpen ? -actionWidth : 0
+                            let raw = base + h
+                            if raw > 0 {
+                                offset = raw * 0.3
+                            } else if raw < -actionWidth {
+                                let over = raw + actionWidth
+                                offset = -actionWidth + over * 0.35
+                            } else {
+                                offset = raw
+                            }
+
+                            if !didSnap && offset <= -actionWidth {
+                                didSnap = true
+                                Haptics.impact(.medium)
+                            } else if didSnap && offset > -actionWidth + 10 {
+                                didSnap = false
                             }
                         }
                         .onEnded { v in
-                            if v.translation.width < -threshold {
-                                withAnimation(.standard) {
-                                    offset = -500
+                            let velocity = v.predictedEndTranslation.width - v.translation.width
+
+                            if v.translation.width < -fullSwipeThreshold || velocity < -300 {
+                                Haptics.destructive()
+                                withAnimation(.easeInOut(duration: 0.25)) { offset = -500 }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                    offset = 0; isOpen = false; didSnap = false
+                                    onCancel()
                                 }
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-                                    offset = 0; activated = false; onCancel()
-                                }
-                            } else {
-                                withAnimation(.standard) {
-                                    offset = 0; activated = false
+                                return
+                            }
+
+                            let shouldOpen = isOpen
+                                ? v.translation.width > 40 ? false : true
+                                : offset < -(actionWidth * 0.4)
+
+                            withAnimation(.snappy(duration: 0.3)) {
+                                if shouldOpen {
+                                    offset = -actionWidth
+                                    isOpen = true
+                                } else {
+                                    offset = 0
+                                    isOpen = false
                                 }
                             }
+                            didSnap = false
                         }
                 )
+                .onTapGesture {
+                    if isOpen {
+                        withAnimation(.snappy(duration: 0.3)) {
+                            offset = 0; isOpen = false
+                        }
+                    }
+                }
         }
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
     }
 }
 
 extension View {
-    func swipeToCancel(action: @escaping () -> Void) -> some View {
-        modifier(SwipeToCancelModifier(onCancel: action))
+    func swipeToCancel(cornerRadius: CGFloat = 24, action: @escaping () -> Void) -> some View {
+        modifier(SwipeToCancelModifier(onCancel: action, cornerRadius: cornerRadius))
     }
 }
 
@@ -883,6 +905,7 @@ extension MyBookingsView {
     // MARK: - Actions
 
     private func triggerCancel(_ group: BookingGroup) {
+        cancelAnchorGroupID = group.id
         switch group {
         case .single(let b):
             bookingToCancel = b
@@ -890,6 +913,81 @@ extension MyBookingsView {
         case .range(let bs, _, _, _):
             cancelGroupBookings = bs
             showingGroupCancelAlert = true
+        }
+    }
+
+    private func singleCancelPresentedBinding(for group: BookingGroup) -> Binding<Bool> {
+        Binding(
+            get: {
+                showingCancelAlert && cancelAnchorGroupID == group.id
+            },
+            set: { newValue in
+                if !newValue {
+                    showingCancelAlert = false
+                    if cancelAnchorGroupID == group.id {
+                        cancelAnchorGroupID = nil
+                    }
+                }
+            }
+        )
+    }
+
+    private func rangeCancelPresentedBinding(for group: BookingGroup) -> Binding<Bool> {
+        Binding(
+            get: {
+                showingGroupCancelAlert && cancelAnchorGroupID == group.id
+            },
+            set: { newValue in
+                if !newValue {
+                    showingGroupCancelAlert = false
+                    if cancelAnchorGroupID == group.id {
+                        cancelAnchorGroupID = nil
+                    }
+                }
+            }
+        )
+    }
+
+    private func confirmSingleCancel() {
+        guard let b = bookingToCancel else { return }
+        showingCancelAlert = false
+        cancelAnchorGroupID = nil
+        Haptics.destructive()
+        let info = (spotNumber: b.spotNumber, date: b.naturalDate, from: b.fromTime, to: b.toTime)
+        Task {
+            let error = await bookingManager.cancelBooking(b)
+            if error == nil {
+                Haptics.notify(.success)
+                cancelledBooking = info
+                withAnimation(.easeIn(duration: 0.2)) { showCancelSuccess = true }
+                ToastManager.shared.showUndo(
+                    message: "Spot \(b.spotNumber) cancelled"
+                ) {
+                    Task {
+                        try? await bookingManager.createBooking(
+                            spotID: b.spotNumber, spotLabel: b.spot,
+                            userEmail: b.email, userName: b.user,
+                            dateFrom: b.date, dateTo: b.date,
+                            timeFrom: b.fromTime, timeTo: b.toTime
+                        )
+                    }
+                }
+            } else {
+                Haptics.notify(.error)
+            }
+        }
+    }
+
+    private func confirmRangeCancel() {
+        guard let group = cancelGroupBookings else { return }
+        showingGroupCancelAlert = false
+        cancelAnchorGroupID = nil
+        Haptics.destructive()
+        Task {
+            for b in group {
+                _ = await bookingManager.cancelBooking(b)
+            }
+            Haptics.notify(.success)
         }
     }
 

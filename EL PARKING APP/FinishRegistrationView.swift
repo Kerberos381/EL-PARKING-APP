@@ -17,8 +17,11 @@ struct FinishRegistrationView: View {
     @State private var car            = ""
     @State private var carType        = ""
     @State private var selectedColor  = AppConfig.carColors[0].hex
-    @State private var pickerColor    = Color.red
-    @State private var carSuggestions: [String] = []
+    @State private var selectedMake   = ""
+    @State private var selectedModel  = ""
+    @State private var selectedPresetID: String = ""
+    @State private var showVehiclePresetSheet = false
+    @State private var showVehicleColorPicker = false
     @State private var newPassword      = ""
     @State private var confirmPassword  = ""
     @State private var showPassword     = false
@@ -26,8 +29,15 @@ struct FinishRegistrationView: View {
     @State private var isLoading        = false
     @State private var errorMsg: String? = nil
 
-    private enum Field: Hashable { case plate, car, newPassword, confirmPassword }
+    private enum Field: Hashable { case plate, newPassword, confirmPassword }
     @FocusState private var focusedField: Field?
+
+    private var selectedVehiclePreset: VehicleMiniaturePreset? {
+        if !selectedPresetID.isEmpty {
+            return VehicleMiniaturePreset.all.first { $0.id == selectedPresetID }
+        }
+        return VehicleMiniaturePreset.matching(description: car, carType: carType)
+    }
 
     var body: some View {
         ZStack {
@@ -68,78 +78,110 @@ struct FinishRegistrationView: View {
                                      placeholder: L10n.platePlaceholder,
                                      text: $plate, capitalization: .characters,
                                      focusField: .plate, submitLabel: .next,
-                                     onSubmit: { focusedField = .car })
+                                     onSubmit: { focusedField = .newPassword })
 
-                            // Car make + model with suggestions
-                            VStack(alignment: .leading, spacing: 0) {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "car.side")
-                                        .foregroundStyle(AppConfig.subtleGray)
-                                        .frame(width: 20)
-                                    TextField(L10n.carInputPlaceholder, text: $car)
-                                        .textInputAutocapitalization(.words)
-                                        .autocorrectionDisabled()
-                                        .foregroundStyle(AppConfig.darkText)
-                                        .focused($focusedField, equals: .car)
-                                        .submitLabel(.next)
-                                        .onSubmit { focusedField = .newPassword }
-                                        .onChange(of: car) { _, val in
-                                            withAnimation(.quick) {
-                                                carSuggestions = CarData.filter(val)
+                            // Car make + model
+                            VStack(spacing: 8) {
+                                Menu {
+                                    ForEach(CarData.makes, id: \.self) { make in
+                                        Button {
+                                            selectedMake = make
+                                            selectedModel = ""
+                                            car = make
+                                        } label: {
+                                            HStack(spacing: 8) {
+                                                CarMakerLogoBadge(make: make, size: 18)
+                                                Text(make)
                                             }
                                         }
-                                }
-                                .padding(14)
-                                .appGlassField()
-
-                                if !carSuggestions.isEmpty {
-                                    suggestionsDropdown(suggestions: carSuggestions) { pick in
-                                        car = pick
-                                        carSuggestions = []
                                     }
-                                    .padding(.top, 4)
-                                    .transition(.opacity.combined(with: .move(edge: .top)))
+                                } label: {
+                                    makeModelPickerRow(
+                                        icon: "building.2.crop.circle",
+                                        title: lang.language == .czech ? "Značka" : "Make",
+                                        value: selectedMake.isEmpty ? (lang.language == .czech ? "Vyberte značku" : "Choose make") : selectedMake,
+                                        isPlaceholder: selectedMake.isEmpty,
+                                        makerLogo: selectedMake.isEmpty ? nil : selectedMake
+                                    )
                                 }
-                            }
-                            .animation(.quick, value: carSuggestions.isEmpty)
+                                .buttonStyle(ScaleButtonStyle())
 
-                            // Body type chips
-                            VStack(alignment: .leading, spacing: 8) {
+                                Menu {
+                                    if selectedMake.isEmpty {
+                                        Button(lang.language == .czech ? "Nejprve vyberte značku" : "Select make first") {}
+                                            .disabled(true)
+                                    } else {
+                                        ForEach(CarData.models(for: selectedMake), id: \.self) { model in
+                                            Button(model) {
+                                                selectedModel = model
+                                                car = CarData.compose(make: selectedMake, model: model)
+                                            }
+                                        }
+                                    }
+                                } label: {
+                                    makeModelPickerRow(
+                                        icon: "car.side",
+                                        title: lang.language == .czech ? "Model" : "Model",
+                                        value: selectedModel.isEmpty ? (lang.language == .czech ? "Vyberte model" : "Choose model") : selectedModel,
+                                        isPlaceholder: selectedModel.isEmpty
+                                    )
+                                }
+                                .buttonStyle(ScaleButtonStyle())
+                            }
+
+                            VStack(alignment: .leading, spacing: 10) {
                                 HStack(spacing: 6) {
-                                    Image(systemName: "car.2")
-                                        .font(.system(size: 11, weight: .semibold))
+                                    Image(systemName: "car.side")
+                                        .font(.system(size: 12, weight: .semibold))
                                         .foregroundStyle(AppConfig.subtleGray)
-                                    Text(L10n.carBodyType.uppercased())
+                                    Text("VEHICLE ICON")
                                         .font(.system(size: 10, weight: .bold))
-                                        .tracking(1.2)
+                                        .tracking(1.1)
                                         .foregroundStyle(AppConfig.subtleGray)
                                 }
-                                bodyTypeChips(selected: $carType)
+
+                                Button {
+                                    Haptics.selection()
+                                    showVehiclePresetSheet = true
+                                } label: {
+                                    iconPickerRow(
+                                        title: lang.language == .czech ? "Ikona" : "Icon",
+                                        value: selectedVehiclePreset?.title ?? "Choose Icon",
+                                        isPlaceholder: selectedVehiclePreset == nil
+                                    )
+                                }
+                                .buttonStyle(ScaleButtonStyle())
                             }
 
                             VehicleMiniatureView(
                                 carType: carType,
                                 colorHex: selectedColor,
-                                description: car
+                                description: car,
+                                presetID: selectedPresetID.isEmpty ? nil : selectedPresetID
                             )
-                            .frame(width: 82, height: 46)
+                            .frame(width: 148, height: 82)
                             .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 2)
 
-                            // Color picker
-                            VStack(alignment: .leading, spacing: 10) {
-                                HStack(spacing: 6) {
+                            DisclosureGroup(isExpanded: $showVehicleColorPicker) {
+                                colorGridWithCustom(selected: $selectedColor)
+                                    .padding(.top, 8)
+                            } label: {
+                                HStack(spacing: 14) {
                                     Image(systemName: "paintpalette")
+                                        .font(.system(size: 15, weight: .semibold))
                                         .foregroundStyle(AppConfig.subtleGray)
-                                        .frame(width: 20)
+                                        .frame(width: 24)
                                     Text(L10n.carColor)
-                                        .font(.subheadline)
-                                        .foregroundStyle(AppConfig.subtleGray)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(AppConfig.darkText)
                                     Spacer()
                                     colorNameLabel(for: selectedColor)
                                 }
-                                colorGridWithCustom(selected: $selectedColor, pickerColor: $pickerColor)
                             }
+                            .tint(AppConfig.darkText)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 15)
+                            .appGlassField()
                         }
                     }
 
@@ -214,6 +256,29 @@ struct FinishRegistrationView: View {
                 }
             }
             .scrollDismissesKeyboard(.immediately)
+            .sheet(isPresented: $showVehiclePresetSheet) {
+                VehicleMiniaturePresetPickerSheet(
+                    title: "Choose Vehicle Icon",
+                    selectedColorHex: selectedColor,
+                    selectedPresetID: selectedVehiclePreset?.id,
+                    selectedMake: selectedMake,
+                    selectedModel: selectedModel
+                ) { preset in
+                    selectedPresetID = preset.id
+                    car = preset.searchDescription
+                    carType = ""
+                    syncMakeModelFromCar()
+                }
+            }
+            .onAppear {
+                if plate.isEmpty { plate = user.registrationPlate }
+                if car.isEmpty { car = user.carDescription }
+                if carType.isEmpty { carType = user.carType }
+                if AppConfig.carColors.contains(where: { $0.hex == user.carColor }) {
+                    selectedColor = user.carColor
+                }
+                syncMakeModelFromCar()
+            }
         }
     }
 
@@ -237,6 +302,7 @@ struct FinishRegistrationView: View {
                 car:         car,
                 color:       selectedColor,
                 carType:     carType,
+                vehicleMiniaturePresetID: selectedPresetID,
                 newPassword: newPassword
             )
             await MainActor.run {
@@ -290,38 +356,75 @@ struct FinishRegistrationView: View {
         }
     }
 
-    @ViewBuilder
-    private func suggestionsDropdown(suggestions: [String], onSelect: @escaping (String) -> Void) -> some View {
-        VStack(spacing: 0) {
-            ForEach(Array(suggestions.enumerated()), id: \.offset) { idx, suggestion in
-                Button {
-                    withAnimation(.quick) { onSelect(suggestion) }
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 12))
-                            .foregroundStyle(AppConfig.subtleGray)
-                        Text(suggestion)
-                            .font(.subheadline)
-                            .foregroundStyle(AppConfig.darkText)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
+    private func makeModelPickerRow(
+        icon: String,
+        title: String,
+        value: String,
+        isPlaceholder: Bool,
+        makerLogo: String? = nil
+    ) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(AppConfig.subtleGray)
+                .frame(width: 24)
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(AppConfig.darkText)
+            Spacer()
+            HStack(spacing: 8) {
+                if let makerLogo, !isPlaceholder {
+                    CarMakerLogoBadge(make: makerLogo, size: 19)
                 }
-                .buttonStyle(ScaleButtonStyle())
-                if idx < suggestions.count - 1 {
-                    Divider().padding(.horizontal, 14)
-                }
+                Text(value)
+                    .font(.subheadline)
+                    .foregroundStyle(isPlaceholder ? AppConfig.subtleGray : AppConfig.darkText)
+                    .lineLimit(1)
             }
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
         }
-        .background(AppConfig.cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 15)
+        .appGlassField()
+    }
+
+    private func iconPickerRow(
+        title: String,
+        value: String,
+        isPlaceholder: Bool
+    ) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(AppConfig.subtleGray)
+                .frame(width: 24)
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(AppConfig.darkText)
+            Spacer()
+            Text(value)
+                .font(.subheadline)
+                .foregroundStyle(isPlaceholder ? AppConfig.subtleGray : AppConfig.darkText)
+                .lineLimit(1)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 15)
+        .appGlassField()
+    }
+
+    private func syncMakeModelFromCar() {
+        let parsed = CarData.splitMakeModel(car)
+        selectedMake = parsed.make
+        selectedModel = parsed.model
     }
 
     @ViewBuilder
-    private func colorGridWithCustom(selected: Binding<String>, pickerColor: Binding<Color>) -> some View {
+    private func colorGridWithCustom(selected: Binding<String>) -> some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 40))], spacing: 8) {
             ForEach(AppConfig.carColors, id: \.hex) { color in
                 let isSelected = selected.wrappedValue == color.hex
@@ -350,13 +453,6 @@ struct FinishRegistrationView: View {
                 .buttonStyle(ScaleButtonStyle())
             }
 
-            VehicleCustomColorButton(
-                selectedHex: selected,
-                pickerColor: pickerColor,
-                size: 38,
-                checkmarkSize: 11,
-                plusSize: 16
-            )
         }
     }
 
@@ -369,16 +465,6 @@ struct FinishRegistrationView: View {
                     .frame(width: 14, height: 14)
                     .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1))
                 Text(match.name)
-                    .font(.caption)
-                    .foregroundStyle(AppConfig.subtleGray)
-            }
-        } else if !hex.isEmpty {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(Color(hex: hex))
-                    .frame(width: 14, height: 14)
-                    .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1))
-                Text(L10n.carColorCustom)
                     .font(.caption)
                     .foregroundStyle(AppConfig.subtleGray)
             }
@@ -438,6 +524,7 @@ struct FinishRegistrationView: View {
             }
         }
         .padding(14)
+        .contentShape(RoundedRectangle(cornerRadius: 14))
         .appGlassField()
     }
 
@@ -481,10 +568,13 @@ struct FinishRegistrationView: View {
                 Image(systemName: showSecure.wrappedValue ? "eye.slash" : "eye")
                     .foregroundStyle(AppConfig.subtleGray)
                     .font(.system(size: 15))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
+        .contentShape(RoundedRectangle(cornerRadius: 14))
         .appGlassField()
     }
 }

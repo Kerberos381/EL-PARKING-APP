@@ -22,7 +22,7 @@ struct SpotDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var lang = LanguageManager.shared
 
-    @State private var showDeleteAlert = false
+    @State private var showCancelDialog = false
 
     private var isAdmin:   Bool { bookingManager.isAdmin }
     private var canModify: Bool { bookingManager.canEditBooking(booking) }
@@ -127,12 +127,23 @@ struct SpotDetailSheet: View {
                         .foregroundStyle(AppConfig.darkText)
                 }
             }
-            .confirmationDialog(L10n.cancelBooking, isPresented: $showDeleteAlert, titleVisibility: .visible) {
-                Button(L10n.cancelBooking, role: .destructive) {
+            .confirmationDialog(
+                isAdmin && booking.email != bookingManager.currentUserEmail
+                    ? L10n.adminCancelBooking
+                    : L10n.cancelBooking,
+                isPresented: $showCancelDialog,
+                titleVisibility: .visible
+            ) {
+                Button(
+                    isAdmin && booking.email != bookingManager.currentUserEmail
+                        ? L10n.cancelAndNotify
+                        : L10n.cancelBooking,
+                    role: .destructive
+                ) {
                     Haptics.destructive()
                     deleteBooking()
                 }
-                Button(L10n.cancel, role: .cancel) {}
+                Button(L10n.keep, role: .cancel) {}
             } message: {
                 Text(L10n.cancelBookingAlert(name: booking.user, spot: booking.spotNumber, date: booking.naturalDate))
             }
@@ -242,7 +253,8 @@ struct SpotDetailSheet: View {
             VehicleMiniatureView(
                 carType: user.carType,
                 colorHex: user.carColor,
-                description: user.carDescription
+                description: user.carDescription,
+                presetID: user.vehicleMiniaturePresetID.isEmpty ? nil : user.vehicleMiniaturePresetID
             )
             .frame(width: 176, height: 98)
             .frame(maxWidth: .infinity, alignment: .center)
@@ -282,7 +294,7 @@ struct SpotDetailSheet: View {
                 actionRow(icon: "trash.circle",
                           label: L10n.cancelBooking,
                           color: AppConfig.spotOccupied) {
-                    showDeleteAlert = true
+                    showCancelDialog = true
                 }
             }
         }
@@ -392,10 +404,9 @@ struct SpotDetailSheet: View {
             } else {
                 Haptics.notify(.error)
             }
-            // If error != nil the booking was restored to the array; SwiftUI will show it again
-            // and the user knows the cancel failed (no silent re-appearance)
         }
     }
+
 }
 
 #Preview {

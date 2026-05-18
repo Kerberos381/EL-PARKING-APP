@@ -47,8 +47,53 @@ struct OverviewView: View {
         if isAdmin {
             return allBookingsForDate
         } else {
-            return bookingManager.getUserBookingsOnDate(selectedDate, email: bookingManager.currentUserEmail)
+            return allBookingsForDate.filter { $0.email == bookingManager.currentUserEmail }
         }
+    }
+
+    /// Bookings grouped by spot label for selected day, sorted by time.
+    private var dayBookingsBySpot: [String: [Booking]] {
+        Dictionary(grouping: allBookingsForDate, by: \.spot).mapValues { items in
+            items.sorted {
+                if $0.fromTime == $1.fromTime { return $0.toTime < $1.toTime }
+                return $0.fromTime < $1.fromTime
+            }
+        }
+    }
+
+    /// Fast lookup map to avoid repeated user searches in booking rows/cells.
+    private var usersByEmailLowercased: [String: AppUser] {
+        Dictionary(uniqueKeysWithValues: authManager.allUsers.map { ($0.email.lowercased(), $0) })
+    }
+
+    /// Spot status computed once per render pass.
+    private var spotStatusByID: [String: SpotStatus] {
+        var result: [String: SpotStatus] = [:]
+        let mineEmail = bookingManager.currentUserEmail
+
+        for spot in bookingManager.parkingSpots {
+            if AppConfig.blockedSpotIDs.contains(spot.id) {
+                result[spot.id] = .blocked
+                continue
+            }
+
+            let dayBookings = dayBookingsBySpot[spot.label] ?? []
+            guard !dayBookings.isEmpty else {
+                result[spot.id] = .available
+                continue
+            }
+
+            let hasMine = dayBookings.contains { $0.email == mineEmail }
+            let hasOthers = dayBookings.contains { $0.email != mineEmail }
+
+            if hasMine && !hasOthers {
+                result[spot.id] = .mine
+            } else {
+                result[spot.id] = isFullyOccupied(dayBookings) ? .occupied : .partial
+            }
+        }
+
+        return result
     }
 
     /// Spots filtered by active filter, with favourites sorted to top
@@ -56,7 +101,7 @@ struct OverviewView: View {
         let base: [ParkingSpot]
         if let filter = activeFilter {
             base = bookingManager.parkingSpots.filter { spot in
-                let status = spotStatus(for: spot)
+                let status = spotStatusByID[spot.id] ?? .available
                 if filter == .occupied {
                     return status == .occupied || status == .mine || status == .partial
                 }
@@ -207,6 +252,9 @@ struct OverviewView: View {
         let isSelected = Calendar.current.isDate(selectedDate, inSameDayAs: date)
         let isToday = offset == 0
         let dayNum = Calendar.current.component(.day, from: date)
+        let innerWidth: CGFloat = 56
+        let innerHeight: CGFloat = 64
+        let pillRadius: CGFloat = 16
         let dayName: String = {
             if isToday { return L10n.today }
             return date.formatShortDayOfWeek()
@@ -219,16 +267,20 @@ struct OverviewView: View {
                 activeFilter = nil
             }
         } label: {
-            VStack(spacing: 4) {
-                Text(dayName)
-                    .font(.system(size: 11, weight: .semibold))
-                Text("\(dayNum)")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
+            ZStack {
+                RoundedRectangle(cornerRadius: pillRadius, style: .continuous)
+                    .fill(isSelected ? AppConfig.pillSelected : AppConfig.cardBg)
+                    .frame(width: innerWidth, height: innerHeight)
+
+                VStack(spacing: 4) {
+                    Text(dayName)
+                        .font(.system(size: 11, weight: .semibold))
+                    Text("\(dayNum)")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                }
+                .foregroundStyle(isSelected ? .white : AppConfig.darkText)
+                .frame(width: innerWidth, height: innerHeight)
             }
-            .foregroundStyle(isSelected ? .white : AppConfig.darkText)
-            .frame(width: 56, height: 64)
-            .background(isSelected ? AppConfig.pillSelected : AppConfig.cardBg)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
             .shadow(color: .black.opacity(isSelected ? 0.15 : 0.04), radius: 6, y: 2)
         }
         .buttonStyle(ScaleButtonStyle())
@@ -239,7 +291,7 @@ struct OverviewView: View {
     private var statsBar: some View {
         HStack(spacing: 8) {
             let total = bookingManager.parkingSpots.count
-            let booked = Set(allBookingsForDate.map(\.spot)).count
+            let booked = Set(allBookingsForDate.map { bookingManager.normalizedSpotKey($0.spot) }).count
             let blocked = AppConfig.blockedSpotIDs.count
             let free = max(0, total - booked - blocked)
 
@@ -293,7 +345,7 @@ struct OverviewView: View {
                     isFavourite: favouriteSpotIDs.contains(spot.id),
                     onFavouriteTap: { toggleFavourite(spot.id) }
                 ) {
-                    handleSpotTap(spot, status: spotStatus(for: spot))
+                    handleSpotTap(spot, status: spotStatusByID[spot.id] ?? .available)
                 }
             }
         }
@@ -304,7 +356,7 @@ struct OverviewView: View {
     /// Convert SpotStatus + admin context into SpotCellStatus
     private func cellStatusForSpot(_ spot: ParkingSpot) -> SpotCellStatus {
         let status = spotStatus(for: spot)
-        let dayBookings = bookingManager.getBookingsForSpotOnDate(spotLabel: spot.label, date: selectedDate)
+        let dayBookings = dayBookingsBySpot[spot.label] ?? []
         let booking = dayBookings.first
         switch status {
         case .available: return .available
@@ -314,9 +366,7 @@ struct OverviewView: View {
             let name = booking?.user
             let plate: String?
             if isAdmin, let b = booking {
-                let appUser = authManager.allUsers.first {
-                    $0.email.lowercased() == b.email.lowercased()
-                }
+                let appUser = usersByEmailLowercased[b.email.lowercased()]
                 let p = appUser?.registrationPlate ?? ""
                 plate = p.isEmpty ? nil : p
             } else {
@@ -325,7 +375,7 @@ struct OverviewView: View {
             return .partial(
                 name: name,
                 plate: plate,
-                ranges: bookingManager.occupiedTimeRangesText(spotLabel: spot.label, on: selectedDate)
+                ranges: occupiedRangesText(for: dayBookings)
             )
         case .occupied:
             let name: String?
@@ -338,9 +388,7 @@ struct OverviewView: View {
                     name = b.user                  // full name of whoever has this spot
                 }
                 if isAdmin {
-                    let appUser = authManager.allUsers.first {
-                        $0.email.lowercased() == b.email.lowercased()
-                    }
+                    let appUser = usersByEmailLowercased[b.email.lowercased()]
                     let p = appUser?.registrationPlate ?? ""
                     plate = p.isEmpty ? nil : p
                 } else {
@@ -356,7 +404,7 @@ struct OverviewView: View {
     // MARK: - Bookings List (Admin-enhanced)
 
     private var bookingsList: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: "list.bullet.rectangle")
                     .foregroundStyle(AppConfig.subtleGray)
@@ -373,6 +421,7 @@ struct OverviewView: View {
                     .background(AppConfig.subtleGray.opacity(0.1))
                     .clipShape(Capsule())
             }
+            .padding(.horizontal, 4)
 
             if visibleBookings.isEmpty {
                 HStack {
@@ -394,34 +443,28 @@ struct OverviewView: View {
                 }
             }
         }
-        .padding(18)
-        .background(AppConfig.cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
         .padding(.horizontal)
     }
 
     private func adminBookingRow(_ booking: Booking) -> some View {
         let isMine = booking.email == bookingManager.currentUserEmail
         let isProtectedAdminBooking = isProtectedAdminBooking(booking)
+        let canCancel = bookingManager.canCancelBooking(booking)
 
-        return HStack(spacing: 12) {
-            // Person avatar circle
+        let card = HStack(spacing: 14) {
             ZStack {
                 Circle()
                     .fill(isMine ? AppConfig.accent.opacity(0.2) : AppConfig.surfaceHigh)
-                    .frame(width: 44, height: 44)
-
+                    .frame(width: 40, height: 40)
                 Text(userInitials(booking.user))
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(isMine ? AppConfig.onAccent : AppConfig.subtleGray)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(isMine ? AppConfig.darkText : AppConfig.subtleGray)
             }
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(booking.user)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AppConfig.darkText)
                         .lineLimit(1)
 
@@ -438,51 +481,53 @@ struct OverviewView: View {
                     }
                 }
 
-                HStack(spacing: 8) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "car")
-                            .font(.system(size: 9))
-                        Text(booking.spotNumber)
-                            .font(.caption)
-                            .fontWeight(.bold)
-                    }
-                    .foregroundStyle(AppConfig.subtleGray)
-
+                HStack(spacing: 6) {
                     Text("\(booking.fromTime) – \(booking.toTime)")
-                        .font(.caption)
+                        .font(.system(.caption2, design: .monospaced).weight(.semibold))
                         .foregroundStyle(AppConfig.subtleGray)
-                }
 
-                if isAdmin {
-                    let appUser = authManager.allUsers.first {
-                        $0.email.lowercased() == booking.email.lowercased()
-                    }
-                    let vehicleParts = [
-                        appUser?.registrationPlate ?? "",
-                        appUser?.carDescription ?? "",
-                        appUser?.carType ?? ""
-                    ].filter { !$0.isEmpty }
-                    if !vehicleParts.isEmpty {
-                        Text(vehicleParts.prefix(2).joined(separator: " · "))
-                            .font(.caption2)
-                            .foregroundStyle(AppConfig.subtleGray.opacity(0.65))
-                            .lineLimit(1)
+                    if isAdmin {
+                        let appUser = usersByEmailLowercased[booking.email.lowercased()]
+                        let plate = appUser?.registrationPlate ?? ""
+                        if !plate.isEmpty {
+                            Text("·")
+                                .font(.caption2)
+                                .foregroundStyle(AppConfig.subtleGray.opacity(0.4))
+                            Text(plate)
+                                .font(.system(.caption2, design: .monospaced).weight(.medium))
+                                .foregroundStyle(AppConfig.subtleGray.opacity(0.65))
+                                .lineLimit(1)
+                        }
                     }
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 0)
 
-            // Spot badge
             Text(booking.spotNumber)
-                .font(.system(size: 18, weight: .black, design: .rounded))
+                .font(.system(size: 20, weight: .black, design: .rounded))
                 .foregroundStyle(AppConfig.darkText)
-                .frame(width: 42, height: 42)
+                .frame(width: 44, height: 44)
                 .background(isMine ? AppConfig.surfaceHigh : AppConfig.surfaceLow)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
 
-            if bookingManager.canCancelBooking(booking) {
-                Button {
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(AppConfig.subtleGray.opacity(0.4))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(AppConfig.cardBg)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .contentShape(RoundedRectangle(cornerRadius: 16))
+        .onTapGesture {
+            Haptics.selection()
+            spotBookingDetail = booking
+        }
+
+        return Group {
+            if canCancel {
+                card.swipeToCancel(cornerRadius: 16) {
                     if isProtectedAdminBooking {
                         Haptics.impact(.rigid)
                         showProtectedAdminAlert = true
@@ -491,21 +536,14 @@ struct OverviewView: View {
                         adminCancelTarget = booking
                         showAdminCancelAlert = true
                     } else {
-                        Haptics.selection()
+                        Haptics.destructive()
                         bookingToCancel = booking
                         showCancelAlert = true
                     }
-                } label: {
-                    Image(systemName: "xmark.circle")
-                        .font(.body)
-                        .foregroundStyle(AppConfig.spotOccupied.opacity(0.6))
                 }
-                .buttonStyle(ScaleButtonStyle())
+            } else {
+                card
             }
-        }
-        .padding(.vertical, 6)
-        .onTapGesture {
-            spotBookingDetail = booking
         }
     }
 
@@ -548,9 +586,7 @@ struct OverviewView: View {
             return false
         }
 
-        return authManager.allUsers.first {
-            $0.email.caseInsensitiveCompare(booking.email) == .orderedSame
-        }?.isAdmin == true
+        return usersByEmailLowercased[booking.email.lowercased()]?.isAdmin == true
     }
 
     private func performAdminCancellation(of booking: Booking) async {
@@ -584,20 +620,7 @@ struct OverviewView: View {
     }
 
     private func spotStatus(for spot: ParkingSpot) -> SpotStatus {
-        if AppConfig.blockedSpotIDs.contains(spot.id) { return .blocked }
-        let dayBookings = bookingManager.getBookingsForSpotOnDate(spotLabel: spot.label, date: selectedDate)
-        guard !dayBookings.isEmpty else { return .available }
-
-        let mine = dayBookings.filter { $0.email == bookingManager.currentUserEmail }
-        let others = dayBookings.filter { $0.email != bookingManager.currentUserEmail }
-
-        if !mine.isEmpty && others.isEmpty {
-            return .mine
-        }
-
-        return bookingManager.isSpotFullyOccupied(spotLabel: spot.label, on: selectedDate)
-            ? .occupied
-            : .partial
+        spotStatusByID[spot.id] ?? .available
     }
 
     private func handleSpotTap(_ spot: ParkingSpot, status: SpotStatus) {
@@ -614,11 +637,46 @@ struct OverviewView: View {
         // Always do a live lookup at tap time — overrides the displayed cell status.
         // This fixes the race where the grid rendered before Firestore loaded,
         // so a booked spot briefly appeared free and would wrongly open BookingSheet.
-        if let existingBooking = bookingManager.getBookingsForSpotOnDate(spotLabel: spot.label, date: selectedDate).first {
+        if let existingBooking = (dayBookingsBySpot[spot.label] ?? []).first {
             spotBookingDetail = existingBooking
         } else {
             preselectedSpot = spot
         }
+    }
+
+    private func occupiedRangesText(for dayBookings: [Booking]) -> String? {
+        guard !dayBookings.isEmpty else { return nil }
+        let merged = mergedIntervals(from: dayBookings.map { (from: $0.fromTime, to: $0.toTime) })
+        return merged.map { "\($0.from)-\($0.to)" }.joined(separator: ", ")
+    }
+
+    private func isFullyOccupied(_ dayBookings: [Booking]) -> Bool {
+        guard !dayBookings.isEmpty else { return false }
+        let merged = mergedIntervals(from: dayBookings.map { (from: $0.fromTime, to: $0.toTime) })
+        guard let first = merged.first else { return false }
+        return first.from <= AppConfig.defaultTimeFrom &&
+            first.to >= AppConfig.fullDayOccupiedCutoffTime &&
+            merged.count == 1
+    }
+
+    private func mergedIntervals(from ranges: [(from: String, to: String)]) -> [(from: String, to: String)] {
+        let sorted = ranges.sorted {
+            if $0.from == $1.from { return $0.to < $1.to }
+            return $0.from < $1.from
+        }
+        guard var current = sorted.first else { return [] }
+        var merged: [(from: String, to: String)] = []
+
+        for next in sorted.dropFirst() {
+            if next.from <= current.to {
+                if next.to > current.to { current.to = next.to }
+            } else {
+                merged.append(current)
+                current = next
+            }
+        }
+        merged.append(current)
+        return merged
     }
 
     private func userInitials(_ name: String) -> String {

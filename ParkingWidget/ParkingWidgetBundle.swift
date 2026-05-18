@@ -13,6 +13,7 @@ struct ParkingWidgetBundle: WidgetBundle {
     var body: some Widget {
         ParkingHomeWidget()
         ParkingHomeWidgetLight()
+        ParkingVehicleIdentityWidget()
         ParkingTimelineCardWidget()
         ParkingLockWidget()
     }

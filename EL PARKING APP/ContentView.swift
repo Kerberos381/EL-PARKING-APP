@@ -118,11 +118,17 @@ struct ContentView: View {
     private var mainTabView: some View {
         TabView(selection: $selectedTab) {
             Tab(L10n.home, systemImage: "house", value: MainTab.home) {
-                HomeView()
+                HomeView(screenMode: .home)
             }
 
             Tab(L10n.parking, systemImage: "square.grid.3x3", value: MainTab.parking) {
                 OverviewView()
+            }
+
+            if !bookingManager.isAdmin {
+                Tab("Info", systemImage: "newspaper", value: MainTab.info) {
+                    HomeView(screenMode: .infoHub)
+                }
             }
 
             if bookingManager.isAdmin {
@@ -151,6 +157,11 @@ struct ContentView: View {
                 }
                 deepLinkManager.clear()
             default:
+                selectedTab = .home
+            }
+        }
+        .onChange(of: bookingManager.isAdmin) { _, isAdmin in
+            if isAdmin, selectedTab == .info {
                 selectedTab = .home
             }
         }
@@ -208,6 +219,7 @@ struct ContentView: View {
 private enum MainTab: Hashable {
     case home
     case parking
+    case info
     case admin
     case settings
 }

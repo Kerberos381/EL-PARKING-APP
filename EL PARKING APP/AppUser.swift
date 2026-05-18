@@ -86,8 +86,13 @@ struct AppUser: Identifiable, Codable, Equatable {
     var carDescription: String
     var carColor: String          // hex string e.g. "#CC3333", empty = unset
     var carType:  String          // CarBodyType rawValue, empty = unset
+    var vehicleMiniaturePresetID: String = ""
+    /// Optional manual vocative override for Czech greeting (e.g. "Katko", "Jane").
+    var preferredVocative: String = ""
     var createdAt: Date
     var rejectionReason: String?
+    /// True when the user has passed the invite/access gate for app data.
+    var inviteAccepted: Bool = true
     /// True when the account was admin-created but the user hasn't yet completed their profile.
     var needsFinishRegistration: Bool
     /// Set to the date when the user completed their finish-registration flow.
@@ -135,7 +140,10 @@ struct AppUser: Identifiable, Codable, Equatable {
             "carDescription":           carDescription,
             "carColor":                 carColor,
             "carType":                  carType,
+            "vehicleMiniaturePresetID": vehicleMiniaturePresetID,
+            "preferredVocative":        preferredVocative,
             "createdAt":                Timestamp(date: createdAt),
+            "inviteAccepted":           inviteAccepted,
             "needsFinishRegistration":  needsFinishRegistration
         ]
         if let reason = rejectionReason { dict["rejectionReason"] = reason }
@@ -181,8 +189,13 @@ struct AppUser: Identifiable, Codable, Equatable {
             carDescription:          data["carDescription"]    as? String ?? "",
             carColor:                data["carColor"]          as? String ?? "",
             carType:                 data["carType"]           as? String ?? "",
+            vehicleMiniaturePresetID: (data["vehicleMiniaturePresetID"] as? String)
+                ?? (data["vehiclePresetId"] as? String)
+                ?? "",
+            preferredVocative:       data["preferredVocative"] as? String ?? "",
             createdAt:               createdAt,
             rejectionReason:         rejectionReason,
+            inviteAccepted:          data["inviteAccepted"] as? Bool ?? true,
             needsFinishRegistration: data["needsFinishRegistration"] as? Bool ?? false,
             activatedAt:             activatedAt,
             strikes:                 strikes,

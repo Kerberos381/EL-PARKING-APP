@@ -6,8 +6,28 @@
 //
 
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct HomeView: View {
+    enum ScreenMode {
+        case home
+        case infoHub
+    }
+
+    private enum HomeFeedTab: String, CaseIterable {
+        case pinned = "Pinned"
+        case updates = "Updates"
+    }
+
+    private enum HomeFeedFilter: String, CaseIterable {
+        case all = "All"
+        case unread = "Unread"
+        case announcements = "Announcements"
+        case info = "Info"
+    }
+
     @EnvironmentObject var bookingManager:       BookingManager
     @EnvironmentObject var announcementsManager: AnnouncementsManager
     @EnvironmentObject var deepLinkManager:      DeepLinkManager
@@ -27,11 +47,18 @@ struct HomeView: View {
     @State private var expandedAnnouncementIDs: Set<String> = []
     @State private var selectedAnnouncement: Announcement?
     @State private var selectedInfoItem: InfoItem?
+    @State private var selectedHomeFeedTab: HomeFeedTab = .pinned
+    @State private var selectedHomeFeedFilter: HomeFeedFilter = .all
     @State private var showWidgetGuideSheet = false
     @State private var lastAnnouncementsRefreshAt = Date()
     @State private var widgetTeaserDragOffset: CGFloat = 0
     @AppStorage("readAnnouncementIDs") private var readAnnouncementIDsRaw = ""
     @AppStorage("homeWidgetTeaserDismissed") private var homeWidgetTeaserDismissed = false
+    private let screenMode: ScreenMode
+
+    init(screenMode: ScreenMode = .home) {
+        self.screenMode = screenMode
+    }
 
     private var todayBooking: Booking? {
         bookingManager.getTodayBooking(for: bookingManager.currentUserEmail)
@@ -62,65 +89,60 @@ struct HomeView: View {
                 ScrollViewReader { proxy in
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 28) {
-                            // Greeting + theme toggle
-                            HStack(alignment: .top) {
-                                Text(L10n.helloGreeting(bookingManager.currentFirstName))
-                                    .font(.system(size: 56, weight: .bold, design: .default))
-                                    .minimumScaleFactor(0.5)
-                                    .lineLimit(1)
-                                    .foregroundStyle(AppConfig.darkText)
+                            if screenMode == .home {
+                                // Greeting + theme toggle
+                                HStack(alignment: .top) {
+                                    Text(L10n.helloGreeting(
+                                        bookingManager.currentFirstName,
+                                        preferredVocative: bookingManager.preferredVocative
+                                    ))
+                                        .font(.system(size: 56, weight: .bold, design: .default))
+                                        .minimumScaleFactor(0.5)
+                                        .lineLimit(1)
+                                        .foregroundStyle(AppConfig.darkText)
 
-                                Spacer()
+                                    Spacer()
 
-                                ThemeToggleButton()
-                                    .padding(.top, 8)
-                            }
-                            .padding(.horizontal)
-
-                            // Hero Booking Card
-                            heroSection
-                                .id("home_hero")
-                                .offset(y: heroVisible ? 0 : 28)
-                                .opacity(heroVisible ? 1 : 0)
-
-                            // Compact quick actions + availability bar
-                            VStack(spacing: 8) {
-                                HStack(spacing: 10) {
-                                    myBookingsQuickButton
-                                        .id("home_my_bookings")
-                                    if !(AppConfig.enableHomePremiumEmptyStates && !hasUpcomingOrActiveBooking) {
-                                        bookSpotQuickButton
-                                            .id("home_book")
-                                    }
+                                    ThemeToggleButton()
+                                        .padding(.top, 8)
                                 }
                                 .padding(.horizontal)
 
-                                garageStatusBar
-                                    .id("home_garage")
-                            }
+                                // Hero Booking Card
+                                heroSection
+                                    .id("home_hero")
+                                    .offset(y: heroVisible ? 0 : 28)
+                                    .opacity(heroVisible ? 1 : 0)
 
-                            // Widget teaser handoff
-                            if AppConfig.enableHomeWidgetTeaserCard && !homeWidgetTeaserDismissed {
-                                widgetTeaserCard
-                                    .id("home_widget_teaser")
-                            }
+                                // Compact quick actions + availability bar
+                                VStack(spacing: 8) {
+                                    HStack(spacing: 10) {
+                                        myBookingsQuickButton
+                                            .id("home_my_bookings")
+                                        if !(AppConfig.enableHomePremiumEmptyStates && !hasUpcomingOrActiveBooking) {
+                                            bookSpotQuickButton
+                                                .id("home_book")
+                                        }
+                                    }
+                                    .padding(.horizontal)
 
-                            // Live announcements + empty state
-                            if AppConfig.enableHomeAnnouncementPriorityStack {
-                                announcementsPrioritySection
-                            } else if !announcementsManager.activeAnnouncements.isEmpty {
-                                announcementsSection
+                                    garageStatusBar
+                                        .id("home_garage")
+                                }
+
+                                // Widget teaser handoff
+                                if AppConfig.enableHomeWidgetTeaserCard && !homeWidgetTeaserDismissed {
+                                    widgetTeaserCard
+                                        .id("home_widget_teaser")
+                                }
+
+                                homeNewsAndInfoHub
+
+                                // Footer logo
+                                footerLogo
                             } else {
-                                announcementsEmptyState
+                                infoHubScreen
                             }
-
-                            // Info cards (admin-managed, only shown when any exist)
-                            if !infoManager.items.isEmpty {
-                                infoSection
-                            }
-
-                            // Footer logo
-                            footerLogo
                         }
                         .padding(.bottom, 100)
                     }
@@ -129,10 +151,12 @@ struct HomeView: View {
                     }
                 }
             }
-            .navigationBarHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
             .onAppear {
-                withAnimation(.motionSheet.delay(0.1)) {
-                    heroVisible = true
+                if screenMode == .home {
+                    withAnimation(.motionSheet.delay(0.1)) {
+                        heroVisible = true
+                    }
                 }
                 if !didPrefetchLikelyNextScreens {
                     didPrefetchLikelyNextScreens = true
@@ -169,6 +193,10 @@ struct HomeView: View {
             }
             .sheet(item: AppConfig.enableHomeAnnouncementDetailSheet ? $selectedAnnouncement : .constant(nil)) { item in
                 announcementDetailSheet(item)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.hidden)
+                    .presentationCornerRadius(24)
+                    .interactiveDismissDisabled(false)
             }
             .sheet(item: AppConfig.enableHomeInfoDetailSheet ? $selectedInfoItem : .constant(nil)) { item in
                 infoDetailSheet(item)
@@ -176,41 +204,6 @@ struct HomeView: View {
             .sheet(isPresented: $showWidgetGuideSheet) {
                 widgetGuideSheet
             }
-            .alert(L10n.cancelBooking, isPresented: $showCancelAlert) {
-                Button(L10n.cancelBooking, role: .destructive) {
-                    if let booking = bookingToCancel {
-                        Haptics.destructive()
-                        let info = (spotNumber: booking.spotNumber, date: booking.naturalDate,
-                                    from: booking.fromTime, to: booking.toTime)
-                        Task {
-                            let error = await bookingManager.cancelBooking(booking)
-                            if error == nil {
-                                Haptics.notify(.success)
-                                cancelledBooking = info
-                                withAnimation(.easeIn(duration: 0.2)) { showCancelSuccess = true }
-                                ToastManager.shared.showUndo(
-                                    message: "Spot \(booking.spotNumber) cancelled"
-                                ) {
-                                    Task {
-                                        try? await bookingManager.createBooking(
-                                            spotID: booking.spotNumber, spotLabel: booking.spot,
-                                            userEmail: booking.email, userName: booking.user,
-                                            dateFrom: booking.date, dateTo: booking.date,
-                                            timeFrom: booking.fromTime, timeTo: booking.toTime
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                Button(L10n.keep, role: .cancel) {}
-            } message: {
-                if let booking = bookingToCancel {
-                    Text(L10n.cancelSpotOnDate(spot: booking.spotShortCode, date: booking.naturalDate))
-                }
-            }
-
             .task(id: deepLinkTaskID) {
                 processPendingDeepLink()
             }
@@ -229,6 +222,35 @@ struct HomeView: View {
         async let infoRefresh: Void = infoManager.refresh()
         _ = await (bookingsRefresh, announcementsRefresh, infoRefresh)
         lastAnnouncementsRefreshAt = Date()
+    }
+
+    private func confirmCancelFromHome() {
+        guard let booking = bookingToCancel else { return }
+        showCancelAlert = false
+        Haptics.destructive()
+        let info = (spotNumber: booking.spotNumber, date: booking.naturalDate, from: booking.fromTime, to: booking.toTime)
+        Task {
+            let error = await bookingManager.cancelBooking(booking)
+            if error == nil {
+                Haptics.notify(.success)
+                cancelledBooking = info
+                withAnimation(.easeIn(duration: 0.2)) { showCancelSuccess = true }
+                ToastManager.shared.showUndo(
+                    message: "Spot \(booking.spotNumber) cancelled"
+                ) {
+                    Task {
+                        try? await bookingManager.createBooking(
+                            spotID: booking.spotNumber, spotLabel: booking.spot,
+                            userEmail: booking.email, userName: booking.user,
+                            dateFrom: booking.date, dateTo: booking.date,
+                            timeFrom: booking.fromTime, timeTo: booking.toTime
+                        )
+                    }
+                }
+            } else {
+                Haptics.notify(.error)
+            }
+        }
     }
 
     private func prefetchLikelyNextScreens() async {
@@ -483,6 +505,16 @@ struct HomeView: View {
                     .clipShape(Capsule())
                 }
                 .buttonStyle(PlainButtonStyle())
+                .confirmationDialog(L10n.cancelBooking, isPresented: $showCancelAlert, titleVisibility: .visible) {
+                    Button(L10n.cancelBooking, role: .destructive) {
+                        confirmCancelFromHome()
+                    }
+                    Button(L10n.keep, role: .cancel) {}
+                } message: {
+                    if let booking = bookingToCancel {
+                        Text(L10n.cancelSpotOnDate(spot: booking.spotShortCode, date: booking.naturalDate))
+                    }
+                }
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 18)
@@ -581,6 +613,267 @@ struct HomeView: View {
         .buttonStyle(ScaleButtonStyle())
     }
 
+    // MARK: - Home News + Info Hub
+
+    private var pinnedAnnouncements: [Announcement] {
+        announcementsManager.activeAnnouncements
+            .filter { $0.isPinned }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private var nonPinnedAnnouncements: [Announcement] {
+        announcementsManager.activeAnnouncements
+            .filter { !$0.isPinned }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private var sortedInfoItems: [InfoItem] {
+        infoManager.items.sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private var allAnnouncementsNewest: [Announcement] {
+        announcementsManager.activeAnnouncements.sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private var filteredPinnedAnnouncements: [Announcement] {
+        let base = pinnedAnnouncements
+        switch selectedHomeFeedFilter {
+        case .all, .announcements:
+            return base
+        case .unread:
+            return base.filter { !isAnnouncementRead($0) }
+        case .info:
+            return []
+        }
+    }
+
+    private var filteredUpdatesAnnouncements: [Announcement] {
+        let base = nonPinnedAnnouncements
+        switch selectedHomeFeedFilter {
+        case .all, .announcements:
+            return base
+        case .unread:
+            return base.filter { !isAnnouncementRead($0) }
+        case .info:
+            return []
+        }
+    }
+
+    private var filteredUpdatesInfoItems: [InfoItem] {
+        let base = sortedInfoItems
+        switch selectedHomeFeedFilter {
+        case .all, .info:
+            return base
+        case .unread, .announcements:
+            return []
+        }
+    }
+
+    private var homeNewsAndInfoHub: some View {
+        if !bookingManager.isAdmin {
+            return AnyView(nonAdminPinnedHomeSection)
+        }
+
+        let hasPinned = !pinnedAnnouncements.isEmpty
+        let hasUpdates = !nonPinnedAnnouncements.isEmpty || !infoManager.items.isEmpty
+
+        return AnyView(VStack(spacing: 14) {
+            HStack(spacing: 0) {
+                ForEach(HomeFeedTab.allCases, id: \.self) { tab in
+                    Button {
+                        Haptics.selection()
+                        withAnimation(.quick) { selectedHomeFeedTab = tab }
+                    } label: {
+                        Text(tab.rawValue)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(selectedHomeFeedTab == tab ? AppConfig.darkText : AppConfig.subtleGray)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(selectedHomeFeedTab == tab ? AppConfig.cardBg : Color.clear)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled((tab == .pinned && !hasPinned) || (tab == .updates && !hasUpdates))
+                    .opacity((tab == .pinned && !hasPinned) || (tab == .updates && !hasUpdates) ? 0.45 : 1)
+                }
+            }
+            .padding(4)
+            .background(AppConfig.surfaceLow)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(.horizontal)
+
+            if selectedHomeFeedTab == .pinned {
+                if !filteredPinnedAnnouncements.isEmpty {
+                    announcementsGroupedView(items: filteredPinnedAnnouncements)
+                        .id("home_announcements_pinned")
+                } else {
+                    AppEmptyStateCard(
+                        icon: "pin",
+                        title: "Pinned Updates",
+                        subtitle: "No pinned news right now"
+                    )
+                    .padding(.horizontal)
+                }
+            } else {
+                if !filteredUpdatesAnnouncements.isEmpty {
+                    announcementsGroupedView(items: filteredUpdatesAnnouncements)
+                        .id("home_announcements_updates")
+                }
+
+                if !filteredUpdatesInfoItems.isEmpty {
+                    infoSectionAppleStyle(items: filteredUpdatesInfoItems)
+                        .id("home_info_updates")
+                }
+
+                if filteredUpdatesAnnouncements.isEmpty && filteredUpdatesInfoItems.isEmpty {
+                    announcementsEmptyState
+                }
+            }
+        }
+        .onAppear {
+            selectedHomeFeedFilter = .all
+            if selectedHomeFeedTab == .pinned && !hasPinned && hasUpdates {
+                selectedHomeFeedTab = .updates
+            } else if selectedHomeFeedTab == .updates && !hasUpdates && hasPinned {
+                selectedHomeFeedTab = .pinned
+            }
+        }
+        .onChange(of: announcementsManager.activeAnnouncements.count) { _, _ in
+            selectedHomeFeedFilter = .all
+            if selectedHomeFeedTab == .pinned && !hasPinned && hasUpdates {
+                selectedHomeFeedTab = .updates
+            } else if selectedHomeFeedTab == .updates && !hasUpdates && hasPinned {
+                selectedHomeFeedTab = .pinned
+            }
+        }
+        .onChange(of: infoManager.items.count) { _, _ in
+            selectedHomeFeedFilter = .all
+            if selectedHomeFeedTab == .pinned && !hasPinned && hasUpdates {
+                selectedHomeFeedTab = .updates
+            } else if selectedHomeFeedTab == .updates && !hasUpdates && hasPinned {
+                selectedHomeFeedTab = .pinned
+            }
+        }
+        .onChange(of: selectedHomeFeedTab) { _, _ in
+            selectedHomeFeedFilter = .all
+        }
+        )
+    }
+
+    private var nonAdminPinnedHomeSection: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 7) {
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(AppConfig.subtleGray)
+                Text("Pinned")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppConfig.darkText)
+                Spacer()
+            }
+            .padding(.horizontal)
+
+            if pinnedAnnouncements.isEmpty {
+                AppEmptyStateCard(
+                    icon: "pin",
+                    title: "Pinned Updates",
+                    subtitle: "No pinned news right now"
+                )
+                .padding(.horizontal)
+            } else {
+                announcementsGroupedView(items: pinnedAnnouncements)
+                    .id("home_announcements_pinned_only")
+            }
+        }
+    }
+
+    private var infoHubScreen: some View {
+        VStack(spacing: 14) {
+            HStack(alignment: .top) {
+                Text("Info")
+                    .font(.system(size: 46, weight: .bold, design: .default))
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+                    .foregroundStyle(AppConfig.darkText)
+                Spacer()
+            }
+            .padding(.horizontal)
+
+            if bookingManager.isAdmin {
+                homeNewsAndInfoHub
+            } else {
+                nonAdminInfoHubFeed
+            }
+        }
+    }
+
+    private var filteredInfoHubAnnouncements: [Announcement] {
+        switch selectedHomeFeedFilter {
+        case .all, .announcements:
+            return allAnnouncementsNewest
+        case .unread:
+            return allAnnouncementsNewest.filter { !isAnnouncementRead($0) }
+        case .info:
+            return []
+        }
+    }
+
+    private var filteredInfoHubInfoItems: [InfoItem] {
+        switch selectedHomeFeedFilter {
+        case .all, .info:
+            return sortedInfoItems
+        case .unread, .announcements:
+            return []
+        }
+    }
+
+    private var nonAdminInfoHubFeed: some View {
+        VStack(spacing: 12) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach([HomeFeedFilter.all, .unread, .announcements, .info], id: \.self) { filter in
+                        Button {
+                            Haptics.selection()
+                            withAnimation(.quick) { selectedHomeFeedFilter = filter }
+                        } label: {
+                            Text(filter.rawValue)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(selectedHomeFeedFilter == filter ? AppConfig.darkText : AppConfig.subtleGray)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(
+                                    Capsule()
+                                        .fill(selectedHomeFeedFilter == filter ? AppConfig.cardBg : AppConfig.surfaceLow)
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .stroke(selectedHomeFeedFilter == filter ? AppConfig.separatorStrong : AppConfig.separatorSoft, lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal)
+            }
+
+            if !filteredInfoHubAnnouncements.isEmpty {
+                announcementsGroupedView(items: filteredInfoHubAnnouncements)
+                    .id("info_tab_announcements")
+            }
+
+            if !filteredInfoHubInfoItems.isEmpty {
+                infoSectionAppleStyle(items: filteredInfoHubInfoItems)
+                    .id("info_tab_info_cards")
+            }
+
+            if filteredInfoHubAnnouncements.isEmpty && filteredInfoHubInfoItems.isEmpty {
+                announcementsEmptyState
+            }
+        }
+    }
+
     // MARK: - Announcements Section
 
     private var announcementsPrioritySection: some View {
@@ -598,7 +891,7 @@ struct HomeView: View {
     @ViewBuilder
     private func announcementsGroupedView(items: [Announcement]) -> some View {
         if AppConfig.enableHomeAppleAnnouncementsStyle {
-            announcementsHeroStyleView(items: items)
+            announcementsTodayStyleView(items: items)
         } else {
             // ── Legacy list style (revert: set enableHomeAppleAnnouncementsStyle = false) ──
             VStack(alignment: .leading, spacing: 10) {
@@ -938,6 +1231,327 @@ struct HomeView: View {
         .padding(.horizontal)
     }
 
+    // MARK: - Today Style Announcements (App Store "Today" pattern)
+
+    @ViewBuilder
+    private func announcementsTodayStyleView(items: [Announcement]) -> some View {
+        if items.isEmpty {
+            announcementsEmptyState
+        } else {
+            VStack(alignment: .leading, spacing: 16) {
+                // Date header — like the App Store "Today" tab
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(todayDateString.uppercased())
+                        .font(.caption.weight(.bold))
+                        .tracking(1)
+                        .foregroundStyle(AppConfig.subtleGray)
+                    HStack {
+                        Text(L10n.announcements)
+                            .font(.largeTitle.weight(.bold))
+                            .foregroundStyle(AppConfig.darkText)
+                        Spacer()
+                        let unread = unreadAnnouncementCount
+                        if unread > 0 {
+                            Text("\(unread) new")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(AppConfig.accentFg)
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+                .padding(.horizontal)
+
+                // Cards
+                ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
+                    let isFirst = idx == 0
+                    todayCard(item, isHero: isFirst)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            markAnnouncementRead(item)
+                            if AppConfig.enableHomeAnnouncementDetailSheet {
+                                Haptics.selection()
+                                selectedAnnouncement = item
+                            }
+                        }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func todayCard(_ item: Announcement, isHero: Bool) -> some View {
+        let isRead = isAnnouncementRead(item)
+        let isNew = isAnnouncementNew(item)
+        let gradient = todayCardGradient(for: item)
+        let isImageBacked = item.imageURL != nil || announcementInlineImage(item) != nil
+        let useLightText = announcementUsesLightText(for: item, isImageBacked: isImageBacked)
+        let primaryTextColor: Color = useLightText ? .white : .black
+        let secondaryTextColor: Color = useLightText ? .white.opacity(0.85) : .black.opacity(0.82)
+        let tertiaryTextColor: Color = useLightText ? .white.opacity(0.68) : .black.opacity(0.65)
+        let metaTextColor: Color = useLightText ? .white.opacity(0.56) : .black.opacity(0.56)
+        let overlayColors: [Color] = isImageBacked
+            ? [.clear, .black.opacity(0.58)]
+            : (useLightText ? [.clear, .black.opacity(0.55)] : [.clear, .white.opacity(0.60)])
+
+        return VStack(alignment: .leading, spacing: 0) {
+            if isHero {
+                // Hero card — tall with gradient background or image
+                ZStack(alignment: .bottomLeading) {
+                    if let imageURL = item.imageURL, let url = URL(string: imageURL) {
+                        AsyncImage(url: url) { phase in
+                            if let img = phase.image {
+                                Color.black
+                                    .frame(height: 260)
+                                    .overlay { img.resizable().scaledToFill() }
+                                    .clipped()
+                            } else {
+                                Rectangle()
+                                    .fill(gradient)
+                                    .frame(height: 260)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 260)
+                        .clipped()
+                    } else if let inlineImage = announcementInlineImage(item) {
+                        Color.black
+                            .frame(height: 260)
+                            .overlay {
+                                Image(uiImage: inlineImage)
+                                    .resizable()
+                                    .scaledToFill()
+                            }
+                            .clipped()
+                    } else {
+                        Rectangle()
+                            .fill(gradient)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 260)
+                            .overlay(alignment: .topTrailing) {
+                                Text(item.emoji)
+                                    .font(.system(size: 80))
+                                    .opacity(0.25)
+                                    .rotationEffect(.degrees(-12))
+                                    .offset(x: -20, y: 20)
+                            }
+                    }
+
+                    // Content overlay
+                    VStack(alignment: .leading, spacing: 8) {
+                        if isNew && !isRead {
+                            Text("NEW")
+                                .font(.caption2.weight(.heavy))
+                                .tracking(1.5)
+                                .foregroundStyle(primaryTextColor.opacity(0.9))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(useLightText ? .white.opacity(0.2) : .black.opacity(0.12))
+                                .clipShape(Capsule())
+                        } else if item.isPinned {
+                            Label("PINNED", systemImage: "pin.fill")
+                                .font(.caption2.weight(.heavy))
+                                .tracking(1)
+                                .foregroundStyle(tertiaryTextColor)
+                        }
+
+                        Text(item.title)
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(primaryTextColor)
+                            .lineLimit(3)
+
+                        if !item.body.isEmpty {
+                            Text(item.body)
+                                .font(.subheadline)
+                                .foregroundStyle(secondaryTextColor)
+                                .lineLimit(2)
+                                .lineSpacing(1)
+                        }
+
+                        HStack {
+                            Text(item.createdBy)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(tertiaryTextColor)
+                            Spacer()
+                            Text(item.createdAt.relativeTime())
+                                .font(.caption)
+                                .foregroundStyle(metaTextColor)
+                        }
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        LinearGradient(
+                            colors: overlayColors,
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                }
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .shadow(color: .black.opacity(0.15), radius: 16, y: 6)
+                .padding(.horizontal)
+
+            } else {
+                // Compact card — shorter, side-by-side layout
+                HStack(spacing: 14) {
+                    // Emoji / image accent block
+                    if let imageURL = item.imageURL, let url = URL(string: imageURL) {
+                        AsyncImage(url: url) { phase in
+                            if let img = phase.image {
+                                img
+                                    .resizable()
+                                    .scaledToFill()
+                                    .background(Color.black)
+                            } else {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .fill(gradient)
+                                    Text(item.emoji).font(.title)
+                                }
+                            }
+                        }
+                        .frame(width: 70, height: 70)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    } else if let inlineImage = announcementInlineImage(item) {
+                        Image(uiImage: inlineImage)
+                            .resizable()
+                            .scaledToFill()
+                            .background(Color.black)
+                        .frame(width: 70, height: 70)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    } else {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(gradient)
+                            Text(item.emoji)
+                                .font(.title)
+                        }
+                        .frame(width: 70, height: 70)
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        if isNew && !isRead {
+                            Text("NEW")
+                                .font(.system(size: 9, weight: .heavy))
+                                .tracking(1)
+                                .foregroundStyle(AppConfig.accentFg)
+                        }
+                        Text(item.title)
+                            .font(.headline)
+                            .foregroundStyle(AppConfig.darkText)
+                            .lineLimit(2)
+                        Text(item.body.isEmpty ? item.createdBy : item.body)
+                            .font(.caption)
+                            .foregroundStyle(AppConfig.subtleGray)
+                            .lineLimit(1)
+                        Text(item.createdAt.relativeTime())
+                            .font(.caption2)
+                            .foregroundStyle(AppConfig.subtleGray.opacity(0.5))
+                    }
+
+                    Spacer()
+
+                    if !isRead {
+                        Circle()
+                            .fill(AppConfig.accentFg)
+                            .frame(width: 8, height: 8)
+                    }
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(AppConfig.subtleGray.opacity(0.3))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(14)
+                .background(AppConfig.cardBg)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(AppConfig.separatorSoft, lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
+                .padding(.horizontal)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .opacity(isRead && !isImageBacked ? 0.78 : 1.0)
+        .animation(.standard, value: isRead)
+    }
+
+    private var todayDateString: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMMM d"
+        return formatter.string(from: Date())
+    }
+
+    private func todayCardGradient(for item: Announcement) -> LinearGradient {
+        if let hex = item.backgroundColorHex {
+            let base = Color(hex: hex)
+            return LinearGradient(colors: [base, base.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        }
+        let colors: [Color] = switch item.emoji {
+        case "🔧", "⚙️", "🛠️":
+            [Color(red: 0.2, green: 0.2, blue: 0.3), Color(red: 0.35, green: 0.35, blue: 0.5)]
+        case "⚠️", "🚨", "❗":
+            [Color(red: 0.85, green: 0.3, blue: 0.2), Color(red: 0.95, green: 0.5, blue: 0.3)]
+        case "🎉", "🥳", "✨", "🎊":
+            [Color(red: 0.55, green: 0.2, blue: 0.8), Color(red: 0.75, green: 0.35, blue: 0.95)]
+        case "📋", "📌", "📝":
+            [Color(red: 0.15, green: 0.4, blue: 0.7), Color(red: 0.25, green: 0.55, blue: 0.85)]
+        case "🅿️", "🚗", "🚙":
+            [Color(red: 0.1, green: 0.5, blue: 0.4), Color(red: 0.2, green: 0.65, blue: 0.55)]
+        case "💡", "🔔":
+            [Color(red: 0.9, green: 0.65, blue: 0.1), Color(red: 0.95, green: 0.75, blue: 0.3)]
+        default:
+            [Color(red: 0.15, green: 0.15, blue: 0.25), Color(red: 0.3, green: 0.3, blue: 0.45)]
+        }
+        return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+
+    private func announcementUsesLightText(for item: Announcement, isImageBacked: Bool) -> Bool {
+        let mode = AnnouncementTextColorMode(rawValue: item.textColorMode) ?? .auto
+        switch mode {
+        case .light:
+            return true
+        case .dark:
+            return false
+        case .auto:
+            if isImageBacked {
+                return true
+            }
+            if let hex = item.backgroundColorHex, !hex.isEmpty {
+                return !isLightHexColor(hex)
+            }
+            return true
+        }
+    }
+
+    private func isLightHexColor(_ hex: String) -> Bool {
+        let cleaned = hex
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "#", with: "")
+        let expanded: String
+        if cleaned.count == 3 {
+            expanded = cleaned.map { "\($0)\($0)" }.joined()
+        } else {
+            expanded = cleaned
+        }
+
+        guard expanded.count >= 6, let value = Int(expanded.prefix(6), radix: 16) else {
+            return false
+        }
+
+        let r = Double((value >> 16) & 0xFF) / 255.0
+        let g = Double((value >> 8) & 0xFF) / 255.0
+        let b = Double(value & 0xFF) / 255.0
+        let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        return luminance > 0.60
+    }
+
     private var widgetTeaserCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -1024,116 +1638,343 @@ struct HomeView: View {
     }
 
     private func announcementDetailSheet(_ item: Announcement) -> some View {
-        NavigationStack {
-            ZStack {
-                AppConfig.pageBg.ignoresSafeArea()
+        let gradient = todayCardGradient(for: item)
+        let isImageBacked = item.imageURL != nil || announcementInlineImage(item) != nil
+        let useLightText = announcementUsesLightText(for: item, isImageBacked: isImageBacked)
+        let primaryTextColor: Color = useLightText ? .white : .black
+        let secondaryTextColor: Color = useLightText ? .white.opacity(0.82) : .black.opacity(0.78)
+        let badgeTextColor: Color = useLightText ? .white.opacity(0.76) : .black.opacity(0.72)
+        let closeIconColor: Color = useLightText ? .white.opacity(0.86) : .black.opacity(0.86)
+        let headerOverlayColors: [Color] = isImageBacked
+            ? [.clear, .clear, .black.opacity(0.54)]
+            : (useLightText ? [.clear, .clear, .black.opacity(0.50)] : [.clear, .clear, .white.opacity(0.60)])
+        return GeometryReader { proxy in
+            ZStack(alignment: .topTrailing) {
+                AppConfig.pageBg
+                    .ignoresSafeArea()
+
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 20) {
-
-                        // Header — matches hero card style
-                        VStack(alignment: .leading, spacing: 14) {
-                            HStack(alignment: .top, spacing: 14) {
-                                Text(item.emoji)
-                                    .font(.title2)
-                                    .frame(width: 64, height: 64)
-                                    .background(AppConfig.surfaceLow)
-                                    .clipShape(RoundedRectangle(cornerRadius: 17))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 17)
-                                            .stroke(item.isPinned ? AppConfig.separatorStrong : AppConfig.separatorSoft, lineWidth: 1)
-                                    )
-                                VStack(alignment: .leading, spacing: 6) {
-                                    HStack(spacing: 6) {
-                                        if isAnnouncementNew(item) {
-                                            Text("NEW")
-                                                .font(.caption2.weight(.bold))
-                                                .tracking(0.5)
-                                                .foregroundStyle(AppConfig.onAccent)
-                                                .padding(.horizontal, 7).padding(.vertical, 3)
-                                                .background(AppConfig.accent)
-                                                .clipShape(Capsule())
-                                        }
-                                        if item.isPinned {
-                                            Label("Pinned", systemImage: "pin.fill")
-                                                .font(.caption2.weight(.semibold))
-                                                .foregroundStyle(AppConfig.subtleGray)
-                                        }
-                                    }
-                                    HStack(spacing: 4) {
-                                        Text(item.createdBy)
-                                        Text("·")
-                                        Text(item.createdAt.relativeTime())
-                                    }
-                                    .font(.caption2)
-                                    .foregroundStyle(AppConfig.subtleGray)
-                                }
-                            }
-
-                            Text(item.title)
-                                .font(.title3.weight(.bold))
-                                .foregroundStyle(AppConfig.darkText)
-                        }
-
-                        Divider()
-
-                        // Body
-                        if !item.body.isEmpty {
-                            Text(item.body)
-                                .font(.body)
-                                .foregroundStyle(AppConfig.darkText)
-                                .lineSpacing(3)
-                        }
-
-                        // Structured fields
-                        if !item.fields.isEmpty {
-                            VStack(spacing: 0) {
-                                ForEach(Array(item.fields.enumerated()), id: \.element.id) { idx, field in
-                                    infoFieldRow(field)
-                                    if idx < item.fields.count - 1 {
-                                        Divider().padding(.leading, 52)
+                    VStack(spacing: 0) {
+                        // Hero header — gradient/image with title and metadata
+                        ZStack(alignment: .bottomLeading) {
+                            if let imageURL = item.imageURL, let url = URL(string: imageURL) {
+                                AsyncImage(url: url) { phase in
+                                    if let img = phase.image {
+                                        Color.black
+                                            .frame(height: 340)
+                                            .overlay { img.resizable().scaledToFill() }
+                                            .clipped()
+                                    } else {
+                                        Rectangle()
+                                            .fill(gradient)
+                                            .frame(height: 340)
                                     }
                                 }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 340)
+                                .clipped()
+                            } else if let inlineImage = announcementInlineImage(item) {
+                                Color.black
+                                    .frame(height: 340)
+                                    .overlay {
+                                        Image(uiImage: inlineImage)
+                                            .resizable()
+                                            .scaledToFill()
+                                    }
+                                    .clipped()
+                            } else {
+                                Rectangle()
+                                    .fill(gradient)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 340)
+                                    .overlay {
+                                        Text(item.emoji)
+                                            .font(.system(size: 160))
+                                            .opacity(0.15)
+                                            .rotationEffect(.degrees(-15))
+                                            .offset(x: 40, y: -30)
+                                    }
+                                    .clipped()
                             }
-                            .background(AppConfig.cardBg)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppConfig.separatorSoft, lineWidth: 1))
-                        }
 
-                        Spacer(minLength: 32)
-                    }
-                    .padding()
-                }
-            }
-            .navigationTitle(item.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 14) {
-                        ShareLink(item: "\(item.title)\n\n\(item.body)") {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(AppConfig.accentFg)
-                        }
-                        if bookingManager.isAdmin {
-                            Button {
-                                Haptics.selection()
-                                Task { await announcementsManager.togglePinned(item) }
-                            } label: {
-                                Image(systemName: item.isPinned ? "pin.slash" : "pin")
+                            VStack(alignment: .leading, spacing: 8) {
+                                if item.isPinned {
+                                    Text("PINNED")
+                                        .font(.caption2.weight(.heavy))
+                                        .tracking(1.5)
+                                        .foregroundStyle(badgeTextColor)
+                                }
+
+                                Text(item.title)
+                                    .font(.title.weight(.bold))
+                                    .foregroundStyle(primaryTextColor)
+
+                                Text(item.createdBy)
                                     .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(AppConfig.subtleGray)
+                                    .foregroundStyle(secondaryTextColor)
+                                    .lineLimit(1)
                             }
+                            .padding(24)
+                            .padding(.bottom, 4)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                LinearGradient(
+                                    colors: headerOverlayColors,
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
                         }
+
+                        // Article body
+                        VStack(alignment: .leading, spacing: 20) {
+                            // Author + date row
+                            HStack(spacing: 12) {
+                                Text(item.emoji)
+                                    .font(.title3)
+                                    .frame(width: 44, height: 44)
+                                    .background(AppConfig.surfaceLow)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.createdBy)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(AppConfig.darkText)
+                                    Text(item.createdAt, style: .date)
+                                        .font(.caption)
+                                        .foregroundStyle(AppConfig.subtleGray)
+                                }
+
+                                Spacer()
+
+                                HStack(spacing: 12) {
+                                    ShareLink(item: "\(item.title)\n\n\(item.body)") {
+                                        Image(systemName: "square.and.arrow.up")
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(AppConfig.accentFg)
+                                            .frame(width: 36, height: 36)
+                                            .background(AppConfig.surfaceLow)
+                                            .clipShape(Circle())
+                                    }
+                                    if bookingManager.isAdmin {
+                                        Button {
+                                            Haptics.selection()
+                                            Task { await announcementsManager.togglePinned(item) }
+                                        } label: {
+                                            Image(systemName: item.isPinned ? "pin.slash.fill" : "pin.fill")
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(AppConfig.subtleGray)
+                                                .frame(width: 36, height: 36)
+                                                .background(AppConfig.surfaceLow)
+                                                .clipShape(Circle())
+                                        }
+                                    }
+                                }
+                            }
+
+                            Divider()
+
+                            if !item.body.isEmpty {
+                                Text(item.body)
+                                    .font(.body)
+                                    .foregroundStyle(AppConfig.darkText)
+                                    .lineSpacing(4)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            if !item.fields.isEmpty {
+                                VStack(spacing: 0) {
+                                    ForEach(Array(item.fields.enumerated()), id: \.element.id) { idx, field in
+                                        infoFieldRow(field)
+                                        if idx < item.fields.count - 1 {
+                                            Divider().padding(.leading, 52)
+                                        }
+                                    }
+                                }
+                                .background(AppConfig.cardBg)
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppConfig.separatorSoft, lineWidth: 1))
+                            }
+
+                            Spacer(minLength: 24)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+                        .padding(.bottom, max(24, proxy.safeAreaInsets.bottom + 12))
                     }
                 }
+                .background(AppConfig.pageBg)
+
+                Button {
+                    selectedAnnouncement = nil
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .heavy))
+                        .foregroundStyle(Color(white: 0.6))
+                        .frame(width: 42, height: 42)
+                        .background(Color(white: 0.19))
+                        .clipShape(Circle())
+                }
+                .shadow(color: .black.opacity(0.3), radius: 6, y: 2)
+                .padding(.trailing, 18)
+                .padding(.top, 14)
             }
         }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
         .onAppear { markAnnouncementRead(item) }
     }
 
     // MARK: - Info Section (admin-managed bento grid)
+
+    private func infoSectionAppleStyle(items: [InfoItem]) -> some View {
+        return VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(todayDateString.uppercased())
+                    .font(.caption.weight(.bold))
+                    .tracking(1)
+                    .foregroundStyle(AppConfig.subtleGray)
+                Text(L10n.info)
+                    .font(.largeTitle.weight(.bold))
+                    .foregroundStyle(AppConfig.darkText)
+            }
+            .padding(.horizontal)
+
+            ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
+                infoTodayStyleCard(item, isHero: idx == 0)
+            }
+        }
+    }
+
+    private func infoTodayStyleCard(_ item: InfoItem, isHero: Bool) -> some View {
+        let hasDetails = canOpenInfoDetail(item)
+        let gradient = infoCardGradient(for: item)
+
+        return VStack(alignment: .leading, spacing: 0) {
+            if isHero {
+                ZStack(alignment: .bottomLeading) {
+                    Rectangle()
+                        .fill(gradient)
+                        .frame(height: 220)
+                        .overlay(alignment: .topTrailing) {
+                            Image(systemName: item.icon)
+                                .font(.system(size: 84, weight: .regular))
+                                .foregroundStyle(.white.opacity(0.18))
+                                .padding(16)
+                        }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(item.title)
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+
+                        if !item.body.isEmpty {
+                            Text(item.body)
+                                .font(.subheadline)
+                                .foregroundStyle(.white.opacity(0.85))
+                                .lineLimit(3)
+                        }
+
+                        HStack {
+                            Text(item.createdAt.relativeTime())
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.68))
+                            Spacer()
+                            if hasDetails && AppConfig.enableHomeInfoDetailSheet {
+                                HStack(spacing: 4) {
+                                    Text("Open")
+                                        .font(.caption.weight(.semibold))
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption2.weight(.semibold))
+                                }
+                                .foregroundStyle(.white.opacity(0.85))
+                            }
+                        }
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.45)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(AppConfig.separatorSoft.opacity(0.45), lineWidth: 0.8)
+                )
+                .shadow(color: .black.opacity(0.12), radius: 14, y: 5)
+                .padding(.horizontal)
+            } else {
+                HStack(spacing: 14) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(gradient)
+                            .frame(width: 70, height: 70)
+                        Image(systemName: item.icon)
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.92))
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.title)
+                            .font(.headline)
+                            .foregroundStyle(AppConfig.darkText)
+                            .lineLimit(2)
+                        if !item.body.isEmpty {
+                            Text(item.body)
+                                .font(.caption)
+                                .foregroundStyle(AppConfig.subtleGray)
+                                .lineLimit(2)
+                        }
+                        Text(item.createdAt.relativeTime())
+                            .font(.caption2)
+                            .foregroundStyle(AppConfig.subtleGray.opacity(0.55))
+                    }
+
+                    Spacer()
+
+                    if hasDetails && AppConfig.enableHomeInfoDetailSheet {
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(AppConfig.subtleGray.opacity(0.38))
+                    }
+                }
+                .padding(14)
+                .background(AppConfig.cardBg)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(AppConfig.separatorSoft, lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
+                .padding(.horizontal)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard hasDetails, AppConfig.enableHomeInfoDetailSheet else { return }
+            Haptics.selection()
+            selectedInfoItem = item
+        }
+    }
+
+    private func infoCardGradient(for item: InfoItem) -> LinearGradient {
+        let palette: [[Color]] = [
+            [Color(red: 0.18, green: 0.25, blue: 0.45), Color(red: 0.25, green: 0.42, blue: 0.68)],
+            [Color(red: 0.17, green: 0.42, blue: 0.36), Color(red: 0.25, green: 0.62, blue: 0.5)],
+            [Color(red: 0.48, green: 0.24, blue: 0.62), Color(red: 0.65, green: 0.35, blue: 0.82)],
+            [Color(red: 0.56, green: 0.28, blue: 0.2), Color(red: 0.76, green: 0.44, blue: 0.3)],
+            [Color(red: 0.22, green: 0.22, blue: 0.3), Color(red: 0.36, green: 0.36, blue: 0.5)]
+        ]
+
+        let key = "\(item.title)|\(item.icon)"
+        let idx = abs(key.hashValue) % palette.count
+        let colors = palette[idx]
+        return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
 
     private var infoSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1382,6 +2223,19 @@ struct HomeView: View {
         }
     }
 
+    private func announcementInlineImage(_ item: Announcement) -> UIImage? {
+        #if canImport(UIKit)
+        guard let base64 = item.imageBase64,
+              let data = Data(base64Encoded: base64),
+              let image = UIImage(data: data) else {
+            return nil
+        }
+        return image
+        #else
+        return nil
+        #endif
+    }
+
     // MARK: - Footer Logo
 
     private var footerLogo: some View {
@@ -1391,7 +2245,7 @@ struct HomeView: View {
                 .tracking(2)
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.5))
 
-            Text("EL Parking v1.0")
+            Text("EL Parking v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")")
                 .font(.caption2)
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.3))
         }

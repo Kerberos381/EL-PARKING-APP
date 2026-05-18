@@ -13,6 +13,7 @@ import WidgetKit
 import CoreGraphics
 import CryptoKit
 import FirebaseFirestore
+import SwiftUI
 
 /// Lightweight struct for encoding booking data to shared UserDefaults for widgets
 struct WidgetBookingData: Codable {
@@ -61,11 +62,16 @@ class BookingManager: ObservableObject {
     @Published var carDescription:    String = ""
     @Published var carColor:           String = ""
     @Published var carType:            String = ""
+    @Published var vehicleMiniaturePresetID: String = ""
+    @Published var preferredVocative: String = ""
 
     private lazy var db = Firestore.firestore()
     private var bookingsListener: ListenerRegistration?
     private var spotsListener: ListenerRegistration?
     private var lastReminderHash: String = ""
+    private var lastBookingsSignature: Int?
+    private var lastSpotsSignature: Int?
+    private var lastVehicleRenderHash: Int = 0
 
     init() {
         loadSpotsCache()      // Cached spot list for offline use
@@ -87,7 +93,9 @@ class BookingManager: ObservableObject {
         plate:    String = "",
         car:      String = "",
         color:    String = "",
-        carType:  String = ""
+        carType:  String = "",
+        vehicleMiniaturePresetID: String = "",
+        preferredVocative: String = ""
     ) {
         currentUserEmail  = email
         currentUserName   = name.isEmpty ? email : name
@@ -97,6 +105,8 @@ class BookingManager: ObservableObject {
         carDescription    = car
         carColor          = color
         self.carType      = carType
+        self.vehicleMiniaturePresetID = vehicleMiniaturePresetID
+        self.preferredVocative = preferredVocative.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Persist for offline / widget use
         UserDefaults.standard.set(email,   forKey: "userEmail")
@@ -105,6 +115,8 @@ class BookingManager: ObservableObject {
         UserDefaults.standard.set(car,     forKey: "carDescription")
         UserDefaults.standard.set(color,   forKey: "carColor")
         UserDefaults.standard.set(carType, forKey: "carType")
+        UserDefaults.standard.set(vehicleMiniaturePresetID, forKey: "vehicleMiniaturePresetID")
+        UserDefaults.standard.set(self.preferredVocative, forKey: "preferredVocative")
 
         // Share identity with App Intents (which run in a separate process)
         let ag = UserDefaults.appGroup
@@ -114,6 +126,7 @@ class BookingManager: ObservableObject {
 
         startFirestoreListener()
         startSpotsListener()
+        updateWidgetData()
     }
 
     func clearUser() {
@@ -124,14 +137,25 @@ class BookingManager: ObservableObject {
         bookings = []
         AppConfig.blockedSpotIDs = []
         parkingSpots      = AppConfig.allParkingSpots   // reset to base (no live accessibility)
+        lastBookingsSignature = nil
+        lastSpotsSignature = nil
         currentUserEmail  = ""
         currentUserName   = ""
         currentUserUID    = ""
         currentUserRole   = .user
+        preferredVocative = ""
         let ag = UserDefaults.appGroup
         ag.removeObject(forKey: "currentUserUID")
         ag.removeObject(forKey: "currentUserEmail")
         ag.removeObject(forKey: "currentUserName")
+        lastVehicleRenderHash = 0
+        if let containerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: "group.com.StivMalakjan.EL-PARKING-APP"
+        ) {
+            try? FileManager.default.removeItem(
+                at: containerURL.appendingPathComponent("vehicleMiniature.png")
+            )
+        }
         updateWidgetData()
     }
 
@@ -143,14 +167,26 @@ class BookingManager: ObservableObject {
         bookingsListener = recentBookingsQuery()
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self, let snapshot, error == nil else { return }
-                let loaded = snapshot.documents
-                    .compactMap { Booking.fromFirestore($0.data(), documentID: $0.documentID) }
-                    .filter { self.shouldKeepBookingLocally($0) }
+                var droppedDocIDs: [String] = []
+                var schemaWarnings: [String] = []
+                let parsed = snapshot.documents.compactMap { doc -> Booking? in
+                    let data = doc.data()
+                    schemaWarnings.append(contentsOf: FirestoreSchemaValidator.bookingWarnings(data: data, docID: doc.documentID))
+                    let booking = Booking.fromFirestore(data, documentID: doc.documentID)
+                    if booking == nil { droppedDocIDs.append(doc.documentID) }
+                    return booking
+                }
+                #if DEBUG
+                if !schemaWarnings.isEmpty {
+                    print("BookingManager listener schema warnings (\(schemaWarnings.count)):\n- \(schemaWarnings.prefix(8).joined(separator: "\n- "))")
+                }
+                if !droppedDocIDs.isEmpty {
+                    print("BookingManager listener dropped \(droppedDocIDs.count) booking docs due to parse mismatch. IDs: \(droppedDocIDs.prefix(8))")
+                }
+                #endif
                 Task { @MainActor in
-                    self.bookings = loaded.sorted { $0.date < $1.date }
-                    self.saveLocalCache()
-                    self.updateWidgetData()
-                    self.scheduleDailyReminders()
+                    let loaded = parsed.filter { self.shouldKeepBookingLocally($0) }
+                    self.applyBookingsSnapshot(loaded)
                 }
             }
     }
@@ -169,7 +205,7 @@ class BookingManager: ObservableObject {
 
                 // If collection is empty, seed it from the hardcoded defaults (one-time)
                 if snapshot.documents.isEmpty {
-                    self.seedSpotsToFirestore()
+                    Task { @MainActor in self.seedSpotsToFirestore() }
                     return  // listener will fire again after seed completes
                 }
 
@@ -183,7 +219,9 @@ class BookingManager: ObservableObject {
                     let label        = (data["label"] as? String) ?? "Parking \(id)"
                     let isAccessible = (data["isAccessible"] as? Bool) ?? false
                     let isBlocked    = (data["isBlocked"]    as? Bool) ?? false
-                    sortOrders[id]   = (data["sortOrder"]    as? Int)  ?? 999
+                    sortOrders[id]   = ((data["sortOrder"] as? Int)
+                                        ?? (data["sortOrder"] as? NSNumber)?.intValue
+                                        ?? 999)
 
                     spots.append(ParkingSpot(id: id, label: label, isAccessible: isAccessible))
                     if isBlocked { blocked.insert(id) }
@@ -198,11 +236,7 @@ class BookingManager: ObservableObject {
                 }
 
                 Task { @MainActor in
-                    AppConfig.blockedSpotIDs  = blocked
-                    AppConfig.allParkingSpots = spots
-                    self.parkingSpots         = spots
-                    self.saveSpotsCache()
-                    self.updateWidgetData()
+                    self.applySpotsSnapshot(spots: spots, blocked: blocked)
                 }
             }
     }
@@ -216,15 +250,48 @@ class BookingManager: ObservableObject {
         do {
             let snapshot = try await recentBookingsQuery().getDocuments()
 
-            bookings = snapshot.documents
-                .compactMap { Booking.fromFirestore($0.data(), documentID: $0.documentID) }
+            var droppedDocIDs: [String] = []
+            var schemaWarnings: [String] = []
+            let loaded = snapshot.documents
+                .compactMap { doc -> Booking? in
+                    let data = doc.data()
+                    schemaWarnings.append(contentsOf: FirestoreSchemaValidator.bookingWarnings(data: data, docID: doc.documentID))
+                    let booking = Booking.fromFirestore(data, documentID: doc.documentID)
+                    if booking == nil { droppedDocIDs.append(doc.documentID) }
+                    return booking
+                }
                 .filter { shouldKeepBookingLocally($0) }
-                .sorted { $0.date < $1.date }
-            saveLocalCache()
-            updateWidgetData()
-            scheduleDailyReminders()
+            #if DEBUG
+            if !schemaWarnings.isEmpty {
+                print("BookingManager refresh schema warnings (\(schemaWarnings.count)):\n- \(schemaWarnings.prefix(8).joined(separator: "\n- "))")
+            }
+            if !droppedDocIDs.isEmpty {
+                print("BookingManager refresh dropped \(droppedDocIDs.count) booking docs due to parse mismatch. IDs: \(droppedDocIDs.prefix(8))")
+            }
+            #endif
+            applyBookingsSnapshot(loaded)
         } catch {
             print("BookingManager refreshBookings error: \(error.localizedDescription)")
+        }
+    }
+
+    func purgeOrphanedBookings() async -> Int {
+        do {
+            let snapshot = try await db.collection("bookings").getDocuments()
+            var deleted = 0
+            for doc in snapshot.documents {
+                let data = doc.data()
+                let booking = Booking.fromFirestore(data, documentID: doc.documentID)
+                if booking == nil {
+                    try await db.collection("bookings").document(doc.documentID).delete()
+                    deleted += 1
+                }
+            }
+            if deleted > 0 { await refreshData() }
+            return deleted
+        } catch {
+            print("purgeOrphanedBookings error: \(error.localizedDescription)")
+            return 0
         }
     }
 
@@ -247,7 +314,9 @@ class BookingManager: ObservableObject {
                 let label        = (data["label"] as? String) ?? "Parking \(id)"
                 let isAccessible = (data["isAccessible"] as? Bool) ?? false
                 let isBlocked    = (data["isBlocked"]    as? Bool) ?? false
-                sortOrders[id]   = (data["sortOrder"]    as? Int)  ?? 999
+                sortOrders[id]   = ((data["sortOrder"] as? Int)
+                                    ?? (data["sortOrder"] as? NSNumber)?.intValue
+                                    ?? 999)
 
                 spots.append(ParkingSpot(id: id, label: label, isAccessible: isAccessible))
                 if isBlocked { blocked.insert(id) }
@@ -260,11 +329,7 @@ class BookingManager: ObservableObject {
                 return (Int(a.id) ?? 999) < (Int(b.id) ?? 999)
             }
 
-            AppConfig.blockedSpotIDs  = blocked
-            AppConfig.allParkingSpots = spots
-            parkingSpots              = spots
-            saveSpotsCache()
-            updateWidgetData()
+            applySpotsSnapshot(spots: spots, blocked: blocked)
         } catch {
             print("BookingManager refreshSpots error: \(error.localizedDescription)")
         }
@@ -314,14 +379,19 @@ class BookingManager: ObservableObject {
         if let blocked = UserDefaults.standard.array(forKey: "cachedBlockedSpotIDs") as? [String] {
             AppConfig.blockedSpotIDs = Set(blocked)
         }
+        lastSpotsSignature = spotsSignature(spots: parkingSpots, blocked: AppConfig.blockedSpotIDs)
     }
 
     // MARK: - Notification Permission
 
     func requestNotificationPermission() {
         UNUserNotificationCenter.current()
-            .requestAuthorization(options: [.alert, .badge, .sound]) { _, error in
+            .requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
                 if let error { print("Notification permission error: \(error.localizedDescription)") }
+                guard granted else { return }
+                DispatchQueue.main.async {
+                    UIApplication.shared.registerForRemoteNotifications()
+                }
             }
     }
 
@@ -848,9 +918,10 @@ class BookingManager: ObservableObject {
         excludingBookingID: UUID? = nil
     ) -> Bool {
         let calendar = Calendar.current
+        let targetSpotKey = normalizedSpotKey(spotLabel)
         return !bookings.contains {
             guard
-                $0.spot == spotLabel,
+                normalizedSpotKey($0.spot) == targetSpotKey,
                 calendar.isDate($0.date, inSameDayAs: date),
                 $0.id != excludingBookingID
             else { return false }
@@ -885,8 +956,10 @@ class BookingManager: ObservableObject {
 
     func getBookingsForSpotOnDate(spotLabel: String, date: Date) -> [Booking] {
         let calendar = Calendar.current
+        let targetSpotKey = normalizedSpotKey(spotLabel)
         return bookings.filter {
-            $0.spot == spotLabel && calendar.isDate($0.date, inSameDayAs: date)
+            normalizedSpotKey($0.spot) == targetSpotKey &&
+            calendar.isDate($0.date, inSameDayAs: date)
         }
         .sorted {
             if $0.fromTime == $1.fromTime { return $0.toTime < $1.toTime }
@@ -1063,7 +1136,7 @@ class BookingManager: ObservableObject {
 
     func availableSpotsCount(on date: Date) -> Int {
         let total   = parkingSpots.count
-        let booked  = Set(getBookingsForDate(date).map(\.spot)).count
+        let booked  = Set(getBookingsForDate(date).map { normalizedSpotKey($0.spot) }).count
         let blocked = AppConfig.blockedSpotIDs.count
         return max(0, total - booked - blocked)
     }
@@ -1071,6 +1144,7 @@ class BookingManager: ObservableObject {
     // MARK: - Post-Change Helpers
 
     private func afterBookingChange() {
+        lastBookingsSignature = bookingsSignature(bookings)
         saveLocalCache()
         scheduleDailyReminders()
         updateWidgetData()
@@ -1117,6 +1191,13 @@ class BookingManager: ObservableObject {
             return candidateBookings.first
         }()
 
+        // Sync current user vehicle identity for dedicated vehicle widget.
+        defaults.set(currentUserName, forKey: "widgetUserName")
+        defaults.set(registrationPlate, forKey: "widgetVehiclePlate")
+        defaults.set(carDescription, forKey: "widgetVehicleDescription")
+        defaults.set(carColor, forKey: "widgetVehicleColor")
+        defaults.set(carType, forKey: "widgetCarType")
+
         if let next = selectedForWidget {
             let widgetBooking = WidgetBookingData(
                 id:          next.id.uuidString,
@@ -1141,7 +1222,50 @@ class BookingManager: ObservableObject {
         defaults.set(max(0, totalSpots - blockedCount - todayBookedCount), forKey: "widgetAvailableCount")
         defaults.set(totalSpots - blockedCount,                             forKey: "widgetTotalCount")
 
+        renderAndSaveVehicleMiniature()
         WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    private func renderAndSaveVehicleMiniature() {
+        guard let containerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: "group.com.StivMalakjan.EL-PARKING-APP"
+        ) else { return }
+
+        let fileURL = containerURL.appendingPathComponent("vehicleMiniature.png")
+
+        guard !carType.isEmpty || !carDescription.isEmpty else {
+            try? FileManager.default.removeItem(at: fileURL)
+            lastVehicleRenderHash = 0
+            return
+        }
+
+        var hasher = Hasher()
+        hasher.combine(carType)
+        hasher.combine(carDescription)
+        hasher.combine(carColor)
+        hasher.combine(vehicleMiniaturePresetID)
+        let hash = hasher.finalize()
+        guard hash != lastVehicleRenderHash else { return }
+
+        let miniature = VehicleMiniatureView(
+            carType: carType,
+            colorHex: carColor,
+            description: carDescription,
+            presetID: vehicleMiniaturePresetID.isEmpty ? nil : vehicleMiniaturePresetID
+        )
+        .frame(width: 280, height: 156)
+        .background(Color.clear)
+
+        let renderer = ImageRenderer(content: miniature)
+        renderer.scale = 3.0
+        renderer.isOpaque = false
+
+        guard let image = renderer.uiImage,
+              let data = image.pngData()
+        else { return }
+
+        try? data.write(to: fileURL)
+        lastVehicleRenderHash = hash
     }
 
     private func bookingDateTime(for time: String, on date: Date) -> Date {
@@ -1177,6 +1301,7 @@ class BookingManager: ObservableObject {
         if let data    = UserDefaults.standard.data(forKey: "bookings"),
            let decoded = try? JSONDecoder().decode([Booking].self, from: data) {
             bookings = decoded
+            lastBookingsSignature = bookingsSignature(decoded)
         }
     }
 
@@ -1187,6 +1312,8 @@ class BookingManager: ObservableObject {
         UserDefaults.standard.set(carDescription,    forKey: "carDescription")
         UserDefaults.standard.set(carColor,          forKey: "carColor")
         UserDefaults.standard.set(carType,           forKey: "carType")
+        UserDefaults.standard.set(vehicleMiniaturePresetID, forKey: "vehicleMiniaturePresetID")
+        UserDefaults.standard.set(preferredVocative, forKey: "preferredVocative")
         UserDefaults.standard.set(currentUserName,   forKey: "userName")
         UserDefaults.standard.set(currentUserEmail,  forKey: "userEmail")
 
@@ -1197,7 +1324,9 @@ class BookingManager: ObservableObject {
             "registrationPlate": registrationPlate,
             "carDescription":    carDescription,
             "carColor":          carColor,
-            "carType":           carType
+            "carType":           carType,
+            "vehicleMiniaturePresetID": vehicleMiniaturePresetID,
+            "preferredVocative": preferredVocative
         ])
     }
 
@@ -1206,6 +1335,8 @@ class BookingManager: ObservableObject {
         carDescription    = UserDefaults.standard.string(forKey: "carDescription")    ?? ""
         carColor          = UserDefaults.standard.string(forKey: "carColor")          ?? ""
         carType           = UserDefaults.standard.string(forKey: "carType")           ?? ""
+        vehicleMiniaturePresetID = UserDefaults.standard.string(forKey: "vehicleMiniaturePresetID") ?? ""
+        preferredVocative = UserDefaults.standard.string(forKey: "preferredVocative") ?? ""
         let savedName     = UserDefaults.standard.string(forKey: "userName") ?? ""
         let savedEmail    = UserDefaults.standard.string(forKey: "userEmail") ?? ""
         if !savedName.isEmpty  { currentUserName  = savedName }
@@ -1385,12 +1516,74 @@ class BookingManager: ObservableObject {
     }
 
     private func recentBookingsQuery() -> Query {
+        // Intentionally no server-side bookingDate filter:
+        // Firestore comparisons are type-strict and can exclude legacy/imported
+        // docs where bookingDate is a "yyyy-MM-dd" string instead of Timestamp.
+        // We parse both shapes in Booking.fromFirestore and filter locally via
+        // shouldKeepBookingLocally(_:) to keep iOS/Android occupancy in sync.
         db.collection("bookings")
-            .whereField(
-                "bookingDate",
-                isGreaterThanOrEqualTo: Timestamp(date: BookingPolicy.listenerQueryStartDate())
-            )
-            .order(by: "bookingDate")
+    }
+
+    private func applyBookingsSnapshot(_ loaded: [Booking]) {
+        let sorted = loaded.sorted { $0.date < $1.date }
+        let signature = bookingsSignature(sorted)
+        guard signature != lastBookingsSignature else { return }
+        lastBookingsSignature = signature
+        bookings = sorted
+        saveLocalCache()
+        updateWidgetData()
+        scheduleDailyReminders()
+    }
+
+    private func applySpotsSnapshot(spots: [ParkingSpot], blocked: Set<String>) {
+        let signature = spotsSignature(spots: spots, blocked: blocked)
+        guard signature != lastSpotsSignature else { return }
+        lastSpotsSignature = signature
+        AppConfig.blockedSpotIDs = blocked
+        AppConfig.allParkingSpots = spots
+        parkingSpots = spots
+        saveSpotsCache()
+        updateWidgetData()
+    }
+
+    private func bookingsSignature(_ items: [Booking]) -> Int {
+        var hasher = Hasher()
+        hasher.combine(items.count)
+        for booking in items {
+            hasher.combine(booking.id)
+            hasher.combine(booking.spot)
+            hasher.combine(booking.email)
+            hasher.combine(booking.date.timeIntervalSinceReferenceDate)
+            hasher.combine(booking.fromTime)
+            hasher.combine(booking.toTime)
+            hasher.combine(booking.createdBy)
+            hasher.combine(booking.groupID)
+        }
+        return hasher.finalize()
+    }
+
+    /// Canonical spot key shared across UI/data paths so `75`, `P75`, and
+    /// `Parking 75` are treated as the same logical spot.
+    func normalizedSpotKey(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let match = trimmed.range(of: #"\d+"#, options: .regularExpression) {
+            return String(trimmed[match])
+        }
+        return trimmed.lowercased()
+    }
+
+    private func spotsSignature(spots: [ParkingSpot], blocked: Set<String>) -> Int {
+        var hasher = Hasher()
+        hasher.combine(spots.count)
+        for spot in spots {
+            hasher.combine(spot.id)
+            hasher.combine(spot.label)
+            hasher.combine(spot.isAccessible)
+        }
+        for id in blocked.sorted() {
+            hasher.combine(id)
+        }
+        return hasher.finalize()
     }
 }
 
@@ -1449,19 +1642,38 @@ extension Booking {
 
     nonisolated static func fromFirestore(_ data: [String: Any], documentID: String? = nil) -> Booking? {
         guard
-            let title      = data["title"] as? String,
-            let spot       = data["spot"]  as? String,
-            let user       = data["user"]  as? String,
-            let email      = data["email"] as? String,
-            let fromTime   = data["fromTime"]  as? String,
-            let toTime     = data["toTime"]    as? String,
-            let createdBy  = data["createdBy"] as? String
-        else { return nil }
-
-        guard
             let rawID = (data["id"] as? String) ?? documentID,
             let bookingDate = bookingDate(from: data["bookingDate"])
         else { return nil }
+
+        guard
+            let spotRaw = (data["spot"] as? String) ?? (data["spotLabel"] as? String),
+            let emailRaw = (data["email"] as? String) ?? (data["userEmail"] as? String)
+        else { return nil }
+
+        let spot = spotRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let email = emailRaw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !spot.isEmpty, !email.isEmpty else { return nil }
+
+        let fromTime = (data["fromTime"] as? String)
+            ?? (data["from"] as? String)
+            ?? (data["timeFrom"] as? String)
+            ?? "07:00"
+        let toTime = (data["toTime"] as? String)
+            ?? (data["to"] as? String)
+            ?? (data["timeTo"] as? String)
+            ?? "18:00"
+        let rawUser = ((data["user"] as? String) ?? (data["displayName"] as? String) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let user = rawUser.isEmpty ? inferredUserName(from: data["title"] as? String, email: email) : rawUser
+        let rawCreator = (data["createdBy"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            ?? ((data["adminEmail"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "")
+        let createdBy = rawCreator.isEmpty ? email : rawCreator
+        let rawTitle = ((data["title"] as? String) ?? (data["bookingTitle"] as? String) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = rawTitle.isEmpty ? "Reservation for \(user)" : rawTitle
 
         let id = UUID(uuidString: rawID) ?? stableUUID(from: rawID)
         let groupID = (data["groupID"] as? String).flatMap { UUID(uuidString: $0) }
@@ -1480,9 +1692,30 @@ extension Booking {
         )
     }
 
+    nonisolated private static func inferredUserName(from title: String?, email: String) -> String {
+        if let title {
+            let cleaned = title
+                .replacingOccurrences(of: "Reservation for ", with: "")
+                .replacingOccurrences(of: "Rezervace pro ", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !cleaned.isEmpty { return cleaned }
+        }
+        return email.components(separatedBy: "@").first ?? email
+    }
+
     nonisolated private static func bookingDate(from value: Any?) -> Date? {
         if let timestamp = value as? Timestamp {
             return timestamp.dateValue()
+        }
+
+        if let date = value as? Date {
+            return date
+        }
+
+        if let numeric = value as? NSNumber {
+            let raw = numeric.doubleValue
+            // Heuristic: millisecond epoch values are > 1e12 in modern dates.
+            return raw > 1_000_000_000_000 ? Date(timeIntervalSince1970: raw / 1000.0) : Date(timeIntervalSince1970: raw)
         }
 
         guard let string = value as? String else { return nil }

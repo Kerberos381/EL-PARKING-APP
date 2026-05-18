@@ -52,100 +52,124 @@ enum CarBodyType: String, CaseIterable, Identifiable {
 // MARK: - Car Suggestions
 
 struct CarData {
-    static let suggestions: [String] = [
-        // Škoda — most common in CZ
-        "Škoda Citigo", "Škoda Fabia", "Škoda Rapid", "Škoda Scala",
-        "Škoda Octavia", "Škoda Superb", "Škoda Kamiq", "Škoda Karoq",
-        "Škoda Kodiaq", "Škoda Enyaq", "Škoda Enyaq Coupé",
-
-        // Volkswagen
-        "VW Polo", "VW Golf", "VW Passat", "VW Arteon",
-        "VW T-Roc", "VW Tiguan", "VW Touareg", "VW ID.3", "VW ID.4",
-
-        // BMW
-        "BMW 1 Series", "BMW 2 Series", "BMW 3 Series", "BMW 5 Series", "BMW 7 Series",
-        "BMW X1", "BMW X3", "BMW X5", "BMW iX", "BMW i4",
-
-        // Mercedes
-        "Mercedes A-Class", "Mercedes C-Class", "Mercedes E-Class", "Mercedes S-Class",
-        "Mercedes GLA", "Mercedes GLC", "Mercedes GLE", "Mercedes EQB", "Mercedes EQC",
-
-        // Audi
-        "Audi A1", "Audi A3", "Audi A4", "Audi A6",
-        "Audi Q2", "Audi Q3", "Audi Q5", "Audi Q8",
-        "Audi e-tron", "Audi Q4 e-tron",
-
-        // Ford
-        "Ford Fiesta", "Ford Focus", "Ford Mondeo", "Ford Puma", "Ford Kuga",
-        "Ford Mustang Mach-E",
-
-        // Toyota
-        "Toyota Yaris", "Toyota Corolla", "Toyota Camry", "Toyota C-HR",
-        "Toyota RAV4", "Toyota bZ4X",
-
-        // Hyundai
-        "Hyundai i20", "Hyundai i30", "Hyundai Tucson", "Hyundai Santa Fe",
-        "Hyundai IONIQ 5", "Hyundai IONIQ 6",
-
-        // Kia
-        "Kia Picanto", "Kia Rio", "Kia Ceed", "Kia Sportage", "Kia Sorento", "Kia EV6",
-
-        // Volvo
-        "Volvo V40", "Volvo V60", "Volvo V90", "Volvo XC40", "Volvo XC60", "Volvo XC90",
-        "Volvo EX30", "Volvo EX40",
-
-        // Renault
-        "Renault Clio", "Renault Megane", "Renault Captur", "Renault Kadjar",
-        "Renault Zoe", "Renault Megane E-Tech",
-
-        // Peugeot
-        "Peugeot 208", "Peugeot 308", "Peugeot 508",
-        "Peugeot 2008", "Peugeot 3008", "Peugeot e-208",
-
-        // Dacia
-        "Dacia Sandero", "Dacia Logan", "Dacia Duster", "Dacia Spring",
-
-        // SEAT / Cupra
-        "SEAT Ibiza", "SEAT Leon", "SEAT Arona", "SEAT Ateca",
-        "Cupra Born", "Cupra Formentor", "Cupra Leon",
-
-        // Opel
-        "Opel Corsa", "Opel Astra", "Opel Insignia", "Opel Mokka", "Opel Crossland",
-
-        // Citroën
-        "Citroën C3", "Citroën C4", "Citroën C5 X", "Citroën Berlingo",
-
-        // Nissan
-        "Nissan Micra", "Nissan Juke", "Nissan Qashqai", "Nissan Leaf", "Nissan Ariya",
-
-        // Mazda
-        "Mazda2", "Mazda3", "Mazda6", "Mazda CX-3", "Mazda CX-5", "Mazda CX-60", "Mazda MX-30",
-
-        // Honda
-        "Honda Jazz", "Honda Civic", "Honda HR-V", "Honda CR-V", "Honda e",
-
-        // Fiat
-        "Fiat Panda", "Fiat 500", "Fiat Tipo", "Fiat 500e",
-
-        // Porsche
-        "Porsche 911", "Porsche Cayenne", "Porsche Macan", "Porsche Taycan",
-
-        // Tesla
-        "Tesla Model 3", "Tesla Model Y", "Tesla Model S", "Tesla Model X",
+    // CZ-focused set based on recent SDA registration trends.
+    static let makes: [String] = [
+        "Škoda", "Hyundai", "Toyota", "Volkswagen", "Kia", "Dacia",
+        "Ford", "Mercedes-Benz", "Renault", "BMW", "Audi", "Volvo",
+        "Tesla", "MG", "Nissan", "Peugeot", "MINI", "Subaru", "Porsche", "Honda",
+        "Alfa Romeo",
+        "Opel", "Mazda", "Citroën", "Seat"
     ]
+
+    static let modelsByMake: [String: [String]] = [
+        "Škoda": ["Octavia", "Octavia RS", "Octavia Combi Style", "Kamiq", "Karoq", "Karoq Style", "Kodiaq", "Fabia", "Scala", "Superb", "Superb Combi L&K", "Enyaq", "Elroq"],
+        "Hyundai": ["i20", "i30", "Tucson", "Kona", "Bayon", "Santa Fe", "IONIQ 5", "IONIQ 6"],
+        "Toyota": ["Corolla", "Yaris", "Yaris Cross", "RAV4", "C-HR", "Camry"],
+        "Volkswagen": ["Golf", "Golf Variant", "Tiguan", "Tiguan 2.0 TSI Elegance", "Passat", "T-Roc", "Polo", "Touareg", "ID.3", "ID.4"],
+        "Kia": ["Ceed", "Sportage", "Sorento", "Niro", "EV6", "EV9", "Picanto"],
+        "Dacia": ["Duster", "Jogger", "Sandero", "Spring"],
+        "Ford": ["Focus", "Kuga", "Puma", "Mustang Mach-E"],
+        "Mercedes-Benz": ["A-Class", "C-Class", "C 220 d 4MATIC", "E-Class", "GLA", "GLC", "GLE", "EQA", "EQA 250", "EQB"],
+        "Renault": ["Clio", "Captur", "Megane", "Austral", "Arkana", "Kangoo"],
+        "BMW": ["3 Series", "5 Series", "X1", "X3", "X5", "i4", "iX"],
+        "Audi": ["A3", "A4", "A4 Avant B9", "A4 Avant 35 TDI S-Line", "A6", "Q3", "Q5", "Q7", "Q8", "Q4", "Q4 e-tron"],
+        "Volvo": ["EX30", "XC40", "XC60", "XC90", "V60", "V90"],
+        "Tesla": ["Model 3", "Model Y", "Model S", "Model X"],
+        "MG": ["ZS", "MG4", "HS", "Marvel R"],
+        "Nissan": ["Qashqai", "Juke", "X-Trail", "Leaf", "Ariya"],
+        "Peugeot": ["208", "308", "2008", "3008", "5008", "Rifter"],
+        "MINI": ["Countryman", "Countryman Electric", "Cooper", "Cooper Electric"],
+        "Subaru": ["Outback", "Forester", "Crosstrek"],
+        "Porsche": ["Cayenne", "Macan", "911", "Taycan"],
+        "Honda": ["Civic", "CR-V", "HR-V", "Jazz"],
+        "Alfa Romeo": ["Stelvio", "Giulia", "Tonale"],
+        "Opel": ["Corsa", "Astra", "Mokka", "Crossland", "Grandland"],
+        "Mazda": ["Mazda3", "Mazda6", "CX-30", "CX-5", "CX-60"],
+        "Citroën": ["C3", "C4", "C5 Aircross", "Berlingo"],
+        "Seat": ["Ibiza", "Leon", "Arona", "Ateca", "Tarraco"]
+    ]
+
+    static var suggestions: [String] {
+        makes.flatMap { make in
+            (modelsByMake[make] ?? []).map { "\(make) \($0)" }
+        }
+    }
+
+    static func models(for make: String) -> [String] {
+        guard let canonical = canonicalMake(from: make) else { return [] }
+        return modelsByMake[canonical] ?? []
+    }
+
+    static func compose(make: String, model: String) -> String {
+        let mk = canonicalMake(from: make) ?? make.trimmingCharacters(in: .whitespacesAndNewlines)
+        let md = model.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !mk.isEmpty else { return md }
+        guard !md.isEmpty else { return mk }
+        return "\(mk) \(md)"
+    }
+
+    static func splitMakeModel(_ full: String) -> (make: String, model: String) {
+        let value = full.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return ("", "") }
+        let normalizedFull = normalize(value)
+
+        // Prefer exact make+model matches first.
+        for make in makes {
+            for model in modelsByMake[make] ?? [] {
+                if normalize(compose(make: make, model: model)) == normalizedFull {
+                    return (make, model)
+                }
+            }
+        }
+
+        // Then exact make-only values.
+        if let makeOnly = makes.first(where: { normalize($0) == normalizedFull }) {
+            return (makeOnly, "")
+        }
+
+        // Fallback for manually-entered unknown models.
+        if let matchedMake = makes.first(where: { normalizedFull.hasPrefix(normalize($0) + " ") }) {
+            let foldedValue = value.folding(options: .diacriticInsensitive, locale: .current).lowercased()
+            let foldedMake = matchedMake.folding(options: .diacriticInsensitive, locale: .current).lowercased()
+            if foldedValue.hasPrefix(foldedMake) {
+                let modelStart = value.index(value.startIndex, offsetBy: min(value.count, matchedMake.count))
+                let model = String(value[modelStart...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                return (matchedMake, model)
+            }
+            return (matchedMake, "")
+        }
+
+        return ("", value)
+    }
+
+    static func canonicalMake(from raw: String) -> String? {
+        let normalized = normalize(raw)
+        return makes.first { normalize($0) == normalized }
+    }
 
     /// Returns up to 6 suggestions matching the query (accent- and case-insensitive).
     static func filter(_ query: String) -> [String] {
         let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return [] }
-        let normalized = q.folding(options: .diacriticInsensitive, locale: .current).lowercased()
+        let normalized = normalize(q)
         return suggestions
             .filter {
-                $0.folding(options: .diacriticInsensitive, locale: .current)
-                  .lowercased()
-                  .contains(normalized)
+                normalize($0).contains(normalized)
             }
             .prefix(6)
             .map { $0 }
+    }
+
+    private static func normalize(_ value: String) -> String {
+        let folded = value.folding(options: .diacriticInsensitive, locale: .current).lowercased()
+        let mapped = folded.map { ch -> Character in
+            if ch.isLetter || ch.isNumber {
+                return ch
+            }
+            return " "
+        }
+        return String(mapped)
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
     }
 }

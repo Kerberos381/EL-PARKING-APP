@@ -23,6 +23,9 @@ struct AdminDashboardView: View {
     @State private var selectedQuickStat: UserStatus = .pending
     @State private var quickFilterRoute: QuickFilterRoute?
     @State private var didPrefetchAdminData = false
+    @State private var showPurgeConfirm     = false
+    @State private var purgeResult: Int?
+    @State private var isPurging            = false
 
     private enum QuickFilterRoute: String, Identifiable {
         case active
@@ -172,6 +175,23 @@ struct AdminDashboardView: View {
                             .buttonStyle(ScaleButtonStyle())
                         }
 
+                        // ── Maintenance section ───────────────────────────────
+                        groupedSection(header: "Maintenance") {
+                            Button {
+                                Haptics.selection()
+                                showPurgeConfirm = true
+                            } label: {
+                                rowLabel(icon: "trash.slash.fill",
+                                         iconColor: .orange,
+                                         title: "Purge Orphaned Bookings",
+                                         subtitle: isPurging ? "Deleting…"
+                                                 : purgeResult.map { "\($0) deleted" }
+                                                 ?? "Delete malformed documents with empty fields",
+                                         badge: 0)
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+                        }
+
                         // ── Recent Activations ────────────────────────────────
                         recentActivationsSection
 
@@ -203,6 +223,20 @@ struct AdminDashboardView: View {
                 AdminUsersView(initialFilter: route.userStatus)
                     .environmentObject(authManager)
                     .environmentObject(bookingManager)
+            }
+            .alert("Purge Orphaned Bookings", isPresented: $showPurgeConfirm) {
+                Button("Purge", role: .destructive) {
+                    isPurging = true
+                    purgeResult = nil
+                    Task {
+                        let count = await bookingManager.purgeOrphanedBookings()
+                        isPurging = false
+                        purgeResult = count
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will permanently delete all booking documents that fail to parse (empty email, missing fields, etc.).")
             }
         }
         .onAppear {

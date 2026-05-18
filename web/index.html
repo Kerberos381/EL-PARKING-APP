@@ -8,12 +8,20 @@
       content="default-src 'self'; script-src 'self' https://www.gstatic.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-src https://*.firebaseapp.com;"
     />
     <title>EL Parking Web</title>
+    <link rel="icon" type="image/png" sizes="256x256" href="./app-icon.png" />
+    <link rel="apple-touch-icon" href="./app-icon.png" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="app">
       <section id="authView" class="card auth-card">
-        <h1>EL Parking</h1>
+        <div class="auth-brand">
+          <img src="./app-icon.png" alt="" />
+          <div>
+            <p class="overline">KARLIN OFFICE PARKING</p>
+            <h1>EL Parking</h1>
+          </div>
+        </div>
         <p class="muted">Sign in with your existing account</p>
         <form id="loginForm" class="stack">
           <label class="field">
@@ -24,9 +32,16 @@
             <span>Password</span>
             <input id="passwordInput" type="password" autocomplete="current-password" required />
           </label>
+          <label class="field inline remember-me">
+            <input id="rememberMeInput" type="checkbox" checked />
+            <span>Keep me signed in</span>
+          </label>
           <button id="loginButton" class="btn primary" type="submit">Sign In</button>
           <p id="authError" class="error" role="alert"></p>
         </form>
+        <p class="auth-privacy">
+          <a href="./privacy-policy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+        </p>
       </section>
 
       <section id="pendingView" class="card pending-card hidden">
@@ -37,11 +52,14 @@
 
       <section id="appView" class="hidden">
         <header class="topbar">
-          <div>
-            <p class="overline">EXECUTIVE MOBILITY</p>
-            <h1 id="greetingText">Hello</h1>
+          <div class="topbar-head">
+            <div class="brand-lockup">
+              <img class="brand-icon" src="./app-icon.png" alt="" />
+              <p class="overline">EXECUTIVE MOBILITY</p>
+            </div>
+            <button id="signOutButton" class="btn subtle">Sign Out</button>
           </div>
-          <button id="signOutButton" class="btn subtle">Sign Out</button>
+          <h1 id="greetingText">Hello</h1>
         </header>
 
         <nav class="tabbar" aria-label="Main navigation">
@@ -68,7 +86,7 @@
           </article>
 
           <article class="card">
-            <div class="row between">
+            <div class="row between section-head">
               <h3>Pinned Updates</h3>
               <button id="refreshHome" class="btn subtle">Refresh</button>
             </div>
@@ -78,20 +96,22 @@
 
         <section id="parkingTab" class="tabpanel hidden">
           <article class="card">
-            <div class="row between">
-              <h3>Parking Overview</h3>
-              <label class="field inline">
-                <span>Date</span>
-                <input id="parkingDateInput" type="date" />
-              </label>
-            </div>
+            <h3>Parking Overview</h3>
             <div id="dayPills" class="day-pills" aria-label="Day selector"></div>
             <div class="stats">
               <div><span id="freeCount">0</span><small>Free</small></div>
               <div><span id="bookedCount">0</span><small>Booked</small></div>
               <div><span id="blockedCount">0</span><small>Blocked</small></div>
             </div>
+            <p class="muted tiny spot-grid-hint">Tap a FREE spot tile to select it.</p>
             <div id="spotsGrid" class="spot-grid"></div>
+            <section id="adminSpotInspector" class="admin-inspector hidden">
+              <div class="admin-inspector-header">
+                <h4 id="adminSpotInspectorTitle">Spot</h4>
+                <button id="adminSpotInspectorClose" class="btn subtle small" type="button">Close</button>
+              </div>
+              <div id="adminSpotInspectorList" class="stack dense"></div>
+            </section>
           </article>
 
           <article class="card">
@@ -106,11 +126,9 @@
                   placeholder="Tap a free spot in the grid above"
                 />
               </label>
-              <label class="field">
-                <span>Spot</span>
-                <select id="spotSelect" class="hidden-native-select" required></select>
-              </label>
-              <div class="row">
+              <p id="selectedSpotHint" class="selection-hint muted tiny">No spot selected yet.</p>
+              <select id="spotSelect" class="hidden-native-select" required></select>
+              <div class="booking-time-grid">
                 <label class="field grow">
                   <span>Date</span>
                   <input id="bookDate" type="date" required />
@@ -132,7 +150,7 @@
 
         <section id="bookingsTab" class="tabpanel hidden">
           <article class="card">
-            <div class="row between">
+            <div class="row between section-head">
               <h3>My Bookings</h3>
               <button id="refreshBookings" class="btn subtle">Refresh</button>
             </div>
@@ -142,15 +160,52 @@
 
         <section id="adminTabPanel" class="tabpanel hidden">
           <article class="card">
-            <h3>Admin Snapshot</h3>
+            <div class="row between section-head">
+              <h3>Admin Snapshot</h3>
+              <button id="adminRefresh" class="btn subtle">Refresh</button>
+            </div>
             <div class="stats">
               <div><span id="usersTotal">0</span><small>Users</small></div>
               <div><span id="usersActive">0</span><small>Active</small></div>
               <div><span id="usersPending">0</span><small>Pending</small></div>
             </div>
-            <p class="muted tiny">
-              Admin features are read-only in this first web cut, to keep rollout safe.
-            </p>
+            <div class="stats">
+              <div><span id="adminTotalBookings">0</span><small>Bookings</small></div>
+              <div><span id="adminPinnedAnnouncements">0</span><small>Pinned</small></div>
+              <div><span id="adminInfoCards">0</span><small>Info Cards</small></div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="row between section-head">
+              <h3>Users</h3>
+              <input id="adminUserSearch" class="admin-search" type="search" placeholder="Search users" />
+            </div>
+            <div id="adminUsersList" class="admin-list"></div>
+          </article>
+
+          <article class="card">
+            <div class="row between section-head">
+              <h3>Spot Management</h3>
+              <span id="adminSpotsSummary" class="muted tiny"></span>
+            </div>
+            <div id="adminSpotsGrid" class="admin-spot-grid"></div>
+          </article>
+
+          <article class="card">
+            <div class="row between section-head">
+              <h3>Announcements</h3>
+              <button id="adminNewAnnouncement" class="btn primary">New Announcement</button>
+            </div>
+            <div id="adminAnnouncementsList" class="admin-list"></div>
+          </article>
+
+          <article class="card">
+            <div class="row between section-head">
+              <h3>Info Cards</h3>
+              <button id="adminNewInfoCard" class="btn primary">New Info Card</button>
+            </div>
+            <div id="adminInfoList" class="admin-list"></div>
           </article>
         </section>
 
@@ -170,12 +225,154 @@
                 <span>Registration Plate</span>
                 <input id="plateInput" type="text" maxlength="24" />
               </label>
-              <label class="field">
-                <span>Vehicle Description</span>
-                <input id="carInput" type="text" maxlength="120" />
-              </label>
+              <input id="carInput" type="hidden" />
+              <div class="settings-section-block">
+                <p class="settings-section-title">Vehicle</p>
+                <div id="vehiclePreview" class="vehicle-preview"></div>
+                <div class="settings-grid">
+                  <label class="field">
+                    <span>Make</span>
+                    <select id="vehicleMakeSelect"></select>
+                  </label>
+                  <label class="field">
+                    <span>Model</span>
+                    <select id="vehicleModelSelect"></select>
+                  </label>
+                </div>
+                <button id="vehicleIconButton" class="settings-row-button" type="button">
+                  <span>Choose Vehicle Icon</span>
+                  <strong id="vehicleIconLabel">Automatic</strong>
+                </button>
+              </div>
               <button id="saveProfileBtn" class="btn primary" type="submit">Save Profile</button>
               <p id="profileError" class="error" role="alert"></p>
+            </form>
+          </article>
+
+          <article class="card settings-link-card">
+            <a href="./privacy-policy.html" target="_blank" rel="noopener noreferrer">
+              <span>Privacy Policy</span>
+              <strong>Open</strong>
+            </a>
+          </article>
+        </section>
+
+        <section id="bookingSuccessModal" class="modal hidden" aria-hidden="true">
+          <article class="modal-card" role="dialog" aria-modal="true" aria-labelledby="bookingSuccessTitle">
+            <h3 id="bookingSuccessTitle">Booking Confirmed</h3>
+            <p id="bookingSuccessMessage" class="muted"></p>
+            <div class="modal-actions">
+              <button id="bookingSuccessStay" class="btn subtle" type="button">Continue</button>
+              <button id="bookingSuccessCalendar" class="btn subtle" type="button">Add to Calendar</button>
+              <button id="bookingSuccessGo" class="btn primary" type="button">Go to My Bookings</button>
+            </div>
+          </article>
+        </section>
+
+        <section id="bookingEditModal" class="modal hidden" aria-hidden="true">
+          <article class="modal-card" role="dialog" aria-modal="true" aria-labelledby="bookingEditTitle">
+            <h3 id="bookingEditTitle">Edit Booking</h3>
+            <form id="bookingEditForm" class="stack">
+              <label class="field">
+                <span>Spot</span>
+                <select id="bookingEditSpot" required></select>
+              </label>
+              <div class="row">
+                <label class="field grow">
+                  <span>Date</span>
+                  <input id="bookingEditDate" type="date" required />
+                </label>
+                <label class="field grow">
+                  <span>From</span>
+                  <input id="bookingEditFrom" type="time" required />
+                </label>
+                <label class="field grow">
+                  <span>To</span>
+                  <input id="bookingEditTo" type="time" required />
+                </label>
+              </div>
+              <p id="bookingEditError" class="error" role="alert"></p>
+              <div class="modal-actions">
+                <button id="bookingEditCancel" class="btn subtle" type="button">Cancel</button>
+                <button id="bookingEditSave" class="btn primary" type="submit">Save</button>
+              </div>
+            </form>
+          </article>
+        </section>
+
+        <section id="spotDetailsModal" class="modal hidden" aria-hidden="true">
+          <article class="modal-card" role="dialog" aria-modal="true" aria-labelledby="spotDetailsTitle">
+            <div class="modal-title-row">
+              <h3 id="spotDetailsTitle">Spot Details</h3>
+              <button id="spotDetailsClose" class="btn subtle small" type="button">Close</button>
+            </div>
+            <p id="spotDetailsMeta" class="muted"></p>
+            <div id="spotDetailsList" class="stack dense"></div>
+          </article>
+        </section>
+
+        <section id="vehiclePickerModal" class="modal hidden" aria-hidden="true">
+          <article class="modal-card vehicle-picker-card" role="dialog" aria-modal="true" aria-labelledby="vehiclePickerTitle">
+            <div class="modal-title-row">
+              <h3 id="vehiclePickerTitle">Choose Vehicle Icon</h3>
+              <button id="vehiclePickerClose" class="btn subtle small" type="button">Close</button>
+            </div>
+            <p id="vehiclePickerMeta" class="muted"></p>
+            <div id="vehiclePickerList" class="vehicle-picker-list"></div>
+          </article>
+        </section>
+
+        <section id="confirmModal" class="modal hidden" aria-hidden="true">
+          <article class="modal-card confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+            <h3 id="confirmTitle">Confirm Action</h3>
+            <p id="confirmMessage" class="muted"></p>
+            <div class="modal-actions">
+              <button id="confirmCancel" class="btn subtle" type="button">Keep</button>
+              <button id="confirmAccept" class="btn danger" type="button">Confirm</button>
+            </div>
+          </article>
+        </section>
+
+        <section id="adminContentModal" class="modal hidden" aria-hidden="true">
+          <article class="modal-card" role="dialog" aria-modal="true" aria-labelledby="adminContentTitle">
+            <h3 id="adminContentTitle">Edit Content</h3>
+            <form id="adminContentForm" class="stack">
+              <label class="field">
+                <span>Icon / Emoji</span>
+                <input id="adminContentIcon" type="text" maxlength="32" />
+              </label>
+              <label class="field">
+                <span>Title</span>
+                <input id="adminContentTitleInput" type="text" maxlength="120" required />
+              </label>
+              <label class="field">
+                <span>Body</span>
+                <textarea id="adminContentBody" maxlength="1200" rows="5" required></textarea>
+              </label>
+              <label id="adminContentImageField" class="field">
+                <span>Image URL (optional)</span>
+                <input id="adminContentImageURL" type="url" maxlength="600" />
+              </label>
+              <div id="adminAnnouncementOptions" class="admin-option-grid">
+                <label class="field inline">
+                  <input id="adminContentActive" type="checkbox" />
+                  <span>Active</span>
+                </label>
+                <label class="field inline">
+                  <input id="adminContentPinned" type="checkbox" />
+                  <span>Pinned</span>
+                </label>
+              </div>
+              <label id="adminInfoLinkField" class="field">
+                <span>Link URL (optional)</span>
+                <input id="adminContentLinkURL" type="url" maxlength="600" />
+              </label>
+              <p id="adminContentError" class="error" role="alert"></p>
+              <div class="modal-actions">
+                <button id="adminContentDelete" class="btn danger" type="button">Delete</button>
+                <button id="adminContentCancel" class="btn subtle" type="button">Cancel</button>
+                <button id="adminContentSave" class="btn primary" type="submit">Save</button>
+              </div>
             </form>
           </article>
         </section>
@@ -188,7 +385,10 @@
           <p class="title"></p>
           <p class="meta"></p>
         </div>
-        <button class="btn danger">Cancel</button>
+        <div class="booking-row-actions">
+          <button class="btn subtle calendar-btn" type="button">Calendar</button>
+          <button class="btn danger cancel-btn" type="button">Cancel</button>
+        </div>
       </article>
     </template>
 

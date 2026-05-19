@@ -1196,6 +1196,35 @@ function renderAnnouncements() {
   }
 }
 
+const SF_SYMBOL_EMOJI = {
+  "info.circle.fill": "ℹ️",
+  "info.circle": "ℹ️",
+  "star.fill": "⭐",
+  "star": "⭐",
+  "bell.fill": "🔔",
+  "bell": "🔔",
+  "car.fill": "🚗",
+  "car": "🚗",
+  "calendar": "📅",
+  "map.fill": "🗺️",
+  "map": "🗺️",
+  "house.fill": "🏠",
+  "house": "🏠",
+  "person.fill": "👤",
+  "checkmark.circle.fill": "✅",
+  "exclamationmark.triangle.fill": "⚠️",
+  "exclamationmark.circle.fill": "⚠️",
+  "bolt.fill": "⚡",
+  "clock.fill": "🕐",
+  "clock": "🕐",
+};
+
+function resolveIcon(icon) {
+  if (!icon) return "ℹ️";
+  if (/^[a-z0-9.]+$/.test(icon)) return SF_SYMBOL_EMOJI[icon] ?? "ℹ️";
+  return icon;
+}
+
 function renderInfoCards() {
   if (!ui.infoList) return;
   ui.infoList.textContent = "";
@@ -1216,7 +1245,7 @@ function renderInfoCards() {
     const body = document.createElement("div");
     body.className = "announcement-body";
     const h = document.createElement("h4");
-    h.textContent = `${item.icon || "ℹ️"} ${item.title}`;
+    h.textContent = `${resolveIcon(item.icon)} ${item.title}`;
     const p = document.createElement("p");
     p.textContent = item.body || "";
     body.append(h, p);
@@ -2644,6 +2673,7 @@ function parseInfoItem(id, data) {
     icon: String(data.icon ?? "info.circle.fill"),
     title: String(data.title ?? ""),
     body: String(data.body ?? ""),
+    imageURL: String(data.imageURL ?? ""),
     details: String(data.details ?? ""),
     linkTitle: String(data.linkTitle ?? ""),
     linkURL: String(data.linkURL ?? ""),

@@ -125,9 +125,13 @@ const VEHICLE_PRESETS = [
   { id: "skoda_karoq_style", make: "Škoda", models: ["Karoq", "Karoq Style"], title: "Škoda Karoq Style", asset: "vehicle_mini_skoda_karoq_style" },
   { id: "vw_tiguan", make: "Volkswagen", models: ["Tiguan", "Tiguan 2.0 TSI Elegance"], title: "Volkswagen Tiguan", asset: "vehicle_mini_vw_tiguan" },
   { id: "vw_golf_variant", make: "Volkswagen", models: ["Golf", "Golf Variant"], title: "Volkswagen Golf Variant", asset: "vehicle_mini_vw_golf_variant" },
+  { id: "vw_caddy_maxi", make: "Volkswagen", models: ["Caddy", "Caddy Maxi"], title: "Volkswagen Caddy Maxi", asset: "vehicle_mini_van_white" },
+  { id: "mercedes_eqa_250", make: "Mercedes-Benz", models: ["EQA", "EQA 250", "EQA 250 Premium Plus"], title: "Mercedes EQA 250", asset: "vehicle_mini_electric_crossover_silver" },
+  { id: "mercedes_gla", make: "Mercedes-Benz", models: ["GLA", "GLA 200"], title: "Mercedes GLA 200", asset: "vehicle_mini_compact_suv_white" },
   { id: "mercedes_c220d_4matic", make: "Mercedes-Benz", models: ["C-Class", "C 220 d 4MATIC"], title: "Mercedes C 220 d 4MATIC", asset: "vehicle_mini_mercedes_c220d_4matic" },
   { id: "bmw_i4", make: "BMW", models: ["i4"], title: "BMW i4", asset: "vehicle_mini_bmw_i4" },
   { id: "bmw_3_black", make: "BMW", models: ["3 Series"], title: "BMW 3 Series · Black", asset: "vehicle_mini_bmw_3_black" },
+  { id: "audi_q4", make: "Audi", models: ["Q4", "Q4 Sportback", "Q4 e-tron", "Q4 Sportback 40 e-tron"], title: "Audi Q4 Sportback", asset: "vehicle_mini_electric_crossover_silver" },
   { id: "audi_a4_avant_b9", make: "Audi", models: ["A4", "A4 Avant B9", "A4 Avant 35 TDI S-Line"], title: "Audi A4 Avant", asset: "vehicle_mini_audi_a4_avant_b9" },
   { id: "alfa_romeo_stelvio", make: "Alfa Romeo", models: ["Stelvio"], title: "Alfa Romeo Stelvio", asset: "vehicle_mini_alfa_romeo_stelvio" },
   { id: "mini_countryman_black", make: "MINI", models: ["Countryman"], title: "MINI Countryman · Black", asset: "vehicle_mini_mini_countryman_black" },
@@ -2316,7 +2320,11 @@ function automaticVehicleAsset(description) {
   if (text.includes("bmw") && text.includes("i4")) return "vehicle_mini_bmw_i4";
   if (text.includes("bmw")) return "vehicle_mini_bmw_3_black";
   if (text.includes("audi")) return "vehicle_mini_audi_a4_avant_b9";
+  if (text.includes("mercedes") && text.includes("eqa")) return "vehicle_mini_electric_crossover_silver";
+  if (text.includes("mercedes") && text.includes("gla")) return "vehicle_mini_compact_suv_white";
   if (text.includes("mercedes")) return "vehicle_mini_mercedes_c220d_4matic";
+  if (text.includes("audi") && text.includes("q4")) return "vehicle_mini_electric_crossover_silver";
+  if (text.includes("caddy")) return "vehicle_mini_van_white";
   if (text.includes("mini")) return "vehicle_mini_mini_countryman_black";
   if (text.includes("subaru")) return "vehicle_mini_subaru_outback_brown";
   if (text.includes("hyundai") && text.includes("bayon")) return "vehicle_mini_hyundai_bayon_navy";

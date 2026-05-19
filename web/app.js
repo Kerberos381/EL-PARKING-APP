@@ -158,6 +158,9 @@ const state = {
   selectedVehiclePresetID: "",
   confirmResolver: null,
   editingContent: null,
+  bookingsFilter: "upcoming",
+  profileDirty: false,
+  bulkSelectedIds: new Set(),
   listeners: {
     allBookings: null,
     spots: null,
@@ -188,6 +191,9 @@ const ui = {
   refreshHome: byId("refreshHome"),
   infoList: byId("infoList"),
   infoCardsSection: byId("infoCardsSection"),
+  toastContainer: byId("toastContainer"),
+  bookingsFilter: byId("bookingsFilter"),
+  bookingSuccessSummary: byId("bookingSuccessSummary"),
   dayPills: byId("dayPills"),
   freeCount: byId("freeCount"),
   bookedCount: byId("bookedCount"),
@@ -368,6 +374,35 @@ async function boot() {
   }
 }
 
+function showToast(message, type = "info") {
+  if (!ui.toastContainer) return;
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  ui.toastContainer.append(toast);
+  requestAnimationFrame(() => toast.classList.add("toast-visible"));
+  setTimeout(() => {
+    toast.classList.remove("toast-visible");
+    toast.addEventListener("transitionend", () => toast.remove(), { once: true });
+  }, 3500);
+}
+
+function setupPullToRefresh() {
+  const homeTab = document.getElementById("homeTab");
+  if (!homeTab) return;
+  let startY = 0;
+  let pulling = false;
+  homeTab.addEventListener("touchstart", (e) => {
+    if (homeTab.scrollTop === 0) { startY = e.touches[0].clientY; pulling = true; }
+  }, { passive: true });
+  homeTab.addEventListener("touchend", (e) => {
+    if (!pulling) return;
+    const dist = e.changedTouches[0].clientY - startY;
+    if (dist > 64) { renderAnnouncements(); renderInfoCards(); showToast("Refreshed."); }
+    pulling = false;
+  }, { passive: true });
+}
+
 function bootstrap() {
   if (ui.bookDate) ui.bookDate.value = state.selectedDate;
   if (ui.rememberMeInput) ui.rememberMeInput.checked = shouldKeepSignedIn();
@@ -382,6 +417,13 @@ function bindEvents() {
   ui.pendingSignOut?.addEventListener("click", () => signOut(auth));
   ui.refreshHome?.addEventListener("click", () => { renderAnnouncements(); renderInfoCards(); });
   ui.refreshBookings?.addEventListener("click", () => renderMyBookings());
+  ui.bookingsFilter?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".bookings-filter-btn");
+    if (!btn) return;
+    state.bookingsFilter = btn.dataset.filter;
+    ui.bookingsFilter.querySelectorAll(".bookings-filter-btn").forEach((b) => b.classList.toggle("active", b === btn));
+    renderMyBookings();
+  });
   ui.adminRefresh?.addEventListener("click", refreshAdminFromServer);
   ui.adminUserSearch?.addEventListener("input", renderAdminUsers);
   ui.adminNewAnnouncement?.addEventListener("click", () => openContentModal("announcement"));
@@ -477,7 +519,21 @@ function bindEvents() {
       closeContentModal();
     }
   });
-  ui.tabs.forEach((tab) => tab.addEventListener("click", () => switchTab(tab.dataset.tab)));
+  ui.tabs.forEach((tab) => tab.addEventListener("click", () => {
+    if (tab.dataset.tab !== "settings" && state.profileDirty) {
+      if (!window.confirm("You have unsaved profile changes. Leave anyway?")) return;
+      state.profileDirty = false;
+    }
+    switchTab(tab.dataset.tab);
+  }));
+
+  const profileFields = ["nameInput", "vocativeInput", "plateInput", "vehicleModelSelect"];
+  profileFields.forEach((id) => {
+    ui[id]?.addEventListener("input", () => { state.profileDirty = true; });
+    ui[id]?.addEventListener("change", () => { state.profileDirty = true; });
+  });
+
+  setupPullToRefresh();
 }
 
 async function handleAuthState(user) {
@@ -753,9 +809,9 @@ function renderAdminUsers() {
       if (!window.confirm(`Send password reset email to ${user.email}?`)) return;
       try {
         await sendPasswordResetEmail(auth, user.email);
-        alert("Password reset email sent.");
+        showToast("Password reset email sent.");
       } catch (error) {
-        alert(error?.message || "Password reset failed.");
+        showToast(error?.message || "Password reset failed.", "error");
       }
     });
 
@@ -894,7 +950,7 @@ async function updateUserAdminFields(user, patch) {
       updatedAt: serverTimestamp(),
     });
   } catch (error) {
-    alert(error?.message || "User update failed.");
+    showToast(error?.message || "User update failed.", "error");
   }
 }
 
@@ -913,7 +969,7 @@ async function updateSpotAdminFields(spot, patch) {
       { merge: true }
     );
   } catch (error) {
-    alert(error?.message || "Spot update failed.");
+    showToast(error?.message || "Spot update failed.", "error");
   }
 }
 
@@ -1094,7 +1150,7 @@ async function refreshAdminFromServer() {
     renderParking();
     renderAnnouncements();
   } catch (error) {
-    alert(error?.message || "Admin refresh failed.");
+    showToast(error?.message || "Admin refresh failed.", "error");
   }
 }
 
@@ -1247,6 +1303,9 @@ function renderDayPills() {
     button.type = "button";
     button.className = "day-pill";
     button.classList.toggle("active", ymd === state.selectedDate);
+    if (occupancy >= 80) button.classList.add("occ-high");
+    else if (occupancy >= 40) button.classList.add("occ-medium");
+    else if (occupancy > 0) button.classList.add("occ-low");
     button.innerHTML = `
       <strong>${ymd === toYmd(new Date()) ? "Today" : weekdayShort(date)}</strong>
       <span>${date.getDate()}</span>
@@ -1400,29 +1459,90 @@ function renderMyBookings() {
   ui.myBookingsList.textContent = "";
   const adminLike = isAdminLike();
   const source = adminLike ? state.allBookings : state.myBookings;
-  const upcoming = source
-    .slice()
-    .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime())
-    .filter((b) => bookingEndDate(b.bookingDate, b.toTime) >= new Date());
+  const now = new Date();
+  const isPast = state.bookingsFilter === "past";
 
-  if (!upcoming.length) {
-    ui.myBookingsList.append(textRow("No upcoming bookings."));
+  const bookings = source
+    .slice()
+    .sort((a, b) => {
+      const diff = a.bookingDate.getTime() - b.bookingDate.getTime();
+      return isPast ? -diff : diff;
+    })
+    .filter((b) => isPast
+      ? bookingEndDate(b.bookingDate, b.toTime) < now
+      : bookingEndDate(b.bookingDate, b.toTime) >= now
+    );
+
+  if (!bookings.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.innerHTML = isPast
+      ? `<span class="empty-state-icon">🗓️</span><p>No past bookings yet.</p>`
+      : `<span class="empty-state-icon">🅿️</span><p>No upcoming bookings.</p><p class="muted">Go to the Parking tab to book a spot.</p>`;
+    ui.myBookingsList.append(empty);
     renderHomeHero();
     return;
   }
 
-  for (const booking of upcoming) {
+  if (adminLike && !isPast) {
+    const bulkBar = document.createElement("div");
+    bulkBar.className = "bulk-bar";
+    const selectAll = document.createElement("input");
+    selectAll.type = "checkbox";
+    selectAll.id = "bulkSelectAll";
+    selectAll.className = "bulk-checkbox";
+    const selectLabel = document.createElement("label");
+    selectLabel.htmlFor = "bulkSelectAll";
+    selectLabel.textContent = "Select all";
+    const bulkCancel = document.createElement("button");
+    bulkCancel.type = "button";
+    bulkCancel.className = "btn danger small bulk-cancel-btn hidden";
+    bulkCancel.textContent = "Cancel selected";
+    bulkCancel.addEventListener("click", async () => {
+      if (!state.bulkSelectedIds.size) return;
+      const count = state.bulkSelectedIds.size;
+      if (!window.confirm(`Cancel ${count} booking${count > 1 ? "s" : ""}?`)) return;
+      const toCancel = bookings.filter((b) => state.bulkSelectedIds.has(b.id));
+      for (const b of toCancel) await cancelBooking(b, false);
+      state.bulkSelectedIds.clear();
+      renderMyBookings();
+    });
+    selectAll.addEventListener("change", () => {
+      bookings.forEach((b) => {
+        if (selectAll.checked) state.bulkSelectedIds.add(b.id);
+        else state.bulkSelectedIds.delete(b.id);
+      });
+      bulkCancel.classList.toggle("hidden", state.bulkSelectedIds.size === 0);
+      ui.myBookingsList.querySelectorAll(".booking-checkbox").forEach((cb) => { cb.checked = selectAll.checked; });
+    });
+    bulkBar.append(selectAll, selectLabel, bulkCancel);
+    ui.myBookingsList.append(bulkBar);
+  }
+
+  for (const booking of bookings) {
     if (adminLike) {
       const row = document.createElement("article");
       row.className = "admin-booking-row";
+
+      if (!isPast) {
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.className = "booking-checkbox bulk-checkbox";
+        cb.checked = state.bulkSelectedIds.has(booking.id);
+        cb.addEventListener("change", () => {
+          if (cb.checked) state.bulkSelectedIds.add(booking.id);
+          else state.bulkSelectedIds.delete(booking.id);
+          const bulkCancel = ui.myBookingsList.querySelector(".bulk-cancel-btn");
+          if (bulkCancel) bulkCancel.classList.toggle("hidden", state.bulkSelectedIds.size === 0);
+        });
+        row.append(cb);
+      }
 
       const main = document.createElement("div");
       main.className = "admin-booking-main";
       const title = document.createElement("p");
       title.className = "admin-booking-title";
-      title.textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(booking.bookingDate)} · ${bookingDisplayName(
-        booking
-      )}`;
+      title.textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(booking.bookingDate)} · ${bookingDisplayName(booking)}`;
       const meta = document.createElement("p");
       meta.className = "admin-booking-meta";
       meta.textContent = `${booking.fromTime} - ${booking.toTime}${booking.email ? ` · ${booking.email}` : ""}`;
@@ -1435,17 +1555,20 @@ function renderMyBookings() {
       calendar.className = "btn subtle small";
       calendar.textContent = "Calendar";
       calendar.addEventListener("click", () => downloadCalendarForBooking(booking));
-      const edit = document.createElement("button");
-      edit.type = "button";
-      edit.className = "btn subtle small";
-      edit.textContent = "Edit";
-      edit.addEventListener("click", () => openBookingEditModal(booking));
-      const cancel = document.createElement("button");
-      cancel.type = "button";
-      cancel.className = "btn danger small";
-      cancel.textContent = "Cancel";
-      cancel.addEventListener("click", () => cancelBooking(booking));
-      actions.append(calendar, edit, cancel);
+      actions.append(calendar);
+      if (!isPast) {
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.className = "btn subtle small";
+        edit.textContent = "Edit";
+        edit.addEventListener("click", () => openBookingEditModal(booking));
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "btn danger small";
+        cancel.textContent = "Cancel";
+        cancel.addEventListener("click", () => cancelBooking(booking));
+        actions.append(edit, cancel);
+      }
 
       row.append(main, actions);
       ui.myBookingsList.append(row);
@@ -1456,9 +1579,22 @@ function renderMyBookings() {
     node.querySelector(".title").textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(booking.bookingDate)}`;
     node.querySelector(".meta").textContent = `${booking.fromTime} - ${booking.toTime}`;
     const calendarButton = node.querySelector(".calendar-btn");
-    const cancel = node.querySelector(".cancel-btn");
+    const cancelBtn = node.querySelector(".cancel-btn");
     calendarButton?.addEventListener("click", () => downloadCalendarForBooking(booking));
-    cancel?.addEventListener("click", () => cancelBooking(booking));
+    if (isPast) {
+      if (cancelBtn) cancelBtn.remove();
+      const rebook = document.createElement("button");
+      rebook.type = "button";
+      rebook.className = "btn subtle rebook-btn";
+      rebook.textContent = "Book again";
+      rebook.addEventListener("click", () => {
+        switchTab("parking");
+        setSelectedSpot(booking.spot);
+      });
+      node.querySelector(".booking-row-actions")?.append(rebook);
+    } else {
+      cancelBtn?.addEventListener("click", () => cancelBooking(booking));
+    }
     ui.myBookingsList.append(node);
   }
 
@@ -1918,15 +2054,17 @@ async function updateBookingTransaction(existingBooking, next) {
   });
 }
 
-async function cancelBooking(booking) {
+async function cancelBooking(booking, confirmFirst = true) {
   if (!state.user || !state.profile) return;
-  const ok = await showConfirm({
-    title: "Cancel Booking",
-    message: `Cancel spot ${extractSpotNumber(booking.spot)} on ${formatLongDate(booking.bookingDate)}?`,
-    acceptLabel: "Cancel Booking",
-    cancelLabel: "Keep Booking",
-  });
-  if (!ok) return;
+  if (confirmFirst) {
+    const ok = await showConfirm({
+      title: "Cancel Booking",
+      message: `Cancel spot ${extractSpotNumber(booking.spot)} on ${formatLongDate(booking.bookingDate)}?`,
+      acceptLabel: "Cancel Booking",
+      cancelLabel: "Keep Booking",
+    });
+    if (!ok) return;
+  }
 
   try {
     const myEmail = String(state.user.email || "").trim().toLowerCase();
@@ -1945,9 +2083,9 @@ async function cancelBooking(booking) {
       transaction.set(lockRef, { slots: updated }, { merge: true });
       transaction.delete(bookingRef);
     });
-    closeSpotDetailsModal();
+    if (confirmFirst) closeSpotDetailsModal();
   } catch (err) {
-    alert(err?.message || "Cancel failed.");
+    showToast(err?.message || "Cancel failed.", "error");
   }
 }
 
@@ -2022,6 +2160,8 @@ async function onSaveProfile(event) {
       vehicleMiniaturePresetID,
     };
     renderGreeting();
+    state.profileDirty = false;
+    showToast("Profile saved.");
   } catch {
     ui.profileError.textContent = "Save failed.";
   } finally {
@@ -2035,6 +2175,7 @@ function hydrateProfileForm() {
   ui.plateInput.value = state.profile?.registrationPlate || "";
   ui.carInput.value = state.profile?.carDescription || "";
   hydrateVehicleSelection();
+  state.profileDirty = false;
 }
 
 function hydrateVehicleSelection() {
@@ -2405,10 +2546,41 @@ function syncBookUiState() {
 }
 
 function showBookingSuccessModal(spotLabel, bookingDate, fromTime, toTime) {
-  if (!ui.bookingSuccessModal || !ui.bookingSuccessMessage) return;
+  if (!ui.bookingSuccessModal) return;
   const spot = extractSpotNumber(spotLabel);
   const dateText = formatLongDate(bookingDate);
-  ui.bookingSuccessMessage.textContent = `Spot ${spot} booked for ${dateText}, ${fromTime}-${toTime}.`;
+
+  if (ui.bookingSuccessSummary) {
+    ui.bookingSuccessSummary.textContent = "";
+    const spotBox = document.createElement("div");
+    spotBox.className = "success-spot-box";
+    const spotNum = document.createElement("span");
+    spotNum.className = "success-spot-number";
+    spotNum.textContent = spot;
+    const spotLabel2 = document.createElement("span");
+    spotLabel2.className = "success-spot-label";
+    spotLabel2.textContent = "Spot";
+    spotBox.append(spotLabel2, spotNum);
+
+    const info = document.createElement("div");
+    info.className = "success-info";
+    const dateLine = document.createElement("p");
+    dateLine.textContent = dateText;
+    const timeLine = document.createElement("p");
+    timeLine.className = "muted";
+    timeLine.textContent = `${fromTime} – ${toTime}`;
+    info.append(dateLine, timeLine);
+
+    const carImg = vehicleImageElement(state.selectedVehiclePresetID,
+      [state.selectedVehicleMake, state.selectedVehicleModel].filter(Boolean).join(" "));
+    if (carImg) {
+      carImg.className = "success-car-img";
+      ui.bookingSuccessSummary.append(spotBox, info, carImg);
+    } else {
+      ui.bookingSuccessSummary.append(spotBox, info);
+    }
+  }
+
   ui.bookingSuccessModal.classList.remove("hidden");
   ui.bookingSuccessModal.setAttribute("aria-hidden", "false");
 }

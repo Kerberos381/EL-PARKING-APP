@@ -164,6 +164,10 @@
               <h3>My Bookings</h3>
               <button id="refreshBookings" class="btn subtle">Refresh</button>
             </div>
+            <div class="bookings-filter" id="bookingsFilter">
+              <button class="bookings-filter-btn active" data-filter="upcoming" type="button">Upcoming</button>
+              <button class="bookings-filter-btn" data-filter="past" type="button">Past</button>
+            </div>
             <div id="myBookingsList" class="stack"></div>
           </article>
         </section>
@@ -273,7 +277,7 @@
         <section id="bookingSuccessModal" class="modal hidden" aria-hidden="true">
           <article class="modal-card" role="dialog" aria-modal="true" aria-labelledby="bookingSuccessTitle">
             <h3 id="bookingSuccessTitle">Booking Confirmed</h3>
-            <p id="bookingSuccessMessage" class="muted"></p>
+            <div id="bookingSuccessSummary" class="booking-success-summary"></div>
             <div class="modal-actions">
               <button id="bookingSuccessStay" class="btn subtle" type="button">Continue</button>
               <button id="bookingSuccessCalendar" class="btn subtle" type="button">Add to Calendar</button>
@@ -415,6 +419,7 @@
       </article>
     </template>
 
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
     <script type="module" src="./app.js"></script>
   </body>
 </html>

@@ -117,53 +117,20 @@ const MAKER_LOGOS = {
 
 const VEHICLE_PRESETS = [
   { id: "volvo_ex30_yellow", make: "Volvo", models: ["EX30"], title: "Volvo EX30 · Moss Yellow", asset: "vehicle_mini_volvo_ex30_moss_yellow_yellow" },
-  { id: "volvo_ex30_gray", make: "Volvo", models: ["EX30"], title: "Volvo EX30 · Gray", asset: "vehicle_mini_volvo_ex30_moss_yellow_gray" },
-  { id: "tesla_model3_white", make: "Tesla", models: ["Model 3"], title: "Tesla Model 3 · White", asset: "vehicle_mini_tesla_model3_white" },
-  { id: "tesla_model3_red", make: "Tesla", models: ["Model 3"], title: "Tesla Model 3 · Red", asset: "vehicle_mini_tesla_model3_red" },
-  { id: "tesla_model3_black", make: "Tesla", models: ["Model 3"], title: "Tesla Model 3 · Black", asset: "vehicle_mini_tesla_model3_black" },
-  { id: "tesla_model3_blue", make: "Tesla", models: ["Model 3"], title: "Tesla Model 3 · Blue", asset: "vehicle_mini_tesla_model3_blue" },
-  { id: "tesla_model_y", make: "Tesla", models: ["Model Y"], title: "Tesla Model Y", asset: "vehicle_mini_tesla_model_y" },
-  { id: "tesla_model_y_white", make: "Tesla", models: ["Model Y"], title: "Tesla Model Y · White", asset: "vehicle_mini_tesla_model_y_white" },
-  { id: "tesla_model_y_black", make: "Tesla", models: ["Model Y"], title: "Tesla Model Y · Black", asset: "vehicle_mini_tesla_model_y_black" },
-  { id: "tesla_model_y_gray", make: "Tesla", models: ["Model Y"], title: "Tesla Model Y · Gray", asset: "vehicle_mini_tesla_model_y_gray" },
-  { id: "octavia_rs", make: "Škoda", models: ["Octavia RS"], title: "Škoda Octavia RS", asset: "vehicle_mini_skoda_octavia_rs" },
-  { id: "octavia_rs_dragon", make: "Škoda", models: ["Octavia RS"], title: "Škoda Octavia RS · Dragon Green", asset: "vehicle_mini_skoda_octavia_rs_dragon_green" },
-  { id: "octavia_rs_white", make: "Škoda", models: ["Octavia RS"], title: "Škoda Octavia RS · White", asset: "vehicle_mini_skoda_octavia_rs_white" },
-  { id: "octavia_rs_gray", make: "Škoda", models: ["Octavia RS"], title: "Škoda Octavia RS · Gray", asset: "vehicle_mini_skoda_octavia_rs_gray" },
   { id: "octavia_combi_style", make: "Škoda", models: ["Octavia", "Octavia Combi Style"], title: "Škoda Octavia Combi Style", asset: "vehicle_mini_skoda_octavia_combi_style" },
-  { id: "octavia_combi_mamba", make: "Škoda", models: ["Octavia", "Octavia Combi Style"], title: "Škoda Octavia Combi RS · Mamba Green", asset: "vehicle_mini_octavia_combi_green" },
-  { id: "octavia_combi_white", make: "Škoda", models: ["Octavia", "Octavia Combi Style"], title: "Škoda Octavia Combi · White", asset: "vehicle_mini_octavia_combi_white" },
-  { id: "octavia_combi_gray", make: "Škoda", models: ["Octavia", "Octavia Combi Style"], title: "Škoda Octavia Combi · Gray", asset: "vehicle_mini_octavia_combi_gray" },
   { id: "skoda_superb_white", make: "Škoda", models: ["Superb"], title: "Škoda Superb · White", asset: "vehicle_mini_superb_white" },
-  { id: "skoda_superb_gray", make: "Škoda", models: ["Superb"], title: "Škoda Superb · Gray", asset: "vehicle_mini_superb_gray" },
-  { id: "skoda_superb_green", make: "Škoda", models: ["Superb"], title: "Škoda Superb · Green", asset: "vehicle_mini_superb_green" },
   { id: "skoda_superb_combi_lk", make: "Škoda", models: ["Superb Combi L&K"], title: "Škoda Superb Combi L&K", asset: "vehicle_mini_skoda_superb_combi_lk" },
   { id: "skoda_kodiaq", make: "Škoda", models: ["Kodiaq"], title: "Škoda Kodiaq", asset: "vehicle_mini_skoda_kodiaq" },
-  { id: "skoda_kodiaq_white", make: "Škoda", models: ["Kodiaq"], title: "Škoda Kodiaq · White", asset: "vehicle_mini_skoda_kodiaq_white" },
   { id: "skoda_kodiaq_gray", make: "Škoda", models: ["Kodiaq"], title: "Škoda Kodiaq · Gray", asset: "vehicle_mini_skoda_kodiaq_gray" },
-  { id: "skoda_kodiaq_black", make: "Škoda", models: ["Kodiaq"], title: "Škoda Kodiaq · Black", asset: "vehicle_mini_skoda_kodiaq_black" },
   { id: "skoda_karoq_style", make: "Škoda", models: ["Karoq", "Karoq Style"], title: "Škoda Karoq Style", asset: "vehicle_mini_skoda_karoq_style" },
   { id: "vw_tiguan", make: "Volkswagen", models: ["Tiguan", "Tiguan 2.0 TSI Elegance"], title: "Volkswagen Tiguan", asset: "vehicle_mini_vw_tiguan" },
   { id: "vw_golf_variant", make: "Volkswagen", models: ["Golf", "Golf Variant"], title: "Volkswagen Golf Variant", asset: "vehicle_mini_vw_golf_variant" },
-  { id: "mercedes_eqa_250", make: "Mercedes-Benz", models: ["EQA", "EQA 250"], title: "Mercedes EQA 250", asset: "vehicle_mini_mercedes_eqa_250" },
   { id: "mercedes_c220d_4matic", make: "Mercedes-Benz", models: ["C-Class", "C 220 d 4MATIC"], title: "Mercedes C 220 d 4MATIC", asset: "vehicle_mini_mercedes_c220d_4matic" },
   { id: "bmw_i4", make: "BMW", models: ["i4"], title: "BMW i4", asset: "vehicle_mini_bmw_i4" },
-  { id: "bmw_3", make: "BMW", models: ["3 Series"], title: "BMW 3 Series", asset: "vehicle_mini_bmw_3" },
-  { id: "bmw_3_white", make: "BMW", models: ["3 Series"], title: "BMW 3 Series · White", asset: "vehicle_mini_bmw_3_white" },
   { id: "bmw_3_black", make: "BMW", models: ["3 Series"], title: "BMW 3 Series · Black", asset: "vehicle_mini_bmw_3_black" },
-  { id: "audi_q4", make: "Audi", models: ["Q4", "Q4 e-tron"], title: "Audi Q4", asset: "vehicle_mini_audi_q4" },
   { id: "audi_a4_avant_b9", make: "Audi", models: ["A4", "A4 Avant B9", "A4 Avant 35 TDI S-Line"], title: "Audi A4 Avant", asset: "vehicle_mini_audi_a4_avant_b9" },
   { id: "alfa_romeo_stelvio", make: "Alfa Romeo", models: ["Stelvio"], title: "Alfa Romeo Stelvio", asset: "vehicle_mini_alfa_romeo_stelvio" },
-  { id: "mini_countryman", make: "MINI", models: ["Countryman"], title: "MINI Countryman", asset: "vehicle_mini_mini_countryman" },
-  { id: "mini_countryman_white", make: "MINI", models: ["Countryman"], title: "MINI Countryman · White", asset: "vehicle_mini_mini_countryman_white" },
   { id: "mini_countryman_black", make: "MINI", models: ["Countryman"], title: "MINI Countryman · Black", asset: "vehicle_mini_mini_countryman_black" },
-  { id: "mini_countryman_green_electric", make: "MINI", models: ["Countryman Electric"], title: "MINI Countryman Electric · Green", asset: "vehicle_mini_mini_countryman_green" },
-  { id: "subaru_outback", make: "Subaru", models: ["Outback"], title: "Subaru Outback", asset: "vehicle_mini_subaru_outback" },
-  { id: "subaru_outback_white", make: "Subaru", models: ["Outback"], title: "Subaru Outback · White", asset: "vehicle_mini_subaru_outback_white" },
-  { id: "ford_focus", make: "Ford", models: ["Focus"], title: "Ford Focus", asset: "vehicle_mini_ford_focus" },
-  { id: "ford_focus_white", make: "Ford", models: ["Focus"], title: "Ford Focus · White", asset: "vehicle_mini_ford_focus_white" },
-  { id: "hyundai_bayon", make: "Hyundai", models: ["Bayon"], title: "Hyundai Bayon", asset: "vehicle_mini_hyundai_bayon" },
-  { id: "kia_ev9", make: "Kia", models: ["EV9"], title: "Kia EV9", asset: "vehicle_mini_kia_ev9" },
 ];
 
 const state = {
@@ -2339,26 +2306,20 @@ function vehicleImageElement(presetID, fallbackDescription) {
 function automaticVehicleAsset(description) {
   const text = normalizeSearchText(description);
   if (text.includes("volvo") && text.includes("ex30")) return "vehicle_mini_volvo_ex30_moss_yellow_yellow";
-  if (text.includes("tesla") && text.includes("model 3")) return "vehicle_mini_tesla_model3_white";
-  if (text.includes("tesla") && text.includes("model y")) return "vehicle_mini_tesla_model_y_white";
-  if (text.includes("octavia") && text.includes("rs")) return "vehicle_mini_skoda_octavia_rs";
-  if (text.includes("octavia")) return "vehicle_mini_octavia_combi_white";
+  if (text.includes("tesla") && text.includes("model 3")) return "vehicle_mini_tesla_model3";
+  if (text.includes("octavia")) return "vehicle_mini_skoda_octavia_combi_style";
   if (text.includes("kodiaq")) return "vehicle_mini_skoda_kodiaq";
   if (text.includes("karoq")) return "vehicle_mini_skoda_karoq_style";
   if (text.includes("superb")) return "vehicle_mini_superb_white";
   if (text.includes("tiguan")) return "vehicle_mini_vw_tiguan";
   if (text.includes("golf")) return "vehicle_mini_vw_golf_variant";
   if (text.includes("bmw") && text.includes("i4")) return "vehicle_mini_bmw_i4";
-  if (text.includes("bmw")) return "vehicle_mini_bmw_3";
-  if (text.includes("audi") && text.includes("q4")) return "vehicle_mini_audi_q4";
+  if (text.includes("bmw")) return "vehicle_mini_bmw_3_black";
   if (text.includes("audi")) return "vehicle_mini_audi_a4_avant_b9";
-  if (text.includes("mercedes") && text.includes("eqa")) return "vehicle_mini_mercedes_eqa_250";
   if (text.includes("mercedes")) return "vehicle_mini_mercedes_c220d_4matic";
-  if (text.includes("mini")) return "vehicle_mini_mini_countryman";
-  if (text.includes("subaru")) return "vehicle_mini_subaru_outback";
-  if (text.includes("ford")) return "vehicle_mini_ford_focus";
-  if (text.includes("hyundai") && text.includes("bayon")) return "vehicle_mini_hyundai_bayon";
-  if (text.includes("kia") && text.includes("ev9")) return "vehicle_mini_kia_ev9";
+  if (text.includes("mini")) return "vehicle_mini_mini_countryman_black";
+  if (text.includes("subaru")) return "vehicle_mini_subaru_outback_brown";
+  if (text.includes("hyundai") && text.includes("bayon")) return "vehicle_mini_hyundai_bayon_navy";
   return "vehicle_mini_generic_sedan_white";
 }
 

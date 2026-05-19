@@ -1033,6 +1033,12 @@ h3 {
   font-size: 14px;
 }
 
+.info-card-link {
+  display: inline-block;
+  margin-top: 8px;
+  text-decoration: none;
+}
+
 .modal {
   position: fixed;
   inset: 0;

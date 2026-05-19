@@ -215,6 +215,8 @@ const ui = {
   heroTime: byId("heroTime"),
   announcementsList: byId("announcementsList"),
   refreshHome: byId("refreshHome"),
+  infoList: byId("infoList"),
+  infoCardsSection: byId("infoCardsSection"),
   dayPills: byId("dayPills"),
   freeCount: byId("freeCount"),
   bookedCount: byId("bookedCount"),
@@ -407,7 +409,7 @@ function bindEvents() {
   ui.loginForm?.addEventListener("submit", onLoginSubmit);
   ui.signOutButton?.addEventListener("click", () => signOut(auth));
   ui.pendingSignOut?.addEventListener("click", () => signOut(auth));
-  ui.refreshHome?.addEventListener("click", () => renderAnnouncements());
+  ui.refreshHome?.addEventListener("click", () => { renderAnnouncements(); renderInfoCards(); });
   ui.refreshBookings?.addEventListener("click", () => renderMyBookings());
   ui.adminRefresh?.addEventListener("click", refreshAdminFromServer);
   ui.adminUserSearch?.addEventListener("input", renderAdminUsers);
@@ -688,11 +690,13 @@ function subscribeInfoItems() {
         .map((d) => parseInfoItem(d.id, d.data()))
         .filter(Boolean)
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+      renderInfoCards();
       renderAdminInfoItems();
       renderAdminDashboard();
     },
     () => {
       state.infoItems = [];
+      renderInfoCards();
       renderAdminInfoItems();
       renderAdminDashboard();
     }
@@ -1189,6 +1193,44 @@ function renderAnnouncements() {
     wrap.append(body);
 
     ui.announcementsList.append(wrap);
+  }
+}
+
+function renderInfoCards() {
+  if (!ui.infoList) return;
+  ui.infoList.textContent = "";
+  const items = state.infoItems;
+  if (ui.infoCardsSection) ui.infoCardsSection.classList.toggle("hidden", !items.length);
+  for (const item of items) {
+    const wrap = document.createElement("article");
+    wrap.className = "announcement";
+    if (item.imageURL) {
+      const img = document.createElement("img");
+      img.className = "announcement-media";
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.src = item.imageURL;
+      img.alt = item.title || "Info image";
+      wrap.append(img);
+    }
+    const body = document.createElement("div");
+    body.className = "announcement-body";
+    const h = document.createElement("h4");
+    h.textContent = `${item.icon || "ℹ️"} ${item.title}`;
+    const p = document.createElement("p");
+    p.textContent = item.body || "";
+    body.append(h, p);
+    if (item.linkURL) {
+      const a = document.createElement("a");
+      a.href = item.linkURL;
+      a.textContent = item.linkTitle || "Open";
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.className = "btn subtle small info-card-link";
+      body.append(a);
+    }
+    wrap.append(body);
+    ui.infoList.append(wrap);
   }
 }
 

@@ -59,6 +59,31 @@ body {
   min-width: 0;
 }
 
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+/* Show sun in dark mode, moon in light mode */
+.theme-icon-sun  { display: none; }
+.theme-icon-moon { display: block; }
+.dark-mode .theme-icon-sun  { display: block; }
+.dark-mode .theme-icon-moon { display: none; }
+
 .auth-brand,
 .brand-lockup {
   display: flex;

@@ -1551,6 +1551,10 @@ h3 {
 .day-pill.occ-low  { background: #f0faf2; border-color: #c3e6cb; }
 .day-pill.occ-medium { background: #fffbeb; border-color: #fde68a; }
 .day-pill.occ-high { background: #fef2f2; border-color: #fca5a5; }
+/* Active always wins — keep dark background regardless of occ tint */
+.day-pill.active.occ-low,
+.day-pill.active.occ-medium,
+.day-pill.active.occ-high { background: #121417; border-color: #121417; }
 
 /* ── Toast notifications ── */
 .toast-container {

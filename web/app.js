@@ -2200,7 +2200,7 @@ function makerLogoElement(make) {
   const asset = MAKER_LOGOS[make];
   if (!asset) return null;
   const img = document.createElement("img");
-  img.src = `./assets/makers/${asset}.png`;
+  img.src = `./makers/${asset}.png`;
   img.alt = `${make} logo`;
   img.loading = "lazy";
   img.decoding = "async";
@@ -2212,7 +2212,7 @@ function vehicleImageElement(presetID, fallbackDescription) {
   const asset = preset?.asset || automaticVehicleAsset(fallbackDescription);
   if (!asset) return null;
   const img = document.createElement("img");
-  img.src = `./assets/vehicles/${asset}.png`;
+  img.src = `./vehicles/${asset}.png`;
   img.alt = preset?.title || fallbackDescription || "Vehicle";
   img.loading = "lazy";
   img.decoding = "async";

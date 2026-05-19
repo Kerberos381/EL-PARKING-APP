@@ -1120,6 +1120,16 @@ h3 {
 
 .vehicle-picker-copy small {
   color: var(--subtle);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.vehicle-picker-make-logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .vehicle-picker-check {

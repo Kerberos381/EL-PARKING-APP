@@ -2121,7 +2121,12 @@ function renderVehiclePickerOptions() {
     const title = document.createElement("strong");
     title.textContent = option.title;
     const meta = document.createElement("small");
-    meta.textContent = option.make;
+    const logo = makerLogoElement(option.make);
+    if (logo) {
+      logo.className = "vehicle-picker-make-logo";
+      meta.append(logo);
+    }
+    meta.append(option.make);
     copy.append(title, meta);
     const check = document.createElement("span");
     check.className = "vehicle-picker-check";

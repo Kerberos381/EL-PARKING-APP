@@ -299,7 +299,7 @@ const ui = {
   adminTodayBar: byId("adminTodayBar"),
   adminTodayBooked: byId("adminTodayBooked"),
   adminTodayFree: byId("adminTodayFree"),
-  themeToggle: byId("themeToggle"),
+  themeToggleBtn: byId("themeToggleBtn"),
   tabs: [...document.querySelectorAll(".tab")],
   tabPanels: {
     home: byId("homeTab"),
@@ -427,10 +427,6 @@ function applyTheme(pref) {
 }
 
 function initThemeToggle() {
-  const stored = localStorage.getItem("el-parking-theme") || "auto";
-  ui.themeToggle?.querySelectorAll(".theme-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.theme === stored);
-  });
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     if (!localStorage.getItem("el-parking-theme")) applyTheme("auto");
   });
@@ -546,19 +542,11 @@ function bindEvents() {
   });
   ui.spotSearch?.addEventListener("input", () => renderParking());
 
-  ui.themeToggle?.addEventListener("click", (e) => {
-    const btn = e.target.closest(".theme-btn");
-    if (!btn) return;
-    const pref = btn.dataset.theme;
-    if (pref === "auto") {
-      localStorage.removeItem("el-parking-theme");
-    } else {
-      localStorage.setItem("el-parking-theme", pref);
-    }
-    applyTheme(pref);
-    ui.themeToggle.querySelectorAll(".theme-btn").forEach((b) => {
-      b.classList.toggle("active", b === btn);
-    });
+  ui.themeToggleBtn?.addEventListener("click", () => {
+    const isDark = document.documentElement.classList.contains("dark-mode");
+    const next = isDark ? "light" : "dark";
+    localStorage.setItem("el-parking-theme", next);
+    applyTheme(next);
   });
 
   ui.tabs.forEach((tab) => tab.addEventListener("click", () => {

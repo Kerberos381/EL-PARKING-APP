@@ -65,7 +65,13 @@
               <h1 id="greetingText">Hello</h1>
             </div>
           </div>
-          <button id="signOutButton" class="btn subtle">Sign Out</button>
+          <div class="topbar-right">
+            <button id="themeToggleBtn" class="btn subtle icon-btn" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">
+              <span class="theme-icon-sun">☀️</span>
+              <span class="theme-icon-moon">🌙</span>
+            </button>
+            <button id="signOutButton" class="btn subtle">Sign Out</button>
+          </div>
         </header>
 
         <nav class="tabbar" aria-label="Main navigation">
@@ -274,17 +280,6 @@
               <button id="saveProfileBtn" class="btn primary" type="submit">Save Profile</button>
               <p id="profileError" class="error" role="alert"></p>
             </form>
-          </article>
-
-          <article class="card">
-            <div class="row between section-head">
-              <h3>Appearance</h3>
-            </div>
-            <div class="theme-toggle" id="themeToggle">
-              <button class="theme-btn" data-theme="auto"  type="button">Auto</button>
-              <button class="theme-btn" data-theme="light" type="button">Light</button>
-              <button class="theme-btn" data-theme="dark"  type="button">Dark</button>
-            </div>
           </article>
 
           <article class="card settings-link-card">

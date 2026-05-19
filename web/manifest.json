@@ -1,0 +1,16 @@
+{
+  "name": "EL Parking",
+  "short_name": "EL Parking",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#35c759",
+  "icons": [
+    {
+      "src": "./app-icon.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

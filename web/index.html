@@ -70,7 +70,7 @@
         <nav class="tabbar" aria-label="Main navigation">
           <button class="tab active" data-tab="home">Home</button>
           <button class="tab" data-tab="parking">Parking</button>
-          <button class="tab" data-tab="bookings">Bookings</button>
+          <button class="tab" data-tab="bookings">Bookings<span class="tab-badge hidden" id="bookingsBadge"></span></button>
           <button id="adminTab" class="tab hidden" data-tab="admin">Admin</button>
           <button class="tab" data-tab="settings">Settings</button>
         </nav>
@@ -114,6 +114,7 @@
               <div><span id="blockedCount">0</span><small>Blocked</small></div>
             </div>
             <p class="muted tiny spot-grid-hint">Tap a FREE spot tile to select it.</p>
+            <input id="spotSearch" type="search" class="spot-search" placeholder="Search spot…" autocomplete="off" />
             <div id="spotsGrid" class="spot-grid"></div>
             <section id="adminSpotInspector" class="admin-inspector hidden">
               <div class="admin-inspector-header">
@@ -173,6 +174,14 @@
         </section>
 
         <section id="adminTabPanel" class="tabpanel hidden">
+          <div class="admin-today-bar" id="adminTodayBar">
+            <span class="admin-today-label">Today</span>
+            <div class="admin-today-stats">
+              <span><strong id="adminTodayBooked">0</strong> booked</span>
+              <span class="admin-today-sep">·</span>
+              <span><strong id="adminTodayFree">0</strong> free</span>
+            </div>
+          </div>
           <article class="card">
             <div class="row between section-head">
               <h3>Admin Snapshot</h3>
@@ -408,14 +417,17 @@
 
     <template id="bookingRowTemplate">
       <article class="booking-row">
-        <div>
-          <p class="title"></p>
-          <p class="meta"></p>
+        <div class="booking-row-summary">
+          <div>
+            <p class="title"></p>
+            <p class="meta"></p>
+          </div>
+          <div class="booking-row-actions">
+            <button class="btn subtle calendar-btn" type="button">Calendar</button>
+            <button class="btn danger cancel-btn" type="button">Cancel</button>
+          </div>
         </div>
-        <div class="booking-row-actions">
-          <button class="btn subtle calendar-btn" type="button">Calendar</button>
-          <button class="btn danger cancel-btn" type="button">Cancel</button>
-        </div>
+        <div class="booking-row-detail"></div>
       </article>
     </template>
 

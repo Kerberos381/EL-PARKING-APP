@@ -66,23 +66,41 @@ body {
   flex-shrink: 0;
 }
 
-.icon-btn {
-  width: 38px;
-  height: 38px;
+.theme-toggle-btn {
+  width: 36px;
+  height: 36px;
   padding: 0;
+  border: 1px solid var(--line);
   border-radius: 50%;
+  background: var(--surface);
+  color: var(--subtle);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 17px;
+  cursor: pointer;
   flex-shrink: 0;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease, transform 80ms ease;
+  box-shadow: var(--shadow-control);
 }
 
-/* Show sun in dark mode, moon in light mode */
+.theme-toggle-btn:hover {
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.theme-toggle-btn:active { transform: scale(0.93); }
+
+/* Moon in light mode, sun in dark mode */
 .theme-icon-sun  { display: none; }
 .theme-icon-moon { display: block; }
 .dark-mode .theme-icon-sun  { display: block; }
 .dark-mode .theme-icon-moon { display: none; }
+
+.dark-mode .theme-toggle-btn {
+  background: var(--surface);
+  border-color: var(--line);
+  color: #facc15;
+}
 
 .auth-brand,
 .brand-lockup {

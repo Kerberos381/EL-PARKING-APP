@@ -314,7 +314,7 @@ h3 {
   background: var(--surface);
   padding: 10px 12px;
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) 28px;
+  grid-template-columns: 104px minmax(0, 1fr) 28px;
   gap: 12px;
   align-items: center;
   text-align: left;
@@ -328,7 +328,6 @@ h3 {
 }
 
 .make-picker-media {
-  width: 58px;
   height: 58px;
   border-radius: 16px;
   background: #fff;
@@ -340,14 +339,15 @@ h3 {
 }
 
 .make-picker-media img {
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   object-fit: contain;
 }
 
 .make-picker-name {
   font-size: 15px;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .field input,
@@ -1472,13 +1472,15 @@ h3 {
     grid-template-columns: 1fr;
   }
 
-  .vehicle-picker-row {
+  .vehicle-picker-row,
+  .make-picker-row {
     grid-template-columns: 86px minmax(0, 1fr) 24px;
     padding: 10px;
   }
 
   .vehicle-picker-media,
-  .vehicle-picker-auto {
+  .vehicle-picker-auto,
+  .make-picker-media {
     height: 50px;
   }
 

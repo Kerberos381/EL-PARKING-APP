@@ -161,6 +161,8 @@ const state = {
   bookingsFilter: "upcoming",
   profileDirty: false,
   bulkSelectedIds: new Set(),
+  spotsReady: false,
+  bookingsReady: false,
   listeners: {
     allBookings: null,
     spots: null,
@@ -292,6 +294,11 @@ const ui = {
   adminContentDelete: byId("adminContentDelete"),
   adminContentCancel: byId("adminContentCancel"),
   adminContentSave: byId("adminContentSave"),
+  spotSearch: byId("spotSearch"),
+  bookingsBadge: byId("bookingsBadge"),
+  adminTodayBar: byId("adminTodayBar"),
+  adminTodayBooked: byId("adminTodayBooked"),
+  adminTodayFree: byId("adminTodayFree"),
   tabs: [...document.querySelectorAll(".tab")],
   tabPanels: {
     home: byId("homeTab"),
@@ -519,6 +526,8 @@ function bindEvents() {
       closeContentModal();
     }
   });
+  ui.spotSearch?.addEventListener("input", () => renderParking());
+
   ui.tabs.forEach((tab) => tab.addEventListener("click", () => {
     if (tab.dataset.tab !== "settings" && state.profileDirty) {
       if (!window.confirm("You have unsaved profile changes. Leave anyway?")) return;
@@ -553,6 +562,8 @@ async function handleAuthState(user) {
   state.selectedVehicleModel = "";
   state.selectedVehiclePresetID = "";
   state.editingContent = null;
+  state.spotsReady = false;
+  state.bookingsReady = false;
   state.selectedSpotLabel = "";
   state.selectedAdminSpotLabel = "";
   state.editingBooking = null;
@@ -631,6 +642,7 @@ function subscribeSpots() {
       state.spots = snap.docs
         .map((d) => parseSpot(d.id, d.data()))
         .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999) || compareNumberString(a.id, b.id));
+      state.spotsReady = true;
       renderSpotSelect();
       ensureSelectedSpotIsValid();
       recalculateDerivedBookings();
@@ -660,6 +672,7 @@ function subscribeAllBookings() {
         .filter(shouldKeepBookingLocally)
         .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime());
       state.allBookings = loaded;
+      state.bookingsReady = true;
       recalculateDerivedBookings();
       ensureSelectedSpotIsValid();
       renderHomeHero();
@@ -1174,6 +1187,7 @@ function renderHomeHero() {
     ui.heroDate.textContent = "";
     ui.heroSpot.textContent = "--";
     ui.heroTime.textContent = "Book your next place";
+    updateTabBadges();
     return;
   }
 
@@ -1184,6 +1198,27 @@ function renderHomeHero() {
   ui.heroDate.textContent = `${lead} · ${formatShortDate(upcoming.bookingDate)}`;
   ui.heroSpot.textContent = String(extractSpotNumber(upcoming.spot));
   ui.heroTime.textContent = `${upcoming.fromTime} - ${upcoming.toTime}`;
+  updateTabBadges();
+}
+
+function updateTabBadges() {
+  if (!ui.bookingsBadge) return;
+  const now = new Date();
+  const todayKey = toYmd(now);
+  const hasActiveToday = state.myBookings.some(
+    (b) => toYmd(b.bookingDate) === todayKey && bookingEndDate(b.bookingDate, b.toTime) >= now
+  );
+  ui.bookingsBadge.classList.toggle("hidden", !hasActiveToday);
+}
+
+function updateAdminTodayBar() {
+  if (!ui.adminTodayBar || !isAdminLike()) return;
+  const todayKey = toYmd(new Date());
+  const todayBookings = state.allBookings.filter((b) => toYmd(b.bookingDate) === todayKey);
+  const bookedSpots = new Set(todayBookings.map((b) => normalizedSpotKey(b.spot))).size;
+  const usable = state.spots.filter((s) => !s.isBlocked).length;
+  if (ui.adminTodayBooked) ui.adminTodayBooked.textContent = String(bookedSpots);
+  if (ui.adminTodayFree) ui.adminTodayFree.textContent = String(Math.max(usable - bookedSpots, 0));
 }
 
 function renderAnnouncements() {
@@ -1292,6 +1327,14 @@ function renderInfoCards() {
 
 function renderDayPills() {
   ui.dayPills.textContent = "";
+  if (!state.spotsReady) {
+    for (let i = 0; i < 7; i++) {
+      const skel = document.createElement("div");
+      skel.className = "skeleton skeleton-pill";
+      ui.dayPills.append(skel);
+    }
+    return;
+  }
   const start = dayStart(toYmd(new Date()));
   for (let i = 0; i < 7; i += 1) {
     const date = addDays(start, i);
@@ -1366,6 +1409,17 @@ function userForBooking(booking) {
 
 function renderParking() {
   const adminLike = isAdminLike();
+
+  if (!state.spotsReady) {
+    ui.spotsGrid.textContent = "";
+    for (let i = 0; i < 8; i++) {
+      const skel = document.createElement("div");
+      skel.className = "skeleton skeleton-spot";
+      ui.spotsGrid.append(skel);
+    }
+    return;
+  }
+
   const blockedKeys = new Set(state.spots.filter((s) => s.isBlocked).map((s) => normalizedSpotKey(s.label)));
   const bookedKeys = new Set(state.dayBookings.map((b) => normalizedSpotKey(b.spot)));
   const usable = state.spots.filter((s) => !s.isBlocked);
@@ -1383,6 +1437,8 @@ function renderParking() {
     : "Tap a FREE spot tile to select it.";
   const hintNode = document.querySelector(".spot-grid-hint");
   if (hintNode) hintNode.textContent = hintText;
+
+  const searchQuery = (ui.spotSearch?.value || "").trim().toLowerCase();
 
   ui.spotsGrid.textContent = "";
   for (const spot of state.spots) {
@@ -1416,11 +1472,20 @@ function renderParking() {
     }
     cell.append(strong, small);
 
-    if (stateName === "booked" && adminLike && leadBooking) {
+    if (stateName === "booked" && leadBooking) {
       const owner = document.createElement("div");
-      owner.className = "spot-cell-booking-owner";
-      owner.textContent = bookingDisplayName(leadBooking);
-      cell.append(owner);
+      if (adminLike) {
+        owner.className = "spot-cell-booking-owner";
+        owner.textContent = bookingDisplayName(leadBooking);
+      } else {
+        const isOwn = leadBooking.bookedForUid === state.user?.uid ||
+          (leadBooking.email && leadBooking.email === state.profile?.email?.toLowerCase());
+        if (isOwn) {
+          owner.className = "spot-cell-booking-owner yours";
+          owner.textContent = "YOURS";
+        }
+      }
+      if (owner.textContent) cell.append(owner);
     }
 
     if (isSelectedFree) {
@@ -1428,6 +1493,15 @@ function renderParking() {
       check.className = "spot-cell-check";
       check.textContent = "✓";
       cell.append(check);
+    }
+
+    if (searchQuery) {
+      const spotNum = String(extractSpotNumber(spot.label)).toLowerCase();
+      if (!spotNum.includes(searchQuery)) {
+        cell.classList.add("search-hidden");
+      } else {
+        cell.classList.add("search-match");
+      }
     }
 
     if (stateName === "free") {
@@ -1453,6 +1527,7 @@ function renderParking() {
   ui.selectedSpotDisplay.value = state.selectedSpotLabel ? `Spot ${extractSpotNumber(state.selectedSpotLabel)}` : "";
   syncBookUiState();
   renderAdminSpotInspector();
+  updateAdminTodayBar();
 }
 
 function renderMyBookings() {
@@ -1577,7 +1652,7 @@ function renderMyBookings() {
 
     const node = ui.bookingTemplate.content.firstElementChild.cloneNode(true);
     node.querySelector(".title").textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(booking.bookingDate)}`;
-    node.querySelector(".meta").textContent = `${booking.fromTime} - ${booking.toTime}`;
+    node.querySelector(".meta").textContent = `${booking.fromTime} – ${booking.toTime}`;
     const calendarButton = node.querySelector(".calendar-btn");
     const cancelBtn = node.querySelector(".cancel-btn");
     calendarButton?.addEventListener("click", () => downloadCalendarForBooking(booking));
@@ -1595,6 +1670,37 @@ function renderMyBookings() {
     } else {
       cancelBtn?.addEventListener("click", () => cancelBooking(booking));
     }
+
+    // Populate expandable detail section
+    const detail = node.querySelector(".booking-row-detail");
+    if (detail) {
+      const inner = document.createElement("div");
+      inner.className = "booking-row-detail-inner";
+      const spotBadge = document.createElement("div");
+      spotBadge.className = "booking-detail-spot";
+      spotBadge.textContent = extractSpotNumber(booking.spot);
+      const info = document.createElement("div");
+      info.className = "booking-detail-info";
+      const dateEl = document.createElement("strong");
+      dateEl.textContent = formatLongDate(booking.bookingDate);
+      const timeEl = document.createElement("span");
+      timeEl.textContent = `${booking.fromTime} – ${booking.toTime}`;
+      info.append(dateEl, timeEl);
+      if (booking.user) {
+        const personEl = document.createElement("span");
+        personEl.textContent = booking.user;
+        info.append(personEl);
+      }
+      inner.append(spotBadge, info);
+      detail.append(inner);
+    }
+
+    // Tap the summary row (not buttons) to expand detail
+    node.querySelector(".booking-row-summary")?.addEventListener("click", (e) => {
+      if (e.target.closest("button")) return;
+      node.classList.toggle("expanded");
+    });
+
     ui.myBookingsList.append(node);
   }
 

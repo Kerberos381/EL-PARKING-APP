@@ -117,24 +117,53 @@ const MAKER_LOGOS = {
 
 const VEHICLE_PRESETS = [
   { id: "volvo_ex30_yellow", make: "Volvo", models: ["EX30"], title: "Volvo EX30 · Moss Yellow", asset: "vehicle_mini_volvo_ex30_moss_yellow_yellow" },
+  { id: "volvo_ex30_gray", make: "Volvo", models: ["EX30"], title: "Volvo EX30 · Gray", asset: "vehicle_mini_volvo_ex30_moss_yellow_gray" },
+  { id: "tesla_model3_white", make: "Tesla", models: ["Model 3"], title: "Tesla Model 3 · White", asset: "vehicle_mini_tesla_model3_white" },
+  { id: "tesla_model3_red", make: "Tesla", models: ["Model 3"], title: "Tesla Model 3 · Red", asset: "vehicle_mini_tesla_model3_red" },
+  { id: "tesla_model3_black", make: "Tesla", models: ["Model 3"], title: "Tesla Model 3 · Black", asset: "vehicle_mini_tesla_model3_black" },
+  { id: "tesla_model3_blue", make: "Tesla", models: ["Model 3"], title: "Tesla Model 3 · Blue", asset: "vehicle_mini_tesla_model3_blue" },
+  { id: "tesla_model_y", make: "Tesla", models: ["Model Y"], title: "Tesla Model Y", asset: "vehicle_mini_tesla_model_y" },
+  { id: "tesla_model_y_white", make: "Tesla", models: ["Model Y"], title: "Tesla Model Y · White", asset: "vehicle_mini_tesla_model_y_white" },
+  { id: "tesla_model_y_black", make: "Tesla", models: ["Model Y"], title: "Tesla Model Y · Black", asset: "vehicle_mini_tesla_model_y_black" },
+  { id: "tesla_model_y_gray", make: "Tesla", models: ["Model Y"], title: "Tesla Model Y · Gray", asset: "vehicle_mini_tesla_model_y_gray" },
+  { id: "octavia_rs", make: "Škoda", models: ["Octavia RS"], title: "Škoda Octavia RS", asset: "vehicle_mini_skoda_octavia_rs" },
+  { id: "octavia_rs_dragon", make: "Škoda", models: ["Octavia RS"], title: "Škoda Octavia RS · Dragon Green", asset: "vehicle_mini_skoda_octavia_rs_dragon_green" },
+  { id: "octavia_rs_white", make: "Škoda", models: ["Octavia RS"], title: "Škoda Octavia RS · White", asset: "vehicle_mini_skoda_octavia_rs_white" },
+  { id: "octavia_rs_gray", make: "Škoda", models: ["Octavia RS"], title: "Škoda Octavia RS · Gray", asset: "vehicle_mini_skoda_octavia_rs_gray" },
   { id: "octavia_combi_style", make: "Škoda", models: ["Octavia", "Octavia Combi Style"], title: "Škoda Octavia Combi Style", asset: "vehicle_mini_skoda_octavia_combi_style" },
+  { id: "octavia_combi_mamba", make: "Škoda", models: ["Octavia", "Octavia Combi Style"], title: "Škoda Octavia Combi RS · Mamba Green", asset: "vehicle_mini_octavia_combi_green" },
+  { id: "octavia_combi_white", make: "Škoda", models: ["Octavia", "Octavia Combi Style"], title: "Škoda Octavia Combi · White", asset: "vehicle_mini_octavia_combi_white" },
+  { id: "octavia_combi_gray", make: "Škoda", models: ["Octavia", "Octavia Combi Style"], title: "Škoda Octavia Combi · Gray", asset: "vehicle_mini_octavia_combi_gray" },
   { id: "skoda_superb_white", make: "Škoda", models: ["Superb"], title: "Škoda Superb · White", asset: "vehicle_mini_superb_white" },
+  { id: "skoda_superb_gray", make: "Škoda", models: ["Superb"], title: "Škoda Superb · Gray", asset: "vehicle_mini_superb_gray" },
+  { id: "skoda_superb_green", make: "Škoda", models: ["Superb"], title: "Škoda Superb · Green", asset: "vehicle_mini_superb_green" },
   { id: "skoda_superb_combi_lk", make: "Škoda", models: ["Superb Combi L&K"], title: "Škoda Superb Combi L&K", asset: "vehicle_mini_skoda_superb_combi_lk" },
   { id: "skoda_kodiaq", make: "Škoda", models: ["Kodiaq"], title: "Škoda Kodiaq", asset: "vehicle_mini_skoda_kodiaq" },
+  { id: "skoda_kodiaq_white", make: "Škoda", models: ["Kodiaq"], title: "Škoda Kodiaq · White", asset: "vehicle_mini_skoda_kodiaq_white" },
   { id: "skoda_kodiaq_gray", make: "Škoda", models: ["Kodiaq"], title: "Škoda Kodiaq · Gray", asset: "vehicle_mini_skoda_kodiaq_gray" },
+  { id: "skoda_kodiaq_black", make: "Škoda", models: ["Kodiaq"], title: "Škoda Kodiaq · Black", asset: "vehicle_mini_skoda_kodiaq_black" },
   { id: "skoda_karoq_style", make: "Škoda", models: ["Karoq", "Karoq Style"], title: "Škoda Karoq Style", asset: "vehicle_mini_skoda_karoq_style" },
   { id: "vw_tiguan", make: "Volkswagen", models: ["Tiguan", "Tiguan 2.0 TSI Elegance"], title: "Volkswagen Tiguan", asset: "vehicle_mini_vw_tiguan" },
   { id: "vw_golf_variant", make: "Volkswagen", models: ["Golf", "Golf Variant"], title: "Volkswagen Golf Variant", asset: "vehicle_mini_vw_golf_variant" },
-  { id: "vw_caddy_maxi", make: "Volkswagen", models: ["Caddy", "Caddy Maxi"], title: "Volkswagen Caddy Maxi", asset: "vehicle_mini_van_white" },
-  { id: "mercedes_eqa_250", make: "Mercedes-Benz", models: ["EQA", "EQA 250", "EQA 250 Premium Plus"], title: "Mercedes EQA 250", asset: "vehicle_mini_electric_crossover_silver" },
-  { id: "mercedes_gla", make: "Mercedes-Benz", models: ["GLA", "GLA 200"], title: "Mercedes GLA 200", asset: "vehicle_mini_compact_suv_white" },
+  { id: "mercedes_eqa_250", make: "Mercedes-Benz", models: ["EQA", "EQA 250"], title: "Mercedes EQA 250", asset: "vehicle_mini_mercedes_eqa_250" },
   { id: "mercedes_c220d_4matic", make: "Mercedes-Benz", models: ["C-Class", "C 220 d 4MATIC"], title: "Mercedes C 220 d 4MATIC", asset: "vehicle_mini_mercedes_c220d_4matic" },
   { id: "bmw_i4", make: "BMW", models: ["i4"], title: "BMW i4", asset: "vehicle_mini_bmw_i4" },
+  { id: "bmw_3", make: "BMW", models: ["3 Series"], title: "BMW 3 Series", asset: "vehicle_mini_bmw_3" },
+  { id: "bmw_3_white", make: "BMW", models: ["3 Series"], title: "BMW 3 Series · White", asset: "vehicle_mini_bmw_3_white" },
   { id: "bmw_3_black", make: "BMW", models: ["3 Series"], title: "BMW 3 Series · Black", asset: "vehicle_mini_bmw_3_black" },
-  { id: "audi_q4", make: "Audi", models: ["Q4", "Q4 Sportback", "Q4 e-tron", "Q4 Sportback 40 e-tron"], title: "Audi Q4 Sportback", asset: "vehicle_mini_electric_crossover_silver" },
+  { id: "audi_q4", make: "Audi", models: ["Q4", "Q4 e-tron"], title: "Audi Q4", asset: "vehicle_mini_audi_q4" },
   { id: "audi_a4_avant_b9", make: "Audi", models: ["A4", "A4 Avant B9", "A4 Avant 35 TDI S-Line"], title: "Audi A4 Avant", asset: "vehicle_mini_audi_a4_avant_b9" },
   { id: "alfa_romeo_stelvio", make: "Alfa Romeo", models: ["Stelvio"], title: "Alfa Romeo Stelvio", asset: "vehicle_mini_alfa_romeo_stelvio" },
+  { id: "mini_countryman", make: "MINI", models: ["Countryman"], title: "MINI Countryman", asset: "vehicle_mini_mini_countryman" },
+  { id: "mini_countryman_white", make: "MINI", models: ["Countryman"], title: "MINI Countryman · White", asset: "vehicle_mini_mini_countryman_white" },
   { id: "mini_countryman_black", make: "MINI", models: ["Countryman"], title: "MINI Countryman · Black", asset: "vehicle_mini_mini_countryman_black" },
+  { id: "mini_countryman_green_electric", make: "MINI", models: ["Countryman Electric"], title: "MINI Countryman Electric · Green", asset: "vehicle_mini_mini_countryman_green" },
+  { id: "subaru_outback", make: "Subaru", models: ["Outback"], title: "Subaru Outback", asset: "vehicle_mini_subaru_outback" },
+  { id: "subaru_outback_white", make: "Subaru", models: ["Outback"], title: "Subaru Outback · White", asset: "vehicle_mini_subaru_outback_white" },
+  { id: "ford_focus", make: "Ford", models: ["Focus"], title: "Ford Focus", asset: "vehicle_mini_ford_focus" },
+  { id: "ford_focus_white", make: "Ford", models: ["Focus"], title: "Ford Focus · White", asset: "vehicle_mini_ford_focus_white" },
+  { id: "hyundai_bayon", make: "Hyundai", models: ["Bayon"], title: "Hyundai Bayon", asset: "vehicle_mini_hyundai_bayon" },
+  { id: "kia_ev9", make: "Kia", models: ["EV9"], title: "Kia EV9", asset: "vehicle_mini_kia_ev9" },
 ];
 
 const state = {
@@ -158,11 +187,6 @@ const state = {
   selectedVehiclePresetID: "",
   confirmResolver: null,
   editingContent: null,
-  bookingsFilter: "upcoming",
-  profileDirty: false,
-  bulkSelectedIds: new Set(),
-  spotsReady: false,
-  bookingsReady: false,
   listeners: {
     allBookings: null,
     spots: null,
@@ -191,11 +215,6 @@ const ui = {
   heroTime: byId("heroTime"),
   announcementsList: byId("announcementsList"),
   refreshHome: byId("refreshHome"),
-  infoList: byId("infoList"),
-  infoCardsSection: byId("infoCardsSection"),
-  toastContainer: byId("toastContainer"),
-  bookingsFilter: byId("bookingsFilter"),
-  bookingSuccessSummary: byId("bookingSuccessSummary"),
   dayPills: byId("dayPills"),
   freeCount: byId("freeCount"),
   bookedCount: byId("bookedCount"),
@@ -238,12 +257,8 @@ const ui = {
   plateInput: byId("plateInput"),
   carInput: byId("carInput"),
   vehiclePreview: byId("vehiclePreview"),
-  vehicleMakeButton: byId("vehicleMakeButton"),
-  vehicleMakeLabel: byId("vehicleMakeLabel"),
+  vehicleMakeSelect: byId("vehicleMakeSelect"),
   vehicleModelSelect: byId("vehicleModelSelect"),
-  makePickerModal: byId("makePickerModal"),
-  makePickerList: byId("makePickerList"),
-  makePickerClose: byId("makePickerClose"),
   vehicleIconButton: byId("vehicleIconButton"),
   vehicleIconLabel: byId("vehicleIconLabel"),
   profileError: byId("profileError"),
@@ -294,12 +309,6 @@ const ui = {
   adminContentDelete: byId("adminContentDelete"),
   adminContentCancel: byId("adminContentCancel"),
   adminContentSave: byId("adminContentSave"),
-  spotSearch: byId("spotSearch"),
-  bookingsBadge: byId("bookingsBadge"),
-  adminTodayBar: byId("adminTodayBar"),
-  adminTodayBooked: byId("adminTodayBooked"),
-  adminTodayFree: byId("adminTodayFree"),
-  themeToggleBtn: byId("themeToggleBtn"),
   tabs: [...document.querySelectorAll(".tab")],
   tabPanels: {
     home: byId("homeTab"),
@@ -324,6 +333,8 @@ const REQUIRED_FIREBASE_KEYS = [
 ];
 
 const LOGIN_PERSISTENCE_KEY = "el_parking_keep_signed_in";
+const LOGIN_REMEMBER_STARTED_AT_KEY = "el_parking_remember_started_at";
+const REMEMBER_SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 14;
 
 function validateFirebaseConfig(config) {
   if (!config || typeof config !== "object") return "Firebase config is missing.";
@@ -350,6 +361,9 @@ function shouldKeepSignedIn() {
 function saveKeepSignedInPreference(value) {
   try {
     window.localStorage.setItem(LOGIN_PERSISTENCE_KEY, value ? "1" : "0");
+    if (!value) {
+      window.localStorage.removeItem(LOGIN_REMEMBER_STARTED_AT_KEY);
+    }
   } catch {
     // ignore storage failures
   }
@@ -357,6 +371,30 @@ function saveKeepSignedInPreference(value) {
 
 function currentAuthPersistence() {
   return shouldKeepSignedIn() ? browserLocalPersistence : browserSessionPersistence;
+}
+
+function readRememberSessionStartedAt() {
+  try {
+    const raw = Number(window.localStorage.getItem(LOGIN_REMEMBER_STARTED_AT_KEY) || 0);
+    return Number.isFinite(raw) && raw > 0 ? raw : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function markRememberSessionStartedAt() {
+  try {
+    window.localStorage.setItem(LOGIN_REMEMBER_STARTED_AT_KEY, String(Date.now()));
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function isRememberSessionExpired() {
+  if (!shouldKeepSignedIn()) return false;
+  const startedAt = readRememberSessionStartedAt();
+  if (!startedAt) return false;
+  return Date.now() - startedAt > REMEMBER_SESSION_MAX_AGE_MS;
 }
 
 async function boot() {
@@ -382,69 +420,20 @@ async function boot() {
   }
 }
 
-function showToast(message, type = "info") {
-  if (!ui.toastContainer) return;
-  const toast = document.createElement("div");
-  toast.className = `toast toast-${type}`;
-  toast.textContent = message;
-  ui.toastContainer.append(toast);
-  requestAnimationFrame(() => toast.classList.add("toast-visible"));
-  setTimeout(() => {
-    toast.classList.remove("toast-visible");
-    toast.addEventListener("transitionend", () => toast.remove(), { once: true });
-  }, 3500);
-}
-
-function setupPullToRefresh() {
-  const homeTab = document.getElementById("homeTab");
-  if (!homeTab) return;
-  let startY = 0;
-  let pulling = false;
-  homeTab.addEventListener("touchstart", (e) => {
-    if (homeTab.scrollTop === 0) { startY = e.touches[0].clientY; pulling = true; }
-  }, { passive: true });
-  homeTab.addEventListener("touchend", (e) => {
-    if (!pulling) return;
-    const dist = e.changedTouches[0].clientY - startY;
-    if (dist > 64) { renderAnnouncements(); renderInfoCards(); showToast("Refreshed."); }
-    pulling = false;
-  }, { passive: true });
-}
-
 function bootstrap() {
   if (ui.bookDate) ui.bookDate.value = state.selectedDate;
   if (ui.rememberMeInput) ui.rememberMeInput.checked = shouldKeepSignedIn();
-  initThemeToggle();
   bindEvents();
   syncBookUiState();
   onAuthStateChanged(auth, handleAuthState);
-}
-
-function applyTheme(pref) {
-  const isDark = pref === "dark" ||
-    (pref !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  document.documentElement.classList.toggle("dark-mode", isDark);
-}
-
-function initThemeToggle() {
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-    if (!localStorage.getItem("el-parking-theme")) applyTheme("auto");
-  });
 }
 
 function bindEvents() {
   ui.loginForm?.addEventListener("submit", onLoginSubmit);
   ui.signOutButton?.addEventListener("click", () => signOut(auth));
   ui.pendingSignOut?.addEventListener("click", () => signOut(auth));
-  ui.refreshHome?.addEventListener("click", () => { renderAnnouncements(); renderInfoCards(); });
+  ui.refreshHome?.addEventListener("click", () => renderAnnouncements());
   ui.refreshBookings?.addEventListener("click", () => renderMyBookings());
-  ui.bookingsFilter?.addEventListener("click", (e) => {
-    const btn = e.target.closest(".bookings-filter-btn");
-    if (!btn) return;
-    state.bookingsFilter = btn.dataset.filter;
-    ui.bookingsFilter.querySelectorAll(".bookings-filter-btn").forEach((b) => b.classList.toggle("active", b === btn));
-    renderMyBookings();
-  });
   ui.adminRefresh?.addEventListener("click", refreshAdminFromServer);
   ui.adminUserSearch?.addEventListener("input", renderAdminUsers);
   ui.adminNewAnnouncement?.addEventListener("click", () => openContentModal("announcement"));
@@ -457,6 +446,7 @@ function bindEvents() {
   });
   ui.rememberMeInput?.addEventListener("change", async () => {
     saveKeepSignedInPreference(Boolean(ui.rememberMeInput.checked));
+    if (shouldKeepSignedIn()) markRememberSessionStartedAt();
     try {
       await setPersistence(auth, currentAuthPersistence());
     } catch (error) {
@@ -481,7 +471,16 @@ function bindEvents() {
 
   ui.bookForm?.addEventListener("submit", onBookSubmit);
   ui.profileForm?.addEventListener("submit", onSaveProfile);
-  ui.vehicleMakeButton?.addEventListener("click", openMakePicker);
+  ui.vehicleMakeSelect?.addEventListener("change", () => {
+    state.selectedVehicleMake = ui.vehicleMakeSelect.value;
+    populateVehicleModelSelect();
+    state.selectedVehicleModel = ui.vehicleModelSelect.value;
+    if (!presetMatchesVehicle(state.selectedVehiclePresetID, state.selectedVehicleMake, state.selectedVehicleModel)) {
+      state.selectedVehiclePresetID = "";
+    }
+    syncCarDescriptionField();
+    renderVehiclePreview();
+  });
   ui.vehicleModelSelect?.addEventListener("change", () => {
     state.selectedVehicleModel = ui.vehicleModelSelect.value;
     if (!presetMatchesVehicle(state.selectedVehiclePresetID, state.selectedVehicleMake, state.selectedVehicleModel)) {
@@ -516,10 +515,6 @@ function bindEvents() {
   ui.spotDetailsModal?.addEventListener("click", (event) => {
     if (event.target === ui.spotDetailsModal) closeSpotDetailsModal();
   });
-  ui.makePickerClose?.addEventListener("click", closeMakePicker);
-  ui.makePickerModal?.addEventListener("click", (event) => {
-    if (event.target === ui.makePickerModal) closeMakePicker();
-  });
   ui.vehiclePickerClose?.addEventListener("click", closeVehiclePicker);
   ui.vehiclePickerModal?.addEventListener("click", (event) => {
     if (event.target === ui.vehiclePickerModal) closeVehiclePicker();
@@ -534,36 +529,12 @@ function bindEvents() {
       hideBookingSuccessModal();
       closeBookingEditModal();
       closeSpotDetailsModal();
-      closeMakePicker();
       closeVehiclePicker();
       resolveConfirm(false);
       closeContentModal();
     }
   });
-  ui.spotSearch?.addEventListener("input", () => renderParking());
-
-  ui.themeToggleBtn?.addEventListener("click", () => {
-    const isDark = document.documentElement.classList.contains("dark-mode");
-    const next = isDark ? "light" : "dark";
-    localStorage.setItem("el-parking-theme", next);
-    applyTheme(next);
-  });
-
-  ui.tabs.forEach((tab) => tab.addEventListener("click", () => {
-    if (tab.dataset.tab !== "settings" && state.profileDirty) {
-      if (!window.confirm("You have unsaved profile changes. Leave anyway?")) return;
-      state.profileDirty = false;
-    }
-    switchTab(tab.dataset.tab);
-  }));
-
-  const profileFields = ["nameInput", "vocativeInput", "plateInput", "vehicleModelSelect"];
-  profileFields.forEach((id) => {
-    ui[id]?.addEventListener("input", () => { state.profileDirty = true; });
-    ui[id]?.addEventListener("change", () => { state.profileDirty = true; });
-  });
-
-  setupPullToRefresh();
+  ui.tabs.forEach((tab) => tab.addEventListener("click", () => switchTab(tab.dataset.tab)));
 }
 
 async function handleAuthState(user) {
@@ -583,8 +554,6 @@ async function handleAuthState(user) {
   state.selectedVehicleModel = "";
   state.selectedVehiclePresetID = "";
   state.editingContent = null;
-  state.spotsReady = false;
-  state.bookingsReady = false;
   state.selectedSpotLabel = "";
   state.selectedAdminSpotLabel = "";
   state.editingBooking = null;
@@ -594,6 +563,15 @@ async function handleAuthState(user) {
     ui.authError.textContent = "";
     ui.passwordInput.value = "";
     return;
+  }
+
+  if (isRememberSessionExpired()) {
+    await signOut(auth);
+    ui.authError.textContent = "Session expired. Please sign in again.";
+    return;
+  }
+  if (shouldKeepSignedIn() && !readRememberSessionStartedAt()) {
+    markRememberSessionStartedAt();
   }
 
   const profileSnap = await getDoc(doc(db, "users", user.uid));
@@ -640,6 +618,7 @@ async function onLoginSubmit(event) {
     saveKeepSignedInPreference(Boolean(ui.rememberMeInput?.checked));
     await setPersistence(auth, currentAuthPersistence());
     await signInWithEmailAndPassword(auth, email, password);
+    if (shouldKeepSignedIn()) markRememberSessionStartedAt();
   } catch (err) {
     ui.authError.textContent = friendlyAuthError(err);
   } finally {
@@ -663,7 +642,6 @@ function subscribeSpots() {
       state.spots = snap.docs
         .map((d) => parseSpot(d.id, d.data()))
         .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999) || compareNumberString(a.id, b.id));
-      state.spotsReady = true;
       renderSpotSelect();
       ensureSelectedSpotIsValid();
       recalculateDerivedBookings();
@@ -693,7 +671,6 @@ function subscribeAllBookings() {
         .filter(shouldKeepBookingLocally)
         .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime());
       state.allBookings = loaded;
-      state.bookingsReady = true;
       recalculateDerivedBookings();
       ensureSelectedSpotIsValid();
       renderHomeHero();
@@ -751,13 +728,11 @@ function subscribeInfoItems() {
         .map((d) => parseInfoItem(d.id, d.data()))
         .filter(Boolean)
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-      renderInfoCards();
       renderAdminInfoItems();
       renderAdminDashboard();
     },
     () => {
       state.infoItems = [];
-      renderInfoCards();
       renderAdminInfoItems();
       renderAdminDashboard();
     }
@@ -818,9 +793,12 @@ function renderAdminUsers() {
   }
 
   for (const user of users) {
+    const identity = identityForUser(user);
+    const leading = createUserIdentityMedia(identity, "admin-item-avatar");
     const item = adminItem({
       title: `${user.displayName || user.email}${user.uid === state.user?.uid ? " · You" : ""}`,
       meta: `${user.email || "No email"} · ${user.registrationPlate || "No plate"} · ${user.carDescription || "No vehicle"}`,
+      leading,
     });
 
     const role = compactSelect(["user", "privileged", "admin"], user.role || "user");
@@ -843,9 +821,9 @@ function renderAdminUsers() {
       if (!window.confirm(`Send password reset email to ${user.email}?`)) return;
       try {
         await sendPasswordResetEmail(auth, user.email);
-        showToast("Password reset email sent.");
+        alert("Password reset email sent.");
       } catch (error) {
-        showToast(error?.message || "Password reset failed.", "error");
+        alert(error?.message || "Password reset failed.");
       }
     });
 
@@ -937,9 +915,10 @@ function renderAdminInfoItems() {
   }
 }
 
-function adminItem({ title, meta }) {
+function adminItem({ title, meta, leading = null }) {
   const root = document.createElement("article");
   root.className = "admin-item";
+  if (leading) root.append(leading);
   const main = document.createElement("div");
   main.className = "admin-item-main";
   const titleNode = document.createElement("p");
@@ -983,9 +962,45 @@ async function updateUserAdminFields(user, patch) {
       ...patch,
       updatedAt: serverTimestamp(),
     });
+    const updates = [];
+    if (typeof patch.status === "string") updates.push(`status → ${titleCase(patch.status)}`);
+    if (typeof patch.role === "string") updates.push(`role → ${titleCase(patch.role)}`);
+    if (updates.length) {
+      await enqueueUserNotificationByUid(user.uid, {
+        title: "Account Updated",
+        body: `Admin changed your ${updates.join(", ")}.`,
+      });
+    }
   } catch (error) {
-    showToast(error?.message || "User update failed.", "error");
+    alert(error?.message || "User update failed.");
   }
+}
+
+function findUserUidByEmail(email) {
+  const normalized = String(email || "").trim().toLowerCase();
+  if (!normalized) return "";
+  const found = state.users.find((user) => String(user.email || "").trim().toLowerCase() === normalized);
+  return found?.uid || "";
+}
+
+async function enqueueUserNotificationByUid(uid, { title, body }) {
+  const safeUid = String(uid || "").trim();
+  const safeTitle = String(title || "").trim();
+  const safeBody = String(body || "").trim();
+  if (!safeUid || !safeTitle || !safeBody) return;
+  const notifRef = doc(collection(db, "users", safeUid, "notifications"));
+  await setDoc(notifRef, {
+    title: safeTitle,
+    body: safeBody,
+    delivered: false,
+    createdAt: serverTimestamp(),
+  });
+}
+
+async function enqueueUserNotificationByEmail(email, payload) {
+  const uid = findUserUidByEmail(email);
+  if (!uid) return;
+  await enqueueUserNotificationByUid(uid, payload);
 }
 
 async function updateSpotAdminFields(spot, patch) {
@@ -1003,7 +1018,7 @@ async function updateSpotAdminFields(spot, patch) {
       { merge: true }
     );
   } catch (error) {
-    showToast(error?.message || "Spot update failed.", "error");
+    alert(error?.message || "Spot update failed.");
   }
 }
 
@@ -1019,7 +1034,7 @@ function openContentModal(kind, item = null) {
   ui.adminContentActive.checked = item?.isActive ?? true;
   ui.adminContentPinned.checked = item?.isPinned ?? false;
   ui.adminContentLinkURL.value = item?.linkURL || "";
-  ui.adminContentImageField.classList.remove("hidden");
+  ui.adminContentImageField.classList.toggle("hidden", !isAnnouncement);
   ui.adminAnnouncementOptions.classList.toggle("hidden", !isAnnouncement);
   ui.adminInfoLinkField.classList.toggle("hidden", isAnnouncement);
   ui.adminContentDelete.classList.toggle("hidden", !item);
@@ -1067,7 +1082,6 @@ async function saveCurrentContent(event) {
         icon: ui.adminContentIcon.value.trim() || "info.circle.fill",
         title,
         body,
-        imageURL: ui.adminContentImageURL.value.trim(),
         linkURL: ui.adminContentLinkURL.value.trim(),
         sortOrder: existing?.sortOrder ?? state.infoItems.length,
         createdAtMs: existing?.createdAtMs || Date.now(),
@@ -1111,7 +1125,6 @@ async function saveInfoItem(item) {
       icon: item.icon || "info.circle.fill",
       title: item.title,
       body: item.body,
-      imageURL: item.imageURL || "",
       details: item.details || "",
       fields: [],
       linkTitle: item.linkURL ? "Open" : "",
@@ -1184,7 +1197,7 @@ async function refreshAdminFromServer() {
     renderParking();
     renderAnnouncements();
   } catch (error) {
-    showToast(error?.message || "Admin refresh failed.", "error");
+    alert(error?.message || "Admin refresh failed.");
   }
 }
 
@@ -1208,7 +1221,6 @@ function renderHomeHero() {
     ui.heroDate.textContent = "";
     ui.heroSpot.textContent = "--";
     ui.heroTime.textContent = "Book your next place";
-    updateTabBadges();
     return;
   }
 
@@ -1219,27 +1231,6 @@ function renderHomeHero() {
   ui.heroDate.textContent = `${lead} · ${formatShortDate(upcoming.bookingDate)}`;
   ui.heroSpot.textContent = String(extractSpotNumber(upcoming.spot));
   ui.heroTime.textContent = `${upcoming.fromTime} - ${upcoming.toTime}`;
-  updateTabBadges();
-}
-
-function updateTabBadges() {
-  if (!ui.bookingsBadge) return;
-  const now = new Date();
-  const todayKey = toYmd(now);
-  const hasActiveToday = state.myBookings.some(
-    (b) => toYmd(b.bookingDate) === todayKey && bookingEndDate(b.bookingDate, b.toTime) >= now
-  );
-  ui.bookingsBadge.classList.toggle("hidden", !hasActiveToday);
-}
-
-function updateAdminTodayBar() {
-  if (!ui.adminTodayBar || !isAdminLike()) return;
-  const todayKey = toYmd(new Date());
-  const todayBookings = state.allBookings.filter((b) => toYmd(b.bookingDate) === todayKey);
-  const bookedSpots = new Set(todayBookings.map((b) => normalizedSpotKey(b.spot))).size;
-  const usable = state.spots.filter((s) => !s.isBlocked).length;
-  if (ui.adminTodayBooked) ui.adminTodayBooked.textContent = String(bookedSpots);
-  if (ui.adminTodayFree) ui.adminTodayFree.textContent = String(Math.max(usable - bookedSpots, 0));
 }
 
 function renderAnnouncements() {
@@ -1279,83 +1270,8 @@ function renderAnnouncements() {
   }
 }
 
-const SF_SYMBOL_EMOJI = {
-  "info.circle.fill": "ℹ️",
-  "info.circle": "ℹ️",
-  "star.fill": "⭐",
-  "star": "⭐",
-  "bell.fill": "🔔",
-  "bell": "🔔",
-  "car.fill": "🚗",
-  "car": "🚗",
-  "calendar": "📅",
-  "map.fill": "🗺️",
-  "map": "🗺️",
-  "house.fill": "🏠",
-  "house": "🏠",
-  "person.fill": "👤",
-  "checkmark.circle.fill": "✅",
-  "exclamationmark.triangle.fill": "⚠️",
-  "exclamationmark.circle.fill": "⚠️",
-  "bolt.fill": "⚡",
-  "clock.fill": "🕐",
-  "clock": "🕐",
-};
-
-function resolveIcon(icon) {
-  if (!icon) return "ℹ️";
-  if (/^[a-z0-9.]+$/.test(icon)) return SF_SYMBOL_EMOJI[icon] ?? "ℹ️";
-  return icon;
-}
-
-function renderInfoCards() {
-  if (!ui.infoList) return;
-  ui.infoList.textContent = "";
-  const items = state.infoItems;
-  if (ui.infoCardsSection) ui.infoCardsSection.classList.toggle("hidden", !items.length);
-  for (const item of items) {
-    const wrap = document.createElement("article");
-    wrap.className = "announcement";
-    if (item.imageURL) {
-      const img = document.createElement("img");
-      img.className = "announcement-media";
-      img.loading = "lazy";
-      img.decoding = "async";
-      img.src = item.imageURL;
-      img.alt = item.title || "Info image";
-      wrap.append(img);
-    }
-    const body = document.createElement("div");
-    body.className = "announcement-body";
-    const h = document.createElement("h4");
-    h.textContent = `${resolveIcon(item.icon)} ${item.title}`;
-    const p = document.createElement("p");
-    p.textContent = item.body || "";
-    body.append(h, p);
-    if (item.linkURL) {
-      const a = document.createElement("a");
-      a.href = item.linkURL;
-      a.textContent = item.linkTitle || "Open";
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      a.className = "btn subtle small info-card-link";
-      body.append(a);
-    }
-    wrap.append(body);
-    ui.infoList.append(wrap);
-  }
-}
-
 function renderDayPills() {
   ui.dayPills.textContent = "";
-  if (!state.spotsReady) {
-    for (let i = 0; i < 7; i++) {
-      const skel = document.createElement("div");
-      skel.className = "skeleton skeleton-pill";
-      ui.dayPills.append(skel);
-    }
-    return;
-  }
   const start = dayStart(toYmd(new Date()));
   for (let i = 0; i < 7; i += 1) {
     const date = addDays(start, i);
@@ -1367,9 +1283,6 @@ function renderDayPills() {
     button.type = "button";
     button.className = "day-pill";
     button.classList.toggle("active", ymd === state.selectedDate);
-    if (occupancy >= 80) button.classList.add("occ-high");
-    else if (occupancy >= 40) button.classList.add("occ-medium");
-    else if (occupancy > 0) button.classList.add("occ-low");
     button.innerHTML = `
       <strong>${ymd === toYmd(new Date()) ? "Today" : weekdayShort(date)}</strong>
       <span>${date.getDate()}</span>
@@ -1421,6 +1334,8 @@ function bookingDisplayName(booking) {
 function userForBooking(booking) {
   const email = String(booking?.email || "").toLowerCase();
   const uid = String(booking?.bookedForUid || "").trim();
+  if (uid && state.profile?.uid === uid) return state.profile;
+  if (email && String(state.profile?.email || "").toLowerCase() === email) return state.profile;
   return (
     state.users.find((candidate) => uid && candidate.uid === uid) ||
     state.users.find((candidate) => email && candidate.email === email) ||
@@ -1428,19 +1343,38 @@ function userForBooking(booking) {
   );
 }
 
+function identityForUser(user, fallbackName = "Unknown user") {
+  return {
+    displayName: String(user?.displayName || user?.email || fallbackName || "Unknown user").trim(),
+    email: String(user?.email || "").trim(),
+    registrationPlate: String(user?.registrationPlate || "").trim(),
+    carDescription: String(user?.carDescription || "").trim(),
+    presetID: String(user?.vehicleMiniaturePresetID || "").trim(),
+  };
+}
+
+function identityForBooking(booking) {
+  const identity = identityForUser(userForBooking(booking), bookingDisplayName(booking));
+  if (!identity.carDescription) {
+    identity.carDescription = String(booking?.carDescription || "").trim();
+  }
+  return identity;
+}
+
+function createUserIdentityMedia(identity, className = "user-identity-media") {
+  const media = document.createElement("span");
+  media.className = className;
+  const image = vehicleImageElement(identity?.presetID || "", identity?.carDescription || "");
+  if (image) {
+    media.append(image);
+    return media;
+  }
+  media.textContent = initials(identity?.displayName || "EL");
+  return media;
+}
+
 function renderParking() {
   const adminLike = isAdminLike();
-
-  if (!state.spotsReady) {
-    ui.spotsGrid.textContent = "";
-    for (let i = 0; i < 8; i++) {
-      const skel = document.createElement("div");
-      skel.className = "skeleton skeleton-spot";
-      ui.spotsGrid.append(skel);
-    }
-    return;
-  }
-
   const blockedKeys = new Set(state.spots.filter((s) => s.isBlocked).map((s) => normalizedSpotKey(s.label)));
   const bookedKeys = new Set(state.dayBookings.map((b) => normalizedSpotKey(b.spot)));
   const usable = state.spots.filter((s) => !s.isBlocked);
@@ -1458,8 +1392,6 @@ function renderParking() {
     : "Tap a FREE spot tile to select it.";
   const hintNode = document.querySelector(".spot-grid-hint");
   if (hintNode) hintNode.textContent = hintText;
-
-  const searchQuery = (ui.spotSearch?.value || "").trim().toLowerCase();
 
   ui.spotsGrid.textContent = "";
   for (const spot of state.spots) {
@@ -1493,20 +1425,16 @@ function renderParking() {
     }
     cell.append(strong, small);
 
-    if (stateName === "booked" && leadBooking) {
+    if (stateName === "booked" && adminLike && leadBooking) {
+      const ownerIdentity = identityForBooking(leadBooking);
       const owner = document.createElement("div");
-      if (adminLike) {
-        owner.className = "spot-cell-booking-owner";
-        owner.textContent = bookingDisplayName(leadBooking);
-      } else {
-        const isOwn = leadBooking.bookedForUid === state.user?.uid ||
-          (leadBooking.email && leadBooking.email === state.profile?.email?.toLowerCase());
-        if (isOwn) {
-          owner.className = "spot-cell-booking-owner yours";
-          owner.textContent = "YOURS";
-        }
-      }
-      if (owner.textContent) cell.append(owner);
+      owner.className = "spot-cell-booking-owner";
+      owner.append(createUserIdentityMedia(ownerIdentity, "spot-cell-owner-media"));
+      const ownerName = document.createElement("span");
+      ownerName.className = "spot-cell-owner-name";
+      ownerName.textContent = ownerIdentity.displayName;
+      owner.append(ownerName);
+      cell.append(owner);
     }
 
     if (isSelectedFree) {
@@ -1514,15 +1442,6 @@ function renderParking() {
       check.className = "spot-cell-check";
       check.textContent = "✓";
       cell.append(check);
-    }
-
-    if (searchQuery) {
-      const spotNum = String(extractSpotNumber(spot.label)).toLowerCase();
-      if (!spotNum.includes(searchQuery)) {
-        cell.classList.add("search-hidden");
-      } else {
-        cell.classList.add("search-match");
-      }
     }
 
     if (stateName === "free") {
@@ -1548,101 +1467,45 @@ function renderParking() {
   ui.selectedSpotDisplay.value = state.selectedSpotLabel ? `Spot ${extractSpotNumber(state.selectedSpotLabel)}` : "";
   syncBookUiState();
   renderAdminSpotInspector();
-  updateAdminTodayBar();
 }
 
 function renderMyBookings() {
   ui.myBookingsList.textContent = "";
   const adminLike = isAdminLike();
   const source = adminLike ? state.allBookings : state.myBookings;
-  const now = new Date();
-  const isPast = state.bookingsFilter === "past";
-
-  const bookings = source
+  const upcoming = source
     .slice()
-    .sort((a, b) => {
-      const diff = a.bookingDate.getTime() - b.bookingDate.getTime();
-      return isPast ? -diff : diff;
-    })
-    .filter((b) => isPast
-      ? bookingEndDate(b.bookingDate, b.toTime) < now
-      : bookingEndDate(b.bookingDate, b.toTime) >= now
-    );
+    .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime())
+    .filter((b) => bookingEndDate(b.bookingDate, b.toTime) >= new Date());
 
-  if (!bookings.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.innerHTML = isPast
-      ? `<span class="empty-state-icon">🗓️</span><p>No past bookings yet.</p>`
-      : `<span class="empty-state-icon">🅿️</span><p>No upcoming bookings.</p><p class="muted">Go to the Parking tab to book a spot.</p>`;
-    ui.myBookingsList.append(empty);
+  if (!upcoming.length) {
+    ui.myBookingsList.append(textRow("No upcoming bookings."));
     renderHomeHero();
     return;
   }
 
-  if (adminLike && !isPast) {
-    const bulkBar = document.createElement("div");
-    bulkBar.className = "bulk-bar";
-    const selectAll = document.createElement("input");
-    selectAll.type = "checkbox";
-    selectAll.id = "bulkSelectAll";
-    selectAll.className = "bulk-checkbox";
-    const selectLabel = document.createElement("label");
-    selectLabel.htmlFor = "bulkSelectAll";
-    selectLabel.textContent = "Select all";
-    const bulkCancel = document.createElement("button");
-    bulkCancel.type = "button";
-    bulkCancel.className = "btn danger small bulk-cancel-btn hidden";
-    bulkCancel.textContent = "Cancel selected";
-    bulkCancel.addEventListener("click", async () => {
-      if (!state.bulkSelectedIds.size) return;
-      const count = state.bulkSelectedIds.size;
-      if (!window.confirm(`Cancel ${count} booking${count > 1 ? "s" : ""}?`)) return;
-      const toCancel = bookings.filter((b) => state.bulkSelectedIds.has(b.id));
-      for (const b of toCancel) await cancelBooking(b, false);
-      state.bulkSelectedIds.clear();
-      renderMyBookings();
-    });
-    selectAll.addEventListener("change", () => {
-      bookings.forEach((b) => {
-        if (selectAll.checked) state.bulkSelectedIds.add(b.id);
-        else state.bulkSelectedIds.delete(b.id);
-      });
-      bulkCancel.classList.toggle("hidden", state.bulkSelectedIds.size === 0);
-      ui.myBookingsList.querySelectorAll(".booking-checkbox").forEach((cb) => { cb.checked = selectAll.checked; });
-    });
-    bulkBar.append(selectAll, selectLabel, bulkCancel);
-    ui.myBookingsList.append(bulkBar);
-  }
-
-  for (const booking of bookings) {
+  for (const booking of upcoming) {
     if (adminLike) {
+      const identity = identityForBooking(booking);
       const row = document.createElement("article");
       row.className = "admin-booking-row";
 
-      if (!isPast) {
-        const cb = document.createElement("input");
-        cb.type = "checkbox";
-        cb.className = "booking-checkbox bulk-checkbox";
-        cb.checked = state.bulkSelectedIds.has(booking.id);
-        cb.addEventListener("change", () => {
-          if (cb.checked) state.bulkSelectedIds.add(booking.id);
-          else state.bulkSelectedIds.delete(booking.id);
-          const bulkCancel = ui.myBookingsList.querySelector(".bulk-cancel-btn");
-          if (bulkCancel) bulkCancel.classList.toggle("hidden", state.bulkSelectedIds.size === 0);
-        });
-        row.append(cb);
-      }
-
       const main = document.createElement("div");
       main.className = "admin-booking-main";
+      const identityRow = document.createElement("div");
+      identityRow.className = "admin-booking-identity";
+      identityRow.append(createUserIdentityMedia(identity, "admin-booking-avatar"));
+      const identityName = document.createElement("p");
+      identityName.className = "admin-booking-identity-name";
+      identityName.textContent = identity.displayName;
+      identityRow.append(identityName);
       const title = document.createElement("p");
       title.className = "admin-booking-title";
-      title.textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(booking.bookingDate)} · ${bookingDisplayName(booking)}`;
+      title.textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(booking.bookingDate)}`;
       const meta = document.createElement("p");
       meta.className = "admin-booking-meta";
       meta.textContent = `${booking.fromTime} - ${booking.toTime}${booking.email ? ` · ${booking.email}` : ""}`;
-      main.append(title, meta);
+      main.append(identityRow, title, meta);
 
       const actions = document.createElement("div");
       actions.className = "admin-booking-actions";
@@ -1651,20 +1514,17 @@ function renderMyBookings() {
       calendar.className = "btn subtle small";
       calendar.textContent = "Calendar";
       calendar.addEventListener("click", () => downloadCalendarForBooking(booking));
-      actions.append(calendar);
-      if (!isPast) {
-        const edit = document.createElement("button");
-        edit.type = "button";
-        edit.className = "btn subtle small";
-        edit.textContent = "Edit";
-        edit.addEventListener("click", () => openBookingEditModal(booking));
-        const cancel = document.createElement("button");
-        cancel.type = "button";
-        cancel.className = "btn danger small";
-        cancel.textContent = "Cancel";
-        cancel.addEventListener("click", () => cancelBooking(booking));
-        actions.append(edit, cancel);
-      }
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "btn subtle small";
+      edit.textContent = "Edit";
+      edit.addEventListener("click", () => openBookingEditModal(booking));
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "btn danger small";
+      cancel.textContent = "Cancel";
+      cancel.addEventListener("click", () => cancelBooking(booking));
+      actions.append(calendar, edit, cancel);
 
       row.append(main, actions);
       ui.myBookingsList.append(row);
@@ -1673,55 +1533,11 @@ function renderMyBookings() {
 
     const node = ui.bookingTemplate.content.firstElementChild.cloneNode(true);
     node.querySelector(".title").textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(booking.bookingDate)}`;
-    node.querySelector(".meta").textContent = `${booking.fromTime} – ${booking.toTime}`;
+    node.querySelector(".meta").textContent = `${booking.fromTime} - ${booking.toTime}`;
     const calendarButton = node.querySelector(".calendar-btn");
-    const cancelBtn = node.querySelector(".cancel-btn");
+    const cancel = node.querySelector(".cancel-btn");
     calendarButton?.addEventListener("click", () => downloadCalendarForBooking(booking));
-    if (isPast) {
-      if (cancelBtn) cancelBtn.remove();
-      const rebook = document.createElement("button");
-      rebook.type = "button";
-      rebook.className = "btn subtle rebook-btn";
-      rebook.textContent = "Book again";
-      rebook.addEventListener("click", () => {
-        switchTab("parking");
-        setSelectedSpot(booking.spot);
-      });
-      node.querySelector(".booking-row-actions")?.append(rebook);
-    } else {
-      cancelBtn?.addEventListener("click", () => cancelBooking(booking));
-    }
-
-    // Populate expandable detail section
-    const detail = node.querySelector(".booking-row-detail");
-    if (detail) {
-      const inner = document.createElement("div");
-      inner.className = "booking-row-detail-inner";
-      const spotBadge = document.createElement("div");
-      spotBadge.className = "booking-detail-spot";
-      spotBadge.textContent = extractSpotNumber(booking.spot);
-      const info = document.createElement("div");
-      info.className = "booking-detail-info";
-      const dateEl = document.createElement("strong");
-      dateEl.textContent = formatLongDate(booking.bookingDate);
-      const timeEl = document.createElement("span");
-      timeEl.textContent = `${booking.fromTime} – ${booking.toTime}`;
-      info.append(dateEl, timeEl);
-      if (booking.user) {
-        const personEl = document.createElement("span");
-        personEl.textContent = booking.user;
-        info.append(personEl);
-      }
-      inner.append(spotBadge, info);
-      detail.append(inner);
-    }
-
-    // Tap the summary row (not buttons) to expand detail
-    node.querySelector(".booking-row-summary")?.addEventListener("click", (e) => {
-      if (e.target.closest("button")) return;
-      node.classList.toggle("expanded");
-    });
-
+    cancel?.addEventListener("click", () => cancelBooking(booking));
     ui.myBookingsList.append(node);
   }
 
@@ -1747,18 +1563,26 @@ function renderAdminSpotInspector() {
   ui.adminSpotInspectorList.textContent = "";
 
   for (const booking of bookings) {
+    const identity = identityForBooking(booking);
     const row = document.createElement("article");
     row.className = "admin-booking-row";
 
     const main = document.createElement("div");
     main.className = "admin-booking-main";
+    const identityRow = document.createElement("div");
+    identityRow.className = "admin-booking-identity";
+    identityRow.append(createUserIdentityMedia(identity, "admin-booking-avatar"));
+    const identityName = document.createElement("p");
+    identityName.className = "admin-booking-identity-name";
+    identityName.textContent = identity.displayName;
+    identityRow.append(identityName);
     const title = document.createElement("p");
     title.className = "admin-booking-title";
-    title.textContent = bookingDisplayName(booking);
+    title.textContent = `Spot ${extractSpotNumber(booking.spot)} · ${formatLongDate(booking.bookingDate)}`;
     const meta = document.createElement("p");
     meta.className = "admin-booking-meta";
     meta.textContent = `${booking.fromTime} - ${booking.toTime}${booking.email ? ` · ${booking.email}` : ""}`;
-    main.append(title, meta);
+    main.append(identityRow, title, meta);
 
     const actions = document.createElement("div");
     actions.className = "admin-booking-actions";
@@ -1807,26 +1631,18 @@ function openSpotDetailsModal(spotLabel) {
     const row = document.createElement("article");
     row.className = "spot-detail-row";
 
-    const owner = userForBooking(booking);
-    const avatar = document.createElement("div");
-    avatar.className = "spot-detail-avatar";
-    const presetID = owner?.vehicleMiniaturePresetID || "";
-    const image = vehicleImageElement(presetID, owner?.carDescription || "");
-    if (image) {
-      avatar.append(image);
-    } else {
-      avatar.textContent = initials(bookingDisplayName(booking));
-    }
+    const identity = identityForBooking(booking);
+    const avatar = createUserIdentityMedia(identity, "spot-detail-avatar");
 
     const main = document.createElement("div");
     main.className = "spot-detail-main";
     const title = document.createElement("p");
     title.className = "spot-detail-title";
-    title.textContent = isAdminLike() ? bookingDisplayName(booking) : "Booked";
+    title.textContent = isAdminLike() ? identity.displayName : "Booked";
     const meta = document.createElement("p");
     meta.className = "spot-detail-meta";
-    const vehicleText = owner?.carDescription ? ` · ${owner.carDescription}` : "";
-    const plateText = owner?.registrationPlate ? ` · ${owner.registrationPlate}` : "";
+    const vehicleText = identity.carDescription ? ` · ${identity.carDescription}` : "";
+    const plateText = identity.registrationPlate ? ` · ${identity.registrationPlate}` : "";
     meta.textContent = `${booking.fromTime} - ${booking.toTime}${isAdminLike() ? `${vehicleText}${plateText}` : ""}`;
     main.append(title, meta);
 
@@ -1960,6 +1776,11 @@ async function onSaveBookingEdit(event) {
       fromTime: nextFrom,
       toTime: nextTo,
     });
+    const actor = state.profile?.displayName || state.user?.email || "Admin";
+    await enqueueUserNotificationByEmail(booking.email, {
+      title: "Booking Updated",
+      body: `${actor} changed your booking to spot ${extractSpotNumber(nextSpot)} on ${formatLongDate(dayStart(nextDateYmd))} (${nextFrom}–${nextTo}).`,
+    });
     closeBookingEditModal();
   } catch (err) {
     ui.bookingEditError.textContent = err?.message || "Booking update failed.";
@@ -1996,6 +1817,10 @@ async function onBookSubmit(event) {
       fromTime,
       toTime,
     };
+    await enqueueUserNotificationByUid(state.user.uid, {
+      title: "Booking Confirmed",
+      body: `Spot ${extractSpotNumber(spot)} on ${formatLongDate(date)} (${fromTime}–${toTime}) was booked.`,
+    });
     ui.bookError.textContent = "";
     showBookingSuccessModal(spot, date, fromTime, toTime);
   } catch (err) {
@@ -2181,17 +2006,15 @@ async function updateBookingTransaction(existingBooking, next) {
   });
 }
 
-async function cancelBooking(booking, confirmFirst = true) {
+async function cancelBooking(booking) {
   if (!state.user || !state.profile) return;
-  if (confirmFirst) {
-    const ok = await showConfirm({
-      title: "Cancel Booking",
-      message: `Cancel spot ${extractSpotNumber(booking.spot)} on ${formatLongDate(booking.bookingDate)}?`,
-      acceptLabel: "Cancel Booking",
-      cancelLabel: "Keep Booking",
-    });
-    if (!ok) return;
-  }
+  const ok = await showConfirm({
+    title: "Cancel Booking",
+    message: `Cancel spot ${extractSpotNumber(booking.spot)} on ${formatLongDate(booking.bookingDate)}?`,
+    acceptLabel: "Cancel Booking",
+    cancelLabel: "Keep Booking",
+  });
+  if (!ok) return;
 
   try {
     const myEmail = String(state.user.email || "").trim().toLowerCase();
@@ -2210,9 +2033,17 @@ async function cancelBooking(booking, confirmFirst = true) {
       transaction.set(lockRef, { slots: updated }, { merge: true });
       transaction.delete(bookingRef);
     });
-    if (confirmFirst) closeSpotDetailsModal();
+    const actorIsAdmin = isAdminLike() && myEmail !== ownerEmail;
+    const cancelBody = actorIsAdmin
+      ? `Admin cancelled your booking for spot ${extractSpotNumber(booking.spot)} on ${formatLongDate(booking.bookingDate)} (${booking.fromTime}–${booking.toTime}).`
+      : `Your booking for spot ${extractSpotNumber(booking.spot)} on ${formatLongDate(booking.bookingDate)} (${booking.fromTime}–${booking.toTime}) was cancelled.`;
+    await enqueueUserNotificationByEmail(booking.email, {
+      title: "Booking Cancelled",
+      body: cancelBody,
+    });
+    closeSpotDetailsModal();
   } catch (err) {
-    showToast(err?.message || "Cancel failed.", "error");
+    alert(err?.message || "Cancel failed.");
   }
 }
 
@@ -2287,8 +2118,6 @@ async function onSaveProfile(event) {
       vehicleMiniaturePresetID,
     };
     renderGreeting();
-    state.profileDirty = false;
-    showToast("Profile saved.");
   } catch {
     ui.profileError.textContent = "Save failed.";
   } finally {
@@ -2302,7 +2131,6 @@ function hydrateProfileForm() {
   ui.plateInput.value = state.profile?.registrationPlate || "";
   ui.carInput.value = state.profile?.carDescription || "";
   hydrateVehicleSelection();
-  state.profileDirty = false;
 }
 
 function hydrateVehicleSelection() {
@@ -2310,7 +2138,8 @@ function hydrateVehicleSelection() {
   const presetID = state.profile?.vehicleMiniaturePresetID || "";
   const preset = presetByID(presetID);
   state.selectedVehicleMake = preset?.make || parsed.make || CAR_MAKES[0] || "";
-  renderMakeButton();
+  populateVehicleMakeSelect();
+  ui.vehicleMakeSelect.value = state.selectedVehicleMake;
   state.selectedVehicleModel = preset?.models?.[0] || parsed.model || firstModelForMake(state.selectedVehicleMake);
   populateVehicleModelSelect();
   ui.vehicleModelSelect.value = state.selectedVehicleModel;
@@ -2321,14 +2150,23 @@ function hydrateVehicleSelection() {
   renderVehiclePreview();
 }
 
-function renderMakeButton() {
-  if (!ui.vehicleMakeLabel) return;
-  ui.vehicleMakeLabel.textContent = state.selectedVehicleMake || CAR_MAKES[0] || "";
+function populateVehicleMakeSelect() {
+  if (!ui.vehicleMakeSelect) return;
+  const previous = ui.vehicleMakeSelect.value || state.selectedVehicleMake;
+  ui.vehicleMakeSelect.textContent = "";
+  for (const make of CAR_MAKES) {
+    const option = document.createElement("option");
+    option.value = make;
+    option.textContent = make;
+    ui.vehicleMakeSelect.append(option);
+  }
+  if (CAR_MAKES.includes(previous)) ui.vehicleMakeSelect.value = previous;
+  else ui.vehicleMakeSelect.value = CAR_MAKES[0] || "";
 }
 
 function populateVehicleModelSelect() {
   if (!ui.vehicleModelSelect) return;
-  const make = state.selectedVehicleMake;
+  const make = ui.vehicleMakeSelect?.value || state.selectedVehicleMake;
   const previous = ui.vehicleModelSelect.value || state.selectedVehicleModel;
   const models = MODELS_BY_MAKE[make] || [];
   ui.vehicleModelSelect.textContent = "";
@@ -2344,7 +2182,7 @@ function populateVehicleModelSelect() {
 
 function renderVehiclePreview() {
   if (!ui.vehiclePreview) return;
-  const make = state.selectedVehicleMake || "";
+  const make = state.selectedVehicleMake || ui.vehicleMakeSelect?.value || "";
   const model = state.selectedVehicleModel || ui.vehicleModelSelect?.value || "";
   const preset = presetByID(state.selectedVehiclePresetID);
   const title = preset?.title || [make, model].filter(Boolean).join(" ");
@@ -2374,58 +2212,9 @@ function renderVehiclePreview() {
   if (ui.vehicleIconLabel) ui.vehicleIconLabel.textContent = preset?.title || "Automatic";
 }
 
-function openMakePicker() {
-  if (!ui.makePickerModal) return;
-  renderMakePickerOptions();
-  ui.makePickerModal.classList.remove("hidden");
-  ui.makePickerModal.setAttribute("aria-hidden", "false");
-}
-
-function closeMakePicker() {
-  if (!ui.makePickerModal) return;
-  ui.makePickerModal.classList.add("hidden");
-  ui.makePickerModal.setAttribute("aria-hidden", "true");
-}
-
-function renderMakePickerOptions() {
-  if (!ui.makePickerList) return;
-  ui.makePickerList.textContent = "";
-  for (const make of CAR_MAKES) {
-    const row = document.createElement("button");
-    row.type = "button";
-    row.className = "make-picker-row";
-    row.classList.toggle("selected", state.selectedVehicleMake === make);
-    const media = document.createElement("span");
-    media.className = "make-picker-media";
-    const logo = makerLogoElement(make);
-    if (logo) media.append(logo);
-    else media.textContent = initials(make);
-    const name = document.createElement("span");
-    name.className = "make-picker-name";
-    name.textContent = make;
-    const check = document.createElement("span");
-    check.className = "vehicle-picker-check";
-    check.textContent = state.selectedVehicleMake === make ? "✓" : "";
-    row.append(media, name, check);
-    row.addEventListener("click", () => {
-      state.selectedVehicleMake = make;
-      renderMakeButton();
-      populateVehicleModelSelect();
-      state.selectedVehicleModel = ui.vehicleModelSelect?.value || "";
-      if (!presetMatchesVehicle(state.selectedVehiclePresetID, state.selectedVehicleMake, state.selectedVehicleModel)) {
-        state.selectedVehiclePresetID = "";
-      }
-      syncCarDescriptionField();
-      renderVehiclePreview();
-      closeMakePicker();
-    });
-    ui.makePickerList.append(row);
-  }
-}
-
 function openVehiclePicker() {
   if (!ui.vehiclePickerModal) return;
-  const make = state.selectedVehicleMake;
+  const make = ui.vehicleMakeSelect?.value || state.selectedVehicleMake;
   const model = ui.vehicleModelSelect?.value || state.selectedVehicleModel;
   ui.vehiclePickerTitle.textContent = "Choose Vehicle Icon";
   ui.vehiclePickerMeta.textContent = [make, model].filter(Boolean).join(" · ");
@@ -2442,7 +2231,7 @@ function closeVehiclePicker() {
 
 function renderVehiclePickerOptions() {
   if (!ui.vehiclePickerList) return;
-  const make = state.selectedVehicleMake;
+  const make = ui.vehicleMakeSelect?.value || state.selectedVehicleMake;
   const model = ui.vehicleModelSelect?.value || state.selectedVehicleModel;
   const options = presetsForVehicle(make, model);
   ui.vehiclePickerList.textContent = "";
@@ -2472,12 +2261,7 @@ function renderVehiclePickerOptions() {
     const title = document.createElement("strong");
     title.textContent = option.title;
     const meta = document.createElement("small");
-    const logo = makerLogoElement(option.make);
-    if (logo) {
-      logo.className = "vehicle-picker-make-logo";
-      meta.append(logo);
-    }
-    meta.append(option.make);
+    meta.textContent = option.make;
     copy.append(title, meta);
     const check = document.createElement("span");
     check.className = "vehicle-picker-check";
@@ -2501,7 +2285,7 @@ function renderVehiclePickerOptions() {
 
 function syncCarDescriptionField() {
   if (!ui.carInput) return;
-  const make = state.selectedVehicleMake || "";
+  const make = ui.vehicleMakeSelect?.value || state.selectedVehicleMake || "";
   const model = ui.vehicleModelSelect?.value || state.selectedVehicleModel || "";
   ui.carInput.value = [make, model].filter(Boolean).join(" ");
 }
@@ -2552,14 +2336,33 @@ function presetColorLabel(id) {
   return parts[1]?.trim() || "";
 }
 
+function assignImageWithFallback(img, sources) {
+  const queue = sources.filter(Boolean);
+  let index = 0;
+  const applyNext = () => {
+    if (index >= queue.length) return;
+    img.src = queue[index];
+    index += 1;
+  };
+  img.addEventListener("error", () => {
+    if (index < queue.length) applyNext();
+  });
+  applyNext();
+}
+
 function makerLogoElement(make) {
   const asset = MAKER_LOGOS[make];
   if (!asset) return null;
   const img = document.createElement("img");
-  img.src = `./makers/${asset}.png`;
   img.alt = `${make} logo`;
   img.loading = "lazy";
   img.decoding = "async";
+  assignImageWithFallback(img, [
+    `./assets/makers/${asset}.png`,
+    `./makers/${asset}.png`,
+    `assets/makers/${asset}.png`,
+    `makers/${asset}.png`,
+  ]);
   return img;
 }
 
@@ -2568,34 +2371,41 @@ function vehicleImageElement(presetID, fallbackDescription) {
   const asset = preset?.asset || automaticVehicleAsset(fallbackDescription);
   if (!asset) return null;
   const img = document.createElement("img");
-  img.src = `./vehicles/${asset}.png`;
   img.alt = preset?.title || fallbackDescription || "Vehicle";
   img.loading = "lazy";
   img.decoding = "async";
+  assignImageWithFallback(img, [
+    `./assets/vehicles/${asset}.png`,
+    `./vehicles/${asset}.png`,
+    `assets/vehicles/${asset}.png`,
+    `vehicles/${asset}.png`,
+  ]);
   return img;
 }
 
 function automaticVehicleAsset(description) {
   const text = normalizeSearchText(description);
   if (text.includes("volvo") && text.includes("ex30")) return "vehicle_mini_volvo_ex30_moss_yellow_yellow";
-  if (text.includes("tesla") && text.includes("model 3")) return "vehicle_mini_tesla_model3";
-  if (text.includes("octavia")) return "vehicle_mini_skoda_octavia_combi_style";
+  if (text.includes("tesla") && text.includes("model 3")) return "vehicle_mini_tesla_model3_white";
+  if (text.includes("tesla") && text.includes("model y")) return "vehicle_mini_tesla_model_y_white";
+  if (text.includes("octavia") && text.includes("rs")) return "vehicle_mini_skoda_octavia_rs";
+  if (text.includes("octavia")) return "vehicle_mini_octavia_combi_white";
   if (text.includes("kodiaq")) return "vehicle_mini_skoda_kodiaq";
   if (text.includes("karoq")) return "vehicle_mini_skoda_karoq_style";
   if (text.includes("superb")) return "vehicle_mini_superb_white";
   if (text.includes("tiguan")) return "vehicle_mini_vw_tiguan";
   if (text.includes("golf")) return "vehicle_mini_vw_golf_variant";
   if (text.includes("bmw") && text.includes("i4")) return "vehicle_mini_bmw_i4";
-  if (text.includes("bmw")) return "vehicle_mini_bmw_3_black";
+  if (text.includes("bmw")) return "vehicle_mini_bmw_3";
+  if (text.includes("audi") && text.includes("q4")) return "vehicle_mini_audi_q4";
   if (text.includes("audi")) return "vehicle_mini_audi_a4_avant_b9";
-  if (text.includes("mercedes") && text.includes("eqa")) return "vehicle_mini_electric_crossover_silver";
-  if (text.includes("mercedes") && text.includes("gla")) return "vehicle_mini_compact_suv_white";
+  if (text.includes("mercedes") && text.includes("eqa")) return "vehicle_mini_mercedes_eqa_250";
   if (text.includes("mercedes")) return "vehicle_mini_mercedes_c220d_4matic";
-  if (text.includes("audi") && text.includes("q4")) return "vehicle_mini_electric_crossover_silver";
-  if (text.includes("caddy")) return "vehicle_mini_van_white";
-  if (text.includes("mini")) return "vehicle_mini_mini_countryman_black";
-  if (text.includes("subaru")) return "vehicle_mini_subaru_outback_brown";
-  if (text.includes("hyundai") && text.includes("bayon")) return "vehicle_mini_hyundai_bayon_navy";
+  if (text.includes("mini")) return "vehicle_mini_mini_countryman";
+  if (text.includes("subaru")) return "vehicle_mini_subaru_outback";
+  if (text.includes("ford")) return "vehicle_mini_ford_focus";
+  if (text.includes("hyundai") && text.includes("bayon")) return "vehicle_mini_hyundai_bayon";
+  if (text.includes("kia") && text.includes("ev9")) return "vehicle_mini_kia_ev9";
   return "vehicle_mini_generic_sedan_white";
 }
 
@@ -2673,41 +2483,10 @@ function syncBookUiState() {
 }
 
 function showBookingSuccessModal(spotLabel, bookingDate, fromTime, toTime) {
-  if (!ui.bookingSuccessModal) return;
+  if (!ui.bookingSuccessModal || !ui.bookingSuccessMessage) return;
   const spot = extractSpotNumber(spotLabel);
   const dateText = formatLongDate(bookingDate);
-
-  if (ui.bookingSuccessSummary) {
-    ui.bookingSuccessSummary.textContent = "";
-    const spotBox = document.createElement("div");
-    spotBox.className = "success-spot-box";
-    const spotNum = document.createElement("span");
-    spotNum.className = "success-spot-number";
-    spotNum.textContent = spot;
-    const spotLabel2 = document.createElement("span");
-    spotLabel2.className = "success-spot-label";
-    spotLabel2.textContent = "Spot";
-    spotBox.append(spotLabel2, spotNum);
-
-    const info = document.createElement("div");
-    info.className = "success-info";
-    const dateLine = document.createElement("p");
-    dateLine.textContent = dateText;
-    const timeLine = document.createElement("p");
-    timeLine.className = "muted";
-    timeLine.textContent = `${fromTime} – ${toTime}`;
-    info.append(dateLine, timeLine);
-
-    const carImg = vehicleImageElement(state.selectedVehiclePresetID,
-      [state.selectedVehicleMake, state.selectedVehicleModel].filter(Boolean).join(" "));
-    if (carImg) {
-      carImg.className = "success-car-img";
-      ui.bookingSuccessSummary.append(spotBox, info, carImg);
-    } else {
-      ui.bookingSuccessSummary.append(spotBox, info);
-    }
-  }
-
+  ui.bookingSuccessMessage.textContent = `Spot ${spot} booked for ${dateText}, ${fromTime}-${toTime}.`;
   ui.bookingSuccessModal.classList.remove("hidden");
   ui.bookingSuccessModal.setAttribute("aria-hidden", "false");
 }
@@ -2941,7 +2720,6 @@ function parseInfoItem(id, data) {
     icon: String(data.icon ?? "info.circle.fill"),
     title: String(data.title ?? ""),
     body: String(data.body ?? ""),
-    imageURL: String(data.imageURL ?? ""),
     details: String(data.details ?? ""),
     linkTitle: String(data.linkTitle ?? ""),
     linkURL: String(data.linkURL ?? ""),

@@ -299,6 +299,7 @@ const ui = {
   adminTodayBar: byId("adminTodayBar"),
   adminTodayBooked: byId("adminTodayBooked"),
   adminTodayFree: byId("adminTodayFree"),
+  themeToggle: byId("themeToggle"),
   tabs: [...document.querySelectorAll(".tab")],
   tabPanels: {
     home: byId("homeTab"),
@@ -413,9 +414,26 @@ function setupPullToRefresh() {
 function bootstrap() {
   if (ui.bookDate) ui.bookDate.value = state.selectedDate;
   if (ui.rememberMeInput) ui.rememberMeInput.checked = shouldKeepSignedIn();
+  initThemeToggle();
   bindEvents();
   syncBookUiState();
   onAuthStateChanged(auth, handleAuthState);
+}
+
+function applyTheme(pref) {
+  const isDark = pref === "dark" ||
+    (pref !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.classList.toggle("dark-mode", isDark);
+}
+
+function initThemeToggle() {
+  const stored = localStorage.getItem("el-parking-theme") || "auto";
+  ui.themeToggle?.querySelectorAll(".theme-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.theme === stored);
+  });
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (!localStorage.getItem("el-parking-theme")) applyTheme("auto");
+  });
 }
 
 function bindEvents() {
@@ -527,6 +545,21 @@ function bindEvents() {
     }
   });
   ui.spotSearch?.addEventListener("input", () => renderParking());
+
+  ui.themeToggle?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".theme-btn");
+    if (!btn) return;
+    const pref = btn.dataset.theme;
+    if (pref === "auto") {
+      localStorage.removeItem("el-parking-theme");
+    } else {
+      localStorage.setItem("el-parking-theme", pref);
+    }
+    applyTheme(pref);
+    ui.themeToggle.querySelectorAll(".theme-btn").forEach((b) => {
+      b.classList.toggle("active", b === btn);
+    });
+  });
 
   ui.tabs.forEach((tab) => tab.addEventListener("click", () => {
     if (tab.dataset.tab !== "settings" && state.profileDirty) {

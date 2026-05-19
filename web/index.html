@@ -232,7 +232,10 @@
                 <div class="settings-grid">
                   <label class="field">
                     <span>Make</span>
-                    <select id="vehicleMakeSelect"></select>
+                    <button id="vehicleMakeButton" class="field-select-button" type="button">
+                      <span id="vehicleMakeLabel"></span>
+                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none" aria-hidden="true"><path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
                   </label>
                   <label class="field">
                     <span>Model</span>
@@ -308,6 +311,16 @@
             </div>
             <p id="spotDetailsMeta" class="muted"></p>
             <div id="spotDetailsList" class="stack dense"></div>
+          </article>
+        </section>
+
+        <section id="makePickerModal" class="modal hidden" aria-hidden="true">
+          <article class="modal-card vehicle-picker-card" role="dialog" aria-modal="true" aria-labelledby="makePickerTitle">
+            <div class="modal-title-row">
+              <h3 id="makePickerTitle">Choose Make</h3>
+              <button id="makePickerClose" class="btn subtle small" type="button">Close</button>
+            </div>
+            <div id="makePickerList" class="vehicle-picker-list"></div>
           </article>
         </section>
 

@@ -257,8 +257,12 @@ const ui = {
   plateInput: byId("plateInput"),
   carInput: byId("carInput"),
   vehiclePreview: byId("vehiclePreview"),
-  vehicleMakeSelect: byId("vehicleMakeSelect"),
+  vehicleMakeButton: byId("vehicleMakeButton"),
+  vehicleMakeLabel: byId("vehicleMakeLabel"),
   vehicleModelSelect: byId("vehicleModelSelect"),
+  makePickerModal: byId("makePickerModal"),
+  makePickerList: byId("makePickerList"),
+  makePickerClose: byId("makePickerClose"),
   vehicleIconButton: byId("vehicleIconButton"),
   vehicleIconLabel: byId("vehicleIconLabel"),
   profileError: byId("profileError"),
@@ -441,16 +445,7 @@ function bindEvents() {
 
   ui.bookForm?.addEventListener("submit", onBookSubmit);
   ui.profileForm?.addEventListener("submit", onSaveProfile);
-  ui.vehicleMakeSelect?.addEventListener("change", () => {
-    state.selectedVehicleMake = ui.vehicleMakeSelect.value;
-    populateVehicleModelSelect();
-    state.selectedVehicleModel = ui.vehicleModelSelect.value;
-    if (!presetMatchesVehicle(state.selectedVehiclePresetID, state.selectedVehicleMake, state.selectedVehicleModel)) {
-      state.selectedVehiclePresetID = "";
-    }
-    syncCarDescriptionField();
-    renderVehiclePreview();
-  });
+  ui.vehicleMakeButton?.addEventListener("click", openMakePicker);
   ui.vehicleModelSelect?.addEventListener("change", () => {
     state.selectedVehicleModel = ui.vehicleModelSelect.value;
     if (!presetMatchesVehicle(state.selectedVehiclePresetID, state.selectedVehicleMake, state.selectedVehicleModel)) {
@@ -485,6 +480,10 @@ function bindEvents() {
   ui.spotDetailsModal?.addEventListener("click", (event) => {
     if (event.target === ui.spotDetailsModal) closeSpotDetailsModal();
   });
+  ui.makePickerClose?.addEventListener("click", closeMakePicker);
+  ui.makePickerModal?.addEventListener("click", (event) => {
+    if (event.target === ui.makePickerModal) closeMakePicker();
+  });
   ui.vehiclePickerClose?.addEventListener("click", closeVehiclePicker);
   ui.vehiclePickerModal?.addEventListener("click", (event) => {
     if (event.target === ui.vehiclePickerModal) closeVehiclePicker();
@@ -499,6 +498,7 @@ function bindEvents() {
       hideBookingSuccessModal();
       closeBookingEditModal();
       closeSpotDetailsModal();
+      closeMakePicker();
       closeVehiclePicker();
       resolveConfirm(false);
       closeContentModal();
@@ -1998,8 +1998,7 @@ function hydrateVehicleSelection() {
   const presetID = state.profile?.vehicleMiniaturePresetID || "";
   const preset = presetByID(presetID);
   state.selectedVehicleMake = preset?.make || parsed.make || CAR_MAKES[0] || "";
-  populateVehicleMakeSelect();
-  ui.vehicleMakeSelect.value = state.selectedVehicleMake;
+  renderMakeButton();
   state.selectedVehicleModel = preset?.models?.[0] || parsed.model || firstModelForMake(state.selectedVehicleMake);
   populateVehicleModelSelect();
   ui.vehicleModelSelect.value = state.selectedVehicleModel;
@@ -2010,23 +2009,14 @@ function hydrateVehicleSelection() {
   renderVehiclePreview();
 }
 
-function populateVehicleMakeSelect() {
-  if (!ui.vehicleMakeSelect) return;
-  const previous = ui.vehicleMakeSelect.value || state.selectedVehicleMake;
-  ui.vehicleMakeSelect.textContent = "";
-  for (const make of CAR_MAKES) {
-    const option = document.createElement("option");
-    option.value = make;
-    option.textContent = make;
-    ui.vehicleMakeSelect.append(option);
-  }
-  if (CAR_MAKES.includes(previous)) ui.vehicleMakeSelect.value = previous;
-  else ui.vehicleMakeSelect.value = CAR_MAKES[0] || "";
+function renderMakeButton() {
+  if (!ui.vehicleMakeLabel) return;
+  ui.vehicleMakeLabel.textContent = state.selectedVehicleMake || CAR_MAKES[0] || "";
 }
 
 function populateVehicleModelSelect() {
   if (!ui.vehicleModelSelect) return;
-  const make = ui.vehicleMakeSelect?.value || state.selectedVehicleMake;
+  const make = state.selectedVehicleMake;
   const previous = ui.vehicleModelSelect.value || state.selectedVehicleModel;
   const models = MODELS_BY_MAKE[make] || [];
   ui.vehicleModelSelect.textContent = "";
@@ -2042,7 +2032,7 @@ function populateVehicleModelSelect() {
 
 function renderVehiclePreview() {
   if (!ui.vehiclePreview) return;
-  const make = state.selectedVehicleMake || ui.vehicleMakeSelect?.value || "";
+  const make = state.selectedVehicleMake || "";
   const model = state.selectedVehicleModel || ui.vehicleModelSelect?.value || "";
   const preset = presetByID(state.selectedVehiclePresetID);
   const title = preset?.title || [make, model].filter(Boolean).join(" ");
@@ -2072,9 +2062,58 @@ function renderVehiclePreview() {
   if (ui.vehicleIconLabel) ui.vehicleIconLabel.textContent = preset?.title || "Automatic";
 }
 
+function openMakePicker() {
+  if (!ui.makePickerModal) return;
+  renderMakePickerOptions();
+  ui.makePickerModal.classList.remove("hidden");
+  ui.makePickerModal.setAttribute("aria-hidden", "false");
+}
+
+function closeMakePicker() {
+  if (!ui.makePickerModal) return;
+  ui.makePickerModal.classList.add("hidden");
+  ui.makePickerModal.setAttribute("aria-hidden", "true");
+}
+
+function renderMakePickerOptions() {
+  if (!ui.makePickerList) return;
+  ui.makePickerList.textContent = "";
+  for (const make of CAR_MAKES) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "make-picker-row";
+    row.classList.toggle("selected", state.selectedVehicleMake === make);
+    const media = document.createElement("span");
+    media.className = "make-picker-media";
+    const logo = makerLogoElement(make);
+    if (logo) media.append(logo);
+    else media.textContent = initials(make);
+    const name = document.createElement("span");
+    name.className = "make-picker-name";
+    name.textContent = make;
+    const check = document.createElement("span");
+    check.className = "vehicle-picker-check";
+    check.textContent = state.selectedVehicleMake === make ? "✓" : "";
+    row.append(media, name, check);
+    row.addEventListener("click", () => {
+      state.selectedVehicleMake = make;
+      renderMakeButton();
+      populateVehicleModelSelect();
+      state.selectedVehicleModel = ui.vehicleModelSelect?.value || "";
+      if (!presetMatchesVehicle(state.selectedVehiclePresetID, state.selectedVehicleMake, state.selectedVehicleModel)) {
+        state.selectedVehiclePresetID = "";
+      }
+      syncCarDescriptionField();
+      renderVehiclePreview();
+      closeMakePicker();
+    });
+    ui.makePickerList.append(row);
+  }
+}
+
 function openVehiclePicker() {
   if (!ui.vehiclePickerModal) return;
-  const make = ui.vehicleMakeSelect?.value || state.selectedVehicleMake;
+  const make = state.selectedVehicleMake;
   const model = ui.vehicleModelSelect?.value || state.selectedVehicleModel;
   ui.vehiclePickerTitle.textContent = "Choose Vehicle Icon";
   ui.vehiclePickerMeta.textContent = [make, model].filter(Boolean).join(" · ");
@@ -2091,7 +2130,7 @@ function closeVehiclePicker() {
 
 function renderVehiclePickerOptions() {
   if (!ui.vehiclePickerList) return;
-  const make = ui.vehicleMakeSelect?.value || state.selectedVehicleMake;
+  const make = state.selectedVehicleMake;
   const model = ui.vehicleModelSelect?.value || state.selectedVehicleModel;
   const options = presetsForVehicle(make, model);
   ui.vehiclePickerList.textContent = "";
@@ -2150,7 +2189,7 @@ function renderVehiclePickerOptions() {
 
 function syncCarDescriptionField() {
   if (!ui.carInput) return;
-  const make = ui.vehicleMakeSelect?.value || state.selectedVehicleMake || "";
+  const make = state.selectedVehicleMake || "";
   const model = ui.vehicleModelSelect?.value || state.selectedVehicleModel || "";
   ui.carInput.value = [make, model].filter(Boolean).join(" ");
 }

@@ -283,6 +283,73 @@ h3 {
   font-size: 14px;
 }
 
+.field-select-button {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  padding: 12px 13px;
+  font: inherit;
+  font-size: 16px;
+  min-height: 50px;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.field-select-button:focus {
+  outline: 3px solid var(--accent, #35c759);
+  outline-offset: 2px;
+}
+
+.make-picker-row {
+  border: 1px solid #e5ebf2;
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 28px;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.make-picker-row.selected {
+  border-color: #35c759;
+  background: #effbf2;
+}
+
+.make-picker-media {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  color: var(--subtle);
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.make-picker-media img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+
+.make-picker-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
 .field input,
 .field select,
 .field textarea,

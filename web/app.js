@@ -954,7 +954,7 @@ function openContentModal(kind, item = null) {
   ui.adminContentActive.checked = item?.isActive ?? true;
   ui.adminContentPinned.checked = item?.isPinned ?? false;
   ui.adminContentLinkURL.value = item?.linkURL || "";
-  ui.adminContentImageField.classList.toggle("hidden", !isAnnouncement);
+  ui.adminContentImageField.classList.remove("hidden");
   ui.adminAnnouncementOptions.classList.toggle("hidden", !isAnnouncement);
   ui.adminInfoLinkField.classList.toggle("hidden", isAnnouncement);
   ui.adminContentDelete.classList.toggle("hidden", !item);
@@ -1002,6 +1002,7 @@ async function saveCurrentContent(event) {
         icon: ui.adminContentIcon.value.trim() || "info.circle.fill",
         title,
         body,
+        imageURL: ui.adminContentImageURL.value.trim(),
         linkURL: ui.adminContentLinkURL.value.trim(),
         sortOrder: existing?.sortOrder ?? state.infoItems.length,
         createdAtMs: existing?.createdAtMs || Date.now(),
@@ -1045,6 +1046,7 @@ async function saveInfoItem(item) {
       icon: item.icon || "info.circle.fill",
       title: item.title,
       body: item.body,
+      imageURL: item.imageURL || "",
       details: item.details || "",
       fields: [],
       linkTitle: item.linkURL ? "Open" : "",

@@ -252,6 +252,7 @@ struct ParkKingApp: App {
     @State private var showNotificationEditSheet   = false
     @State private var notificationCancelBooking:   Booking?
     @State private var showNotificationCancelAlert = false
+    @Environment(\.scenePhase) private var scenePhase
 
     private var colorScheme: ColorScheme? {
         (AppTheme(rawValue: themeRaw) ?? .system).colorScheme
@@ -282,6 +283,10 @@ struct ParkKingApp: App {
                     bookingManager.scheduleDailyReminders()
                     if authManager.currentUser?.isActive == true {
                         proximityReminderManager.configure(with: bookingManager)
+                        if let user = authManager.currentUser {
+                            pushManager.startListening(for: user.uid)
+                            appDelegate.syncMessagingTokenToCurrentUser()
+                        }
                     }
                     // bookingManager.scheduleLiveActivities()  // Live Activity disabled
                     updateQuickActions()
@@ -290,6 +295,11 @@ struct ParkKingApp: App {
                        let route = AppQuickAction.route(for: type) {
                         deepLinkManager.navigate(to: route)
                     }
+                }
+                .onChange(of: scenePhase) { _, phase in
+                    guard phase == .active,
+                          authManager.currentUser?.isActive == true else { return }
+                    appDelegate.syncMessagingTokenToCurrentUser()
                 }
                 // Bridge: when auth changes, configure BookingManager + push notifications for the user
                 .onChange(of: authManager.currentUser) { _, user in
@@ -348,7 +358,7 @@ struct ParkKingApp: App {
                           let route = AppQuickAction.route(for: type) else { return }
                     deepLinkManager.navigate(to: route)
                 }
-                .sheet(isPresented: $showNotificationEditSheet) {
+                .fullScreenCover(isPresented: $showNotificationEditSheet) {
                     if let booking = notificationEditBooking {
                         BookingSheet(
                             preselectedSpot: AppConfig.allParkingSpots.first(where: { $0.label == booking.spot }),

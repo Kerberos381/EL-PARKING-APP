@@ -98,6 +98,77 @@ service cloud.firestore {
           && bookingMs <  (todayUtcMidnight + 95 * 3600 * 1000);
     }
 
+    function validBookingDocument(bookingId) {
+      return request.resource.data.keys().hasAll([
+          'id', 'title', 'spot', 'user', 'email', 'bookingDate',
+          'fromTime', 'toTime', 'createdBy', 'createdAt', 'expiresAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'id', 'title', 'spot', 'user', 'email', 'bookingDate',
+          'fromTime', 'toTime', 'createdBy', 'createdAt', 'expiresAt',
+          'groupID', 'spotID', 'bookedForUid', 'updatedAt'
+        ])
+        && request.resource.data.id == bookingId
+        && request.resource.data.title is string
+        && request.resource.data.spot is string
+        && request.resource.data.spot.matches('^Parking [0-9]+$')
+        && request.resource.data.user is string
+        && request.resource.data.email is string
+        && request.resource.data.bookingDate is timestamp
+        && validTimeString(request.resource.data.fromTime)
+        && validTimeString(request.resource.data.toTime)
+        && request.resource.data.fromTime < request.resource.data.toTime
+        && request.resource.data.createdBy is string
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.expiresAt is timestamp
+        && (!request.resource.data.keys().hasAny(['groupID'])
+            || request.resource.data.groupID is string)
+        && (!request.resource.data.keys().hasAny(['spotID'])
+            || request.resource.data.spotID is string)
+        && (!request.resource.data.keys().hasAny(['bookedForUid'])
+            || request.resource.data.bookedForUid is string)
+        && (!request.resource.data.keys().hasAny(['updatedAt'])
+            || request.resource.data.updatedAt is timestamp);
+    }
+
+    function bookingDateAllowedForActor() {
+      return isAdmin()
+        || (isPrivileged()
+          && request.resource.data.createdBy == myEmail()
+          && bookingDateIsWithin3Days())
+        || (request.resource.data.email == myEmail()
+          && request.resource.data.createdBy == myEmail()
+          && (bookingDateIsToday()
+            || (bookingDateIsTomorrow() && isAfter18LocalTime())));
+    }
+
+    function validBookingCreate(bookingId) {
+      return validBookingDocument(bookingId)
+        && bookingDateAllowedForActor();
+    }
+
+    function validBookingUpdate(bookingId) {
+      return validBookingDocument(bookingId)
+        && (bookingDateAllowedForActor()
+            || request.resource.data.bookingDate == resource.data.bookingDate)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function canModifyBooking() {
+      return resource.data.email == myEmail()
+        || resource.data.createdBy == myEmail()
+        || isAdmin();
+    }
+
+    function validSpotLockDocument() {
+      return request.resource.data.keys().hasOnly(['slots'])
+        && request.resource.data.slots is list
+        && request.resource.data.slots.size() <= 64;
+    }
+
     // ── /users/{uid} ──────────────────────────────────────────────────────────
 
     match /users/{uid} {
@@ -126,7 +197,6 @@ service cloud.firestore {
           && request.resource.data.get('needsFinishRegistration', false) == true
           && request.resource.data.status        == 'active'
           && request.resource.data.get('inviteAccepted', false) == true
-          && request.resource.data.emailVerified == true
           && request.resource.data.email         == request.auth.token.email)
       );
 
@@ -203,25 +273,13 @@ service cloud.firestore {
       //   privileged → today through today+3
       //   user       → today (any time) OR tomorrow (only after 18:00 local)
       allow create: if hasAppAccess()
-                    && validTimeString(request.resource.data.fromTime)
-                    && validTimeString(request.resource.data.toTime)
-                    && request.resource.data.fromTime < request.resource.data.toTime
-                    && (isAdmin()
-                        || (isPrivileged() && bookingDateIsWithin3Days())
-                        || (bookingDateIsToday()
-                            || (bookingDateIsTomorrow() && isAfter18LocalTime())));
+                    && validBookingCreate(bookingId);
 
-      allow update: if hasAppAccess() && (
-        resource.data.email == myEmail() ||
-        resource.data.createdBy == myEmail() ||
-        isAdmin()
-      );
+      allow update: if hasAppAccess()
+                    && canModifyBooking()
+                    && validBookingUpdate(bookingId);
 
-      allow delete: if hasAppAccess() && (
-        resource.data.email == myEmail() ||
-        resource.data.createdBy == myEmail() ||
-        isAdmin()
-      );
+      allow delete: if hasAppAccess() && canModifyBooking();
     }
 
     // ── /spot_locks/{lockId} ──────────────────────────────────────────────────
@@ -229,7 +287,7 @@ service cloud.firestore {
 
     match /spot_locks/{lockId} {
       allow read:            if hasAppAccess();
-      allow create, update:  if hasAppAccess();
+      allow create, update:  if hasAppAccess() && validSpotLockDocument();
       allow delete:          if isAdmin();
     }
 
@@ -279,7 +337,9 @@ service cloud.firestore {
       allow update: if signedIn()
                     && request.auth.uid == uid
                     && request.resource.data.delivered == true
-                    && resource.data.delivered == false;
+                    && resource.data.delivered == false
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['delivered']);
     }
 
     // ── /appConfig/{configId} ─────────────────────────────────────────────────

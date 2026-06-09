@@ -146,6 +146,7 @@ struct AppConfig {
     // To add a domain: echo -n "yourdomain.com" | shasum -a 256
     private static let allowedEmailDomainHashes: Set<String> = [
         "6dcd882bfad5a739cdcc1833e9a8f340233b4db777afb302f615fe30d87ae45c", // essilor.com
+        "24ca550ae0c87d8eb8f8d784ec8deb57312af4de6823c1635a509bf69a2b25f4", // essilor.cz
         "3b25ad563a5aa9aa91a73c606016fe635e2c26470da3fa789af7f4d853e244a0", // ext.essilor.com
         "a2fbd416f3c3a7e71506bc88890fe1bb2853afa0e7348395d1ad0da75732e1f8", // luxottica.com
         "1c0d91e0243bd27642ba27cdf1e15f0596e1daefe498a193e5c5ce14e293c476", // essilorluxottica.id

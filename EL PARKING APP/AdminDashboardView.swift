@@ -76,7 +76,7 @@ struct AdminDashboardView: View {
                 Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 18) {
+                    VStack(spacing: 20) {
 
                         // ── Pending alert banner ──────────────────────────────
                         if userCounts.pending > 0 {
@@ -96,16 +96,17 @@ struct AdminDashboardView: View {
                                 rowLabel(icon: "person.2.fill",
                                          iconColor: .blue,
                                          title: L10n.userManagement,
-                                         subtitle: pendingSubtitle,
+                                         subtitle: "Users",
                                          badge: userCounts.pending)
                             }
                             .buttonStyle(ScaleButtonStyle())
                             Divider().padding(.leading, 56)
                             Button { showCreateUser = true } label: {
                                 rowLabel(icon: "person.badge.plus",
-                                         iconColor: .green,
+                                         iconColor: AppConfig.darkText,
+                                         iconForeground: .black,
                                          title: L10n.adminCreateUser,
-                                         subtitle: createUserSubtitle,
+                                         subtitle: "New User",
                                          badge: 0)
                             }
                             .buttonStyle(ScaleButtonStyle())
@@ -114,7 +115,7 @@ struct AdminDashboardView: View {
                                 rowLabel(icon: "tray.and.arrow.down.fill",
                                          iconColor: .cyan,
                                          title: L10n.bulkImport,
-                                         subtitle: L10n.bulkImportSubtitle,
+                                         subtitle: "CSV Import",
                                          badge: 0)
                             }
                             .buttonStyle(ScaleButtonStyle())
@@ -129,7 +130,7 @@ struct AdminDashboardView: View {
                                 rowLabel(icon: "parkingsign.circle.fill",
                                          iconColor: .orange,
                                          title: L10n.spotManagement,
-                                         subtitle: spotSubtitle,
+                                         subtitle: "Spots",
                                          badge: 0)
                             }
                             .buttonStyle(ScaleButtonStyle())
@@ -142,7 +143,7 @@ struct AdminDashboardView: View {
                                 rowLabel(icon: "megaphone.fill",
                                          iconColor: .pink,
                                          title: L10n.announcements,
-                                         subtitle: announcementSubtitle,
+                                         subtitle: "Posts",
                                          badge: 0)
                             }
                             .buttonStyle(ScaleButtonStyle())
@@ -154,7 +155,7 @@ struct AdminDashboardView: View {
                                 rowLabel(icon: "info.circle.fill",
                                          iconColor: .purple,
                                          title: L10n.infoCards,
-                                         subtitle: infoSubtitle,
+                                         subtitle: "Cards",
                                          badge: 0)
                             }
                             .buttonStyle(ScaleButtonStyle())
@@ -169,7 +170,7 @@ struct AdminDashboardView: View {
                                 rowLabel(icon: "chart.bar.fill",
                                          iconColor: .red,
                                          title: L10n.bookingStatistics,
-                                         subtitle: L10n.statsSubtitle,
+                                         subtitle: "Trends",
                                          badge: 0)
                             }
                             .buttonStyle(ScaleButtonStyle())
@@ -184,9 +185,7 @@ struct AdminDashboardView: View {
                                 rowLabel(icon: "trash.slash.fill",
                                          iconColor: .orange,
                                          title: "Purge Orphaned Bookings",
-                                         subtitle: isPurging ? "Deleting…"
-                                                 : purgeResult.map { "\($0) deleted" }
-                                                 ?? "Delete malformed documents with empty fields",
+                                         subtitle: isPurging ? "Deleting…" : "Cleanup",
                                          badge: 0)
                             }
                             .buttonStyle(ScaleButtonStyle())
@@ -263,10 +262,9 @@ struct AdminDashboardView: View {
             HStack(spacing: 8) {
                 Image(systemName: "clock.badge.checkmark.fill")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Text(L10n.recentActivations.uppercased())
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(1.5)
+                    .foregroundStyle(AppConfig.subtleGray)
+                Text(L10n.recentActivations)
+                    .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(AppConfig.subtleGray)
             }
             .padding(.horizontal, 4)
@@ -377,11 +375,10 @@ struct AdminDashboardView: View {
 
     private var statsGroupedCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("OVERVIEW")
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(1.2)
+            Text("Overview")
+                .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(AppConfig.subtleGray)
-                .padding(.horizontal, 6)
+                .padding(.horizontal, 4)
 
             GeometryReader { proxy in
                 let spacing: CGFloat = 8
@@ -448,13 +445,6 @@ struct AdminDashboardView: View {
     ) -> some View {
         let isSelected = selectedQuickStat == filter
         let isPending = filter == .pending
-        let shortTitle: String = {
-            switch filter {
-            case .active: return "Act"
-            case .pending: return "Pen"
-            case .suspended: return "Sus"
-            }
-        }()
         let iconColor: Color = {
             switch filter {
             case .suspended:
@@ -475,31 +465,24 @@ struct AdminDashboardView: View {
                     .foregroundStyle(iconColor)
                     .symbolEffect(.breathe, options: .repeating, isActive: pulse && !reduceMotion)
 
-                if isSelected {
-                    Text(title)
-                        .font(.system(size: 15, weight: .regular))
-                        .foregroundStyle(AppConfig.darkText)
-                        .lineLimit(1)
-                    if isPending {
-                        Text("\(count)")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(.orange)
-                            .clipShape(Capsule())
-                            .contentTransition(.numericText())
-                    } else {
-                        Text("\(count)")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(AppConfig.subtleGray)
-                            .contentTransition(.numericText())
-                    }
+                Text(title)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(isSelected ? AppConfig.darkText : AppConfig.subtleGray)
+                    .lineLimit(1)
+                if isPending {
+                    Text("\(count)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(.orange)
+                        .clipShape(Capsule())
+                        .contentTransition(.numericText())
                 } else {
-                    Text(shortTitle)
-                        .font(.system(size: 12, weight: .medium))
+                    Text("\(count)")
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(AppConfig.subtleGray)
-                        .lineLimit(1)
+                        .contentTransition(.numericText())
                 }
             }
             .padding(.horizontal, 10)
@@ -569,62 +552,78 @@ struct AdminDashboardView: View {
     // MARK: - Grouped Section
 
     private func groupedSection<Content: View>(header: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(header.uppercased())
-                .font(.system(size: 10, weight: .semibold))
+        VStack(alignment: .leading, spacing: 7) {
+            Text(header)
+                .font(.caption.weight(.semibold))
                 .tracking(1.0)
                 .foregroundStyle(AppConfig.subtleGray)
                 .padding(.horizontal, 8)
             VStack(spacing: 0) {
                 content()
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
             .background(Color(uiColor: .secondarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(AppConfig.separatorSoft.opacity(0.35), lineWidth: 0.5)
+            )
             .containerShape(.rect(cornerRadius: 20))
         }
     }
 
-    private func rowLabel(icon: String, iconColor: Color, title: String, subtitle: String, badge: Int) -> some View {
-        HStack(spacing: 14) {
-            appleSettingsIcon(icon: icon, tint: iconColor)
-
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 8) {
-                    Text(title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppConfig.darkText)
-                    if badge > 0 {
-                        Text(badge > 9 ? "9+" : "\(badge)")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.orange)
-                            .clipShape(Capsule())
-                            .transition(.scale.combined(with: .opacity))
-                    }
-                }
+    private func rowLabel(
+        icon: String,
+        iconColor: Color,
+        iconForeground: Color = .white,
+        title: String,
+        subtitle: String,
+        badge: Int
+    ) -> some View {
+        HStack(spacing: 12) {
+            appleSettingsIcon(icon: icon, tint: iconColor, iconForeground: iconForeground)
+                .frame(width: 28, height: 28, alignment: .center)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppConfig.darkText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .layoutPriority(1)
+            Spacer()
+            if badge > 0 {
+                Text(badge > 9 ? "9+" : "\(badge)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.orange)
+                    .clipShape(Capsule())
+                    .transition(.scale.combined(with: .opacity))
+            } else {
                 Text(subtitle)
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(AppConfig.subtleGray)
                     .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: 150, alignment: .trailing)
             }
-            Spacer()
             Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(AppConfig.subtleGray.opacity(0.45))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppConfig.subtleGray.opacity(0.7))
                 .accessibilityHidden(true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .frame(minHeight: 56)
+        .padding(.vertical, 6)
+        .frame(height: 56)
         .contentShape(Rectangle())
     }
 
     private func appleSettingsIcon(
         icon: String,
         tint: Color,
+        iconForeground: Color = .white,
         size: CGFloat = 28,
         iconSize: CGFloat = 13
     ) -> some View {
@@ -633,7 +632,7 @@ struct AdminDashboardView: View {
                 .fill(tint)
             Image(systemName: icon)
                 .font(.system(size: iconSize, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(iconForeground)
         }
         .frame(width: size, height: size)
     }

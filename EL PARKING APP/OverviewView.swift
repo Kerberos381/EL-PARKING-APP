@@ -159,7 +159,7 @@ struct OverviewView: View {
                     .environmentObject(bookingManager)
                     .environmentObject(authManager)
             }
-            .sheet(item: $preselectedSpot) { spot in
+            .fullScreenCover(item: $preselectedSpot) { spot in
                 BookingSheet(
                     preselectedSpot: spot,
                     preselectedDate: selectedDate,
@@ -224,7 +224,8 @@ struct OverviewView: View {
 
             Spacer()
 
-            ThemeToggleButton()
+            Color.clear
+                .frame(width: 44, height: 44)
                 .padding(.top, 4)
         }
         .padding(.horizontal)

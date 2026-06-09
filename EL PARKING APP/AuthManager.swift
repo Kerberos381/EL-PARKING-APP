@@ -86,8 +86,41 @@ class AuthManager: ObservableObject {
                 }
             }
             #endif
-            guard let data = doc.data(), var user = AppUser.fromFirestore(data) else {
+            guard let data = doc.data() else {
+                if let bootstrapped = await bootstrapMissingUserProfile(uid: uid) {
+                    currentUser = bootstrapped
+                    if bootstrapped.needsFinishRegistration {
+                        authState = .needsFinishRegistration(bootstrapped)
+                    } else if bootstrapped.isActive {
+                        authState = .authenticated(bootstrapped)
+                        if bootstrapped.isAdmin { startUsersListener() }
+                    } else {
+                        authState = .pendingApproval
+                    }
+                    return
+                }
+                errorMessage = "Account profile is missing. Please sign in with password once, then contact admin if this persists."
                 authState = .unauthenticated
+                try? Auth.auth().signOut()
+                return
+            }
+
+            guard var user = AppUser.fromFirestore(data) else {
+                if let repaired = await repairInvalidUserProfile(uid: uid, data: data) {
+                    currentUser = repaired
+                    if repaired.needsFinishRegistration {
+                        authState = .needsFinishRegistration(repaired)
+                    } else if repaired.isActive {
+                        authState = .authenticated(repaired)
+                        if repaired.isAdmin { startUsersListener() }
+                    } else {
+                        authState = .pendingApproval
+                    }
+                    return
+                }
+                errorMessage = "Account profile is invalid. Please contact admin."
+                authState = .unauthenticated
+                try? Auth.auth().signOut()
                 return
             }
 
@@ -116,7 +149,104 @@ class AuthManager: ObservableObject {
                 authState = .pendingApproval
             }
         } catch {
+            errorMessage = "Unable to load account profile."
             authState = .unauthenticated
+        }
+    }
+
+    private func bootstrapMissingUserProfile(uid: String) async -> AppUser? {
+        guard let authUser = Auth.auth().currentUser else { return nil }
+        guard let email = authUser.email?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !email.isEmpty else {
+            return nil
+        }
+
+        let fallbackName: String
+        if let name = authUser.displayName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+            fallbackName = name
+        } else {
+            fallbackName = email
+        }
+
+        let profile = AppUser(
+            uid: uid,
+            email: email,
+            displayName: fallbackName,
+            role: .user,
+            status: .pending,
+            registrationPlate: "",
+            carDescription: "",
+            carColor: "",
+            carType: "",
+            vehicleMiniaturePresetID: "",
+            preferredVocative: "",
+            companyBadge: CompanyBadge.infer(from: email),
+            createdAt: Date(),
+            rejectionReason: nil,
+            inviteAccepted: false,
+            needsFinishRegistration: true,
+            activatedAt: nil
+        )
+
+        do {
+            try await db.collection("users").document(uid).setData(profile.toFirestore(), merge: true)
+            return profile
+        } catch {
+            return nil
+        }
+    }
+
+    private func repairInvalidUserProfile(uid: String, data: [String: Any]) async -> AppUser? {
+        guard let authUser = Auth.auth().currentUser else { return nil }
+        guard let email = authUser.email?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !email.isEmpty else {
+            return nil
+        }
+
+        let fallbackName: String
+        if let rawName = data["displayName"] as? String, !rawName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fallbackName = rawName
+        } else if let authName = authUser.displayName?.trimmingCharacters(in: .whitespacesAndNewlines), !authName.isEmpty {
+            fallbackName = authName
+        } else {
+            fallbackName = email
+        }
+
+        let repairedRole = UserRole(rawValue: (data["role"] as? String) ?? "") ?? .user
+        let repairedStatus = UserStatus(rawValue: (data["status"] as? String) ?? "") ?? .active
+
+        let repairedHistory = (data["strikeHistory"] as? [[String: Any]] ?? [])
+            .compactMap { StrikeEntry.fromFirestore($0) }
+            .sorted { $0.assignedAt < $1.assignedAt }
+
+        let repaired = AppUser(
+            uid: uid,
+            email: (data["email"] as? String)?.lowercased() ?? email,
+            displayName: fallbackName,
+            role: repairedRole,
+            status: repairedStatus,
+            registrationPlate: data["registrationPlate"] as? String ?? "",
+            carDescription: data["carDescription"] as? String ?? "",
+            carColor: data["carColor"] as? String ?? "",
+            carType: data["carType"] as? String ?? "",
+            vehicleMiniaturePresetID: (data["vehicleMiniaturePresetID"] as? String) ?? "",
+            preferredVocative: data["preferredVocative"] as? String ?? "",
+            companyBadge: CompanyBadge(rawValue: (data["companyBadge"] as? String) ?? "") ?? CompanyBadge.infer(from: email),
+            createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date(),
+            rejectionReason: data["rejectionReason"] as? String,
+            inviteAccepted: data["inviteAccepted"] as? Bool ?? true,
+            needsFinishRegistration: data["needsFinishRegistration"] as? Bool ?? false,
+            activatedAt: (data["activatedAt"] as? Timestamp)?.dateValue(),
+            strikes: data["strikes"] as? Int ?? 0,
+            suspendedAt: (data["suspendedAt"] as? Timestamp)?.dateValue(),
+            suspensionCount: data["suspensionCount"] as? Int ?? 0,
+            strikeHistory: repairedHistory,
+            lastStrikeAt: (data["lastStrikeAt"] as? Timestamp)?.dateValue()
+        )
+
+        do {
+            try await db.collection("users").document(uid).setData(repaired.toFirestore(), merge: true)
+            return repaired
+        } catch {
+            return nil
         }
     }
 
@@ -203,6 +333,7 @@ class AuthManager: ObservableObject {
                 carDescription:          car.trimmingCharacters(in: .whitespaces),
                 carColor:                "",
                 carType:                 "",
+                companyBadge:            CompanyBadge.infer(from: email),
                 createdAt:               Date(),
                 rejectionReason:         nil,
                 inviteAccepted:          false,
@@ -247,10 +378,10 @@ class AuthManager: ObservableObject {
 
     // MARK: - Biometric Sign-In (passwordless after first login)
 
-    func loginWithBiometrics() async {
+    func loginWithBiometrics() async -> Bool {
         guard let email = KeychainManager.shared.savedEmail else {
             errorMessage = "No saved credentials found. Please sign in with your password first."
-            return
+            return false
         }
 
         isLoading = true
@@ -261,22 +392,24 @@ class AuthManager: ObservableObject {
         guard let password = await KeychainManager.shared.retrievePassword(
             reason: "Sign in to EL Parking"
         ) else {
-            // User cancelled or biometric failed — don't show error (they can use password)
-            return
+            errorMessage = "Face ID credentials are unavailable. Please sign in with your password."
+            return false
         }
 
         do {
             try await Auth.auth().signIn(withEmail: email, password: password)
+            return true
         } catch {
             errorMessage = friendlyError(error)
             // Credentials may be stale (password changed elsewhere) — clear them
             KeychainManager.shared.deleteCredentials()
+            return false
         }
     }
 
     // MARK: - Sign Out
 
-    func signOut() {
+    func signOut(forgetBiometricCredentials: Bool = true) {
         try? Auth.auth().signOut()
         usersListener?.remove()
         usersListener = nil
@@ -285,7 +418,10 @@ class AuthManager: ObservableObject {
         allUsers      = []
         // pendingCount is computed from allUsers — no explicit reset needed
         authState     = .unauthenticated
-        // Note: we keep Keychain credentials so Face ID sign-in still works next time
+        if forgetBiometricCredentials {
+            KeychainManager.shared.deleteCredentials()
+            UserDefaults.standard.set(false, forKey: "biometricLockEnabled")
+        }
     }
 
     private func usersSignature(_ users: [AppUser]) -> Int {
@@ -319,7 +455,8 @@ class AuthManager: ObservableObject {
         carColor: String = "",
         carType: String = "",
         vehicleMiniaturePresetID: String = "",
-        preferredVocative: String = ""
+        preferredVocative: String = "",
+        companyBadge: CompanyBadge? = nil
     ) async {
         guard let uid = currentUser?.uid else { return }
         do {
@@ -333,6 +470,7 @@ class AuthManager: ObservableObject {
             ]
             if !carColor.isEmpty { update["carColor"] = carColor }
             if !carType.isEmpty  { update["carType"]  = carType  }
+            if let companyBadge { update["companyBadge"] = companyBadge.rawValue }
             try await db.collection("users").document(uid).updateData(update)
             currentUser?.displayName       = displayName
             currentUser?.registrationPlate = plate
@@ -341,8 +479,26 @@ class AuthManager: ObservableObject {
             currentUser?.preferredVocative = trimmedVocative
             if !carColor.isEmpty { currentUser?.carColor = carColor }
             if !carType.isEmpty  { currentUser?.carType  = carType  }
+            if let companyBadge { currentUser?.companyBadge = companyBadge }
         } catch {
             print("AuthManager profile update error: \(error.localizedDescription)")
+        }
+    }
+
+    func adminUpdateUserCompanyBadge(_ user: AppUser, companyBadge: CompanyBadge) async {
+        do {
+            try await db.collection("users").document(user.uid).updateData([
+                "companyBadge": companyBadge.rawValue
+            ])
+            AuditLogger.log(
+                action: "admin_update_company_badge",
+                detail: "Updated company badge for \(user.email) to \(companyBadge.rawValue)",
+                performedBy: currentUser?.uid ?? "unknown",
+                targetUID: user.uid
+            )
+            await fetchAllUsers()
+        } catch {
+            print("AuthManager adminUpdateUserCompanyBadge error: \(error.localizedDescription)")
         }
     }
 
@@ -390,7 +546,8 @@ class AuthManager: ObservableObject {
         name: String,
         email: String,
         tempPassword: String,
-        role: UserRole
+        role: UserRole,
+        companyBadge: CompanyBadge? = nil
     ) async -> Result<AppUser, Error> {
         errorMessage = nil
 
@@ -463,6 +620,7 @@ class AuthManager: ObservableObject {
                 carDescription:          "",
                 carColor:                "",
                 carType:                 "",
+                companyBadge:            companyBadge ?? CompanyBadge.infer(from: normalizedEmail),
                 createdAt:               Date(),
                 rejectionReason:         nil,
                 inviteAccepted:          true,

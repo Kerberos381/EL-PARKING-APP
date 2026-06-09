@@ -20,40 +20,43 @@ struct ContentView: View {
     @AppStorage("hasAskedBiometrics")    private var hasAskedBiometrics   = false
     @AppStorage("lastSeenVersion")       private var lastSeenVersion      = ""
     @AppStorage("hasSeenOnboarding")     private var hasSeenOnboarding    = false
-    @State private var biometricUnlocked     = false
+    @AppStorage("hasSeenFirstLaunchIntro") private var hasSeenFirstLaunchIntro = false
+    @State private var biometricUnlocked     = true
     @State private var showBiometricPrompt   = false
     @State private var backgroundedAt: Date? = nil
     @State private var showWhatsNew          = false
+    @State private var showFirstLaunchIntro  = false
     @State private var showOnboarding        = false
     @State private var whatsNewRelease: AppRelease? = nil
+    @State private var didRunPostLoginFlow   = false
     @State private var selectedTab: MainTab = .home
+    @State private var lastNonLoadingState: AuthState = .unauthenticated
+    @State private var ambientScale: CGFloat = 0.8
+    @State private var ambientOpacity: Double = 0.2
+    @State private var logoScale: CGFloat = 0.96
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var launchTransition: Animation {
+        reduceMotion ? .linear(duration: 0.25) : .spring(duration: 0.45, bounce: 0.0)
+    }
 
     var body: some View {
-        Group {
-            switch authManager.authState {
-            case .loading:
+        ZStack {
+            authContent(for: stageState)
+                .scaleEffect(authManager.authState == .loading ? 0.95 : 1.0)
+
+            if authManager.authState == .loading {
                 splashView
-
-            case .unauthenticated:
-                LoginView()
-
-            case .pendingApproval:
-                PendingApprovalView()
-
-            case .needsFinishRegistration(let user):
-                FinishRegistrationView(user: user)
-                    .environmentObject(authManager)
-
-            case .authenticated:
-                if biometricEnabled && !biometricUnlocked {
-                    BiometricLockView(isUnlocked: $biometricUnlocked)
-                } else {
-                    mainTabView
-                }
+                    .transition(
+                        .asymmetric(
+                            insertion: .identity,
+                            removal: .opacity.combined(with: .scale(scale: 1.08))
+                        )
+                    )
             }
         }
-        .animation(.standard, value: stateKey)
+        .animation(launchTransition, value: authManager.authState)
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
             case .background:
@@ -70,8 +73,20 @@ struct ContentView: View {
         .onChange(of: authManager.authState) { oldState, newState in
             if case .unauthenticated = newState, case .authenticated = oldState {
                 hasAskedBiometrics = false
+                biometricUnlocked = false
+                didRunPostLoginFlow = false
+            }
+            if case .loading = newState {
+                // Keep the previously rendered state beneath splash to avoid launch blink.
+            } else {
+                lastNonLoadingState = newState
             }
             if case .authenticated = newState {
+                guard !didRunPostLoginFlow else { return }
+                didRunPostLoginFlow = true
+                // Avoid showing a confusing biometric lock screen immediately after
+                // successful credential sign-in. Keep re-lock behavior on background timeout.
+                biometricUnlocked = true
                 if !hasAskedBiometrics,
                    KeychainManager.shared.canUseBiometrics,
                    KeychainManager.shared.hasSavedCredentials {
@@ -80,7 +95,12 @@ struct ContentView: View {
                         showBiometricPrompt = true
                     }
                 }
-                if !hasSeenOnboarding {
+                if !hasSeenFirstLaunchIntro {
+                    hasSeenFirstLaunchIntro = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        showFirstLaunchIntro = true
+                    }
+                } else if !hasSeenOnboarding {
                     hasSeenOnboarding = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         showOnboarding = true
@@ -89,6 +109,20 @@ struct ContentView: View {
                     checkWhatsNew()
                 }
             }
+        }
+        .sheet(isPresented: $showFirstLaunchIntro, onDismiss: {
+            if !hasSeenOnboarding {
+                hasSeenOnboarding = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    showOnboarding = true
+                }
+            } else {
+                checkWhatsNew()
+            }
+        }) {
+            WhatsNewView(release: AppReleaseNotes.firstLaunchIntro)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
         }
         .sheet(isPresented: $showOnboarding) {
             OnboardingView()
@@ -111,9 +145,48 @@ struct ContentView: View {
         } message: {
             Text(L10n.signInInstantly(KeychainManager.shared.biometricName))
         }
+        .onAppear {
+            // Existing users who have already seen onboarding should not be forced
+            // into the first-launch intro on upgrade.
+            if hasSeenOnboarding && !hasSeenFirstLaunchIntro {
+                hasSeenFirstLaunchIntro = true
+            }
+        }
     }
 
     // MARK: - Main App
+
+    private var stageState: AuthState {
+        if case .loading = authManager.authState {
+            if let user = authManager.currentUser {
+                if user.needsFinishRegistration { return .needsFinishRegistration(user) }
+                return user.isActive ? .authenticated(user) : .pendingApproval
+            }
+            return lastNonLoadingState
+        }
+        return authManager.authState
+    }
+
+    @ViewBuilder
+    private func authContent(for state: AuthState) -> some View {
+        switch state {
+        case .loading:
+            LoginView()
+        case .unauthenticated:
+            LoginView()
+        case .pendingApproval:
+            PendingApprovalView()
+        case .needsFinishRegistration(let user):
+            FinishRegistrationView(user: user)
+                .environmentObject(authManager)
+        case .authenticated:
+            if biometricEnabled && !biometricUnlocked {
+                BiometricLockView(isUnlocked: $biometricUnlocked)
+            } else {
+                mainTabView
+            }
+        }
+    }
 
     private var mainTabView: some View {
         TabView(selection: $selectedTab) {
@@ -143,7 +216,7 @@ struct ContentView: View {
             }
 
         }
-        .tint(AppConfig.accentFg)
+        .tint(AppConfig.darkText)
         .tabBarMinimizeBehavior(.onScrollDown)
         .withToastOverlay()
         .onChange(of: deepLinkManager.pendingRoute) { _, route in
@@ -174,17 +247,36 @@ struct ContentView: View {
             Color(red: 0.039, green: 0.039, blue: 0.055)
                 .ignoresSafeArea()
 
-            VStack(spacing: 20) {
-                Image("AppIconImage")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 120, height: 120)
-                    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                    .shadow(color: AppConfig.accent.opacity(0.4), radius: 24, y: 0)
+            ZStack {
+                Circle()
+                    .fill(AppConfig.accent)
+                    .frame(width: 280, height: 280)
+                    .blur(radius: 60)
+                    .opacity(ambientOpacity * 0.5)
 
-                ProgressView()
-                    .tint(AppConfig.accentFg)
-                    .scaleEffect(0.85)
+                Circle()
+                    .fill(AppConfig.accent.opacity(0.15))
+                    .frame(width: 400, height: 400)
+                    .blur(radius: 80)
+                    .scaleEffect(ambientScale)
+                    .opacity(ambientOpacity)
+            }
+
+            Image("AppIconImage")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 100, height: 100)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .shadow(color: Color.black.opacity(0.4), radius: 20, x: 0, y: 10)
+                .scaleEffect(logoScale)
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
+                ambientScale = 1.3
+                ambientOpacity = 0.4
+            }
+            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                logoScale = 1.02
             }
         }
     }

@@ -163,13 +163,24 @@ struct VehicleMiniaturePresetPickerSheet: View {
     private struct PreparedOption: Identifiable {
         let preset: VehicleMiniaturePreset
         let make: String?
+        let displayTitle: String
         var id: String { preset.id }
     }
 
     private var preparedOptions: [PreparedOption] {
-        options.map { preset in
+        let duplicateCounts = Dictionary(grouping: options, by: { $0.pickerDisplayTitle })
+            .mapValues(\.count)
+
+        return options.map { preset in
             let parsed = CarData.splitMakeModel(preset.searchDescription).make
-            return PreparedOption(preset: preset, make: parsed.isEmpty ? nil : parsed)
+            let baseTitle = preset.pickerDisplayTitle
+            let hasDuplicateBaseTitle = (duplicateCounts[baseTitle] ?? 0) > 1
+            let label = hasDuplicateBaseTitle ? preset.title : baseTitle
+            return PreparedOption(
+                preset: preset,
+                make: parsed.isEmpty ? nil : parsed,
+                displayTitle: label
+            )
         }
     }
 
@@ -203,7 +214,7 @@ struct VehicleMiniaturePresetPickerSheet: View {
                                         CarMakerLogoBadge(make: presetMake, size: 20)
                                     }
 
-                                    Text(option.preset.pickerDisplayTitle)
+                                    Text(option.displayTitle)
                                         .font(.body.weight(.medium))
                                         .foregroundStyle(AppConfig.darkText)
                                         .lineLimit(1)

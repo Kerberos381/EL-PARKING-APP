@@ -72,6 +72,8 @@ class InfoManager: ObservableObject {
         fields: [ContactField] = [],
         linkTitle: String = "",
         linkURL: String = "",
+        imageURL: String? = nil,
+        imageBase64: String? = nil,
         sendPush: Bool = false
     ) async {
         errorMessage = nil
@@ -86,6 +88,8 @@ class InfoManager: ObservableObject {
             fields: fields,
             linkTitle: linkTitle,
             linkURL: linkURL,
+            imageURL: imageURL,
+            imageBase64: imageBase64,
             sortOrder: maxOrder + 1, createdAt: Date()
         )
         do {

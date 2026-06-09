@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import PhotosUI
 
 struct AdminInfoView: View {
     @EnvironmentObject var infoManager: InfoManager
@@ -163,7 +164,7 @@ struct AdminInfoView: View {
             }
         }
         .sheet(isPresented: $showAddSheet) {
-            InfoItemFormView(mode: .add) { icon, title, body, fields, linkTitle, linkURL, sendPush in
+            InfoItemFormView(mode: .add) { icon, title, body, fields, linkTitle, linkURL, imageURL, imageBase64, sendPush in
                 Task {
                     await infoManager.create(
                         icon: icon,
@@ -172,13 +173,15 @@ struct AdminInfoView: View {
                         fields: fields,
                         linkTitle: linkTitle,
                         linkURL: linkURL,
+                        imageURL: imageURL,
+                        imageBase64: imageBase64,
                         sendPush: sendPush
                     )
                 }
             }
         }
         .sheet(item: $editingItem) { item in
-            InfoItemFormView(mode: .edit(item)) { icon, title, body, fields, linkTitle, linkURL, sendPush in
+            InfoItemFormView(mode: .edit(item)) { icon, title, body, fields, linkTitle, linkURL, imageURL, imageBase64, sendPush in
                 var updated = item
                 updated.icon      = icon
                 updated.title     = title
@@ -186,6 +189,8 @@ struct AdminInfoView: View {
                 updated.fields    = fields
                 updated.linkTitle = linkTitle
                 updated.linkURL   = linkURL
+                updated.imageURL = imageURL
+                updated.imageBase64 = imageBase64
                 Task { await infoManager.update(updated, sendPush: sendPush) }
             }
         }
@@ -239,8 +244,8 @@ enum InfoFormMode: Identifiable {
 
 struct InfoItemFormView: View {
     let mode: InfoFormMode
-    /// (icon, title, body, fields, linkTitle, linkURL, sendPush)
-    let onSave: (String, String, String, [ContactField], String, String, Bool) -> Void
+    /// (icon, title, body, fields, linkTitle, linkURL, imageURL, imageBase64, sendPush)
+    let onSave: (String, String, String, [ContactField], String, String, String?, String?, Bool) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -252,9 +257,15 @@ struct InfoItemFormView: View {
     @State private var contactFields: [ContactField]
     @State private var linkTitle: String
     @State private var linkURL: String
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var selectedImageData: Data?
+    @State private var imageURLInput: String
+    @State private var existingImageURL: String?
+    @State private var existingImageBase64: String?
+    @State private var showImageUploadSection: Bool
     @State private var sendPush: Bool
 
-    init(mode: InfoFormMode, onSave: @escaping (String, String, String, [ContactField], String, String, Bool) -> Void) {
+    init(mode: InfoFormMode, onSave: @escaping (String, String, String, [ContactField], String, String, String?, String?, Bool) -> Void) {
         self.mode   = mode
         self.onSave = onSave
         if case .edit(let item) = mode {
@@ -264,6 +275,12 @@ struct InfoItemFormView: View {
             _contactFields  = State(initialValue: item.fields)
             _linkTitle      = State(initialValue: item.linkTitle)
             _linkURL        = State(initialValue: item.linkURL)
+            _selectedPhotoItem = State(initialValue: nil)
+            _selectedImageData = State(initialValue: nil)
+            _imageURLInput = State(initialValue: item.imageURL ?? "")
+            _existingImageURL = State(initialValue: item.imageURL)
+            _existingImageBase64 = State(initialValue: item.imageBase64)
+            _showImageUploadSection = State(initialValue: item.imageURL != nil || item.imageBase64 != nil)
             _sendPush       = State(initialValue: false)
         } else {
             _selectedIcon   = State(initialValue: InfoItem.presetIcons[0])
@@ -272,6 +289,12 @@ struct InfoItemFormView: View {
             _contactFields  = State(initialValue: [])
             _linkTitle      = State(initialValue: "")
             _linkURL        = State(initialValue: "")
+            _selectedPhotoItem = State(initialValue: nil)
+            _selectedImageData = State(initialValue: nil)
+            _imageURLInput = State(initialValue: "")
+            _existingImageURL = State(initialValue: nil)
+            _existingImageBase64 = State(initialValue: nil)
+            _showImageUploadSection = State(initialValue: false)
             _sendPush       = State(initialValue: false)
         }
     }
@@ -335,6 +358,167 @@ struct InfoItemFormView: View {
                             TextField(L10n.infoDescPlaceholder, text: $cardBody, axis: .vertical)
                                 .lineLimit(3, reservesSpace: true)
                                 .styledInput()
+                        }
+
+                        formSection(label: "Card Image (optional)") {
+                            DisclosureGroup(isExpanded: $showImageUploadSection) {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    HStack(spacing: 12) {
+                                        if let imageData = selectedImageData,
+                                           let uiImage = UIImage(data: imageData) {
+                                            Image(uiImage: uiImage)
+                                                .resizable()
+                                                .scaledToFill()
+                                                .frame(width: 80, height: 80)
+                                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                                .overlay(alignment: .topTrailing) {
+                                                    Button {
+                                                        withAnimation {
+                                                            selectedImageData = nil
+                                                            selectedPhotoItem = nil
+                                                            imageURLInput = ""
+                                                            existingImageURL = nil
+                                                            existingImageBase64 = nil
+                                                        }
+                                                    } label: {
+                                                        Image(systemName: "xmark.circle.fill")
+                                                            .font(.system(size: 20))
+                                                            .foregroundStyle(.white, .black.opacity(0.5))
+                                                    }
+                                                    .offset(x: 6, y: -6)
+                                                }
+                                        } else if let existingImageURL,
+                                                  let url = URL(string: existingImageURL) {
+                                            AsyncImage(url: url) { phase in
+                                                if let img = phase.image {
+                                                    img
+                                                        .resizable()
+                                                        .scaledToFill()
+                                                        .frame(width: 80, height: 80)
+                                                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                                                } else {
+                                                    RoundedRectangle(cornerRadius: 14)
+                                                        .fill(AppConfig.surfaceLow)
+                                                        .frame(width: 80, height: 80)
+                                                        .overlay(ProgressView())
+                                                }
+                                            }
+                                            .overlay(alignment: .topTrailing) {
+                                                Button {
+                                                        withAnimation {
+                                                            imageURLInput = ""
+                                                            self.existingImageURL = nil
+                                                            existingImageBase64 = nil
+                                                        }
+                                                } label: {
+                                                    Image(systemName: "xmark.circle.fill")
+                                                        .font(.system(size: 20))
+                                                        .foregroundStyle(.white, .black.opacity(0.5))
+                                                }
+                                                .offset(x: 6, y: -6)
+                                            }
+                                        } else if let base64 = existingImageBase64,
+                                                  let data = Data(base64Encoded: base64),
+                                                  let uiImage = UIImage(data: data) {
+                                            Image(uiImage: uiImage)
+                                                .resizable()
+                                                .scaledToFill()
+                                                .frame(width: 80, height: 80)
+                                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                                .overlay(alignment: .topTrailing) {
+                                                    Button {
+                                                        withAnimation {
+                                                            imageURLInput = ""
+                                                            existingImageURL = nil
+                                                            existingImageBase64 = nil
+                                                        }
+                                                    } label: {
+                                                        Image(systemName: "xmark.circle.fill")
+                                                            .font(.system(size: 20))
+                                                            .foregroundStyle(.white, .black.opacity(0.5))
+                                                    }
+                                                    .offset(x: 6, y: -6)
+                                                }
+                                        }
+
+                                        PhotosPicker(
+                                            selection: $selectedPhotoItem,
+                                            matching: .images,
+                                            photoLibrary: .shared()
+                                        ) {
+                                            Label(
+                                                selectedImageData != nil || existingImageURL != nil || existingImageBase64 != nil
+                                                    ? "Change Photo"
+                                                    : "Choose Photo",
+                                                systemImage: "photo.on.rectangle.angled"
+                                            )
+                                            .font(.footnote.weight(.semibold))
+                                            .foregroundStyle(AppConfig.subtleGray)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 9)
+                                            .background(AppConfig.surfaceLow)
+                                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        }
+                                    }
+                                    .onChange(of: selectedPhotoItem) { _, newItem in
+                                        guard let newItem else { return }
+                                        Task {
+                                            if let data = try? await newItem.loadTransferable(type: Data.self),
+                                               let uiImage = UIImage(data: data) {
+                                                let preparedData: Data
+                                                if data.count > 4_000_000 {
+                                                    preparedData = uiImage.jpegData(compressionQuality: 0.9) ?? data
+                                                } else {
+                                                    preparedData = uiImage.jpegData(compressionQuality: 0.98) ?? data
+                                                }
+                                                selectedImageData = preparedData
+                                                imageURLInput = ""
+                                                existingImageURL = nil
+                                                existingImageBase64 = nil
+                                            }
+                                        }
+                                    }
+
+                                    TextField("or paste image URL (https://...)", text: $imageURLInput)
+                                        .keyboardType(.URL)
+                                        .textInputAutocapitalization(.never)
+                                        .autocorrectionDisabled(true)
+                                        .styledInput()
+                                        .onChange(of: imageURLInput) { _, newValue in
+                                            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                                            guard !trimmed.isEmpty else { return }
+                                            selectedImageData = nil
+                                            selectedPhotoItem = nil
+                                            existingImageBase64 = nil
+                                            existingImageURL = trimmed
+                                        }
+
+                                    Text("Secondary option. Prefer default icons for regular info cards.")
+                                        .font(.caption2)
+                                        .foregroundStyle(AppConfig.subtleGray.opacity(0.7))
+                                }
+                                .padding(.top, 8)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "photo.badge.plus")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(AppConfig.subtleGray)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Use custom photo")
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(AppConfig.darkText)
+                                        Text("Hidden by default to keep posts consistent")
+                                            .font(.caption2)
+                                            .foregroundStyle(AppConfig.subtleGray.opacity(0.7))
+                                    }
+                                    Spacer()
+                                    if selectedImageData != nil || existingImageURL != nil || existingImageBase64 != nil {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 14))
+                                            .foregroundStyle(AppConfig.darkText)
+                                    }
+                                }
+                            }
                         }
 
                         // Structured contact / info fields
@@ -460,6 +644,39 @@ struct InfoItemFormView: View {
 
     private var previewCard: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if let imageData = selectedImageData,
+               let uiImage = UIImage(data: imageData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 120)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            } else if let existingImageURL,
+                      let url = URL(string: existingImageURL) {
+                AsyncImage(url: url) { phase in
+                    if let img = phase.image {
+                        img
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 120)
+                            .clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                }
+            } else if let base64 = existingImageBase64,
+                      let data = Data(base64Encoded: base64),
+                      let uiImage = UIImage(data: data) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 120)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
             Image(systemName: selectedIcon)
                 .font(.title3)
                 .foregroundStyle(AppConfig.subtleGray)
@@ -552,7 +769,7 @@ struct InfoItemFormView: View {
     private func formSection<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(label)
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(AppConfig.subtleGray)
             content()
         }
@@ -566,6 +783,12 @@ struct InfoItemFormView: View {
             return copy
         }.filter { !$0.value.isEmpty }
 
+        let trimmedImageURL = imageURLInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let base64Image = selectedImageData?.base64EncodedString() ?? existingImageBase64
+        let resolvedImageURL: String? = (selectedImageData == nil && base64Image == nil && !trimmedImageURL.isEmpty)
+            ? trimmedImageURL
+            : nil
+
         onSave(
             selectedIcon,
             title.trimmingCharacters(in: .whitespaces),
@@ -573,6 +796,8 @@ struct InfoItemFormView: View {
             trimmedFields,
             linkTitle.trimmingCharacters(in: .whitespacesAndNewlines),
             linkURL.trimmingCharacters(in: .whitespacesAndNewlines),
+            resolvedImageURL,
+            base64Image,
             sendPush
         )
         dismiss()

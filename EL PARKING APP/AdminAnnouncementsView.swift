@@ -165,7 +165,7 @@ struct AdminAnnouncementsView: View {
                                     .foregroundStyle(.white)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 3)
-                                    .background(AppConfig.accentFg)
+                                    .background(AppConfig.darkText)
                                     .clipShape(Capsule())
                             }
                             .buttonStyle(ScaleButtonStyle())
@@ -235,8 +235,8 @@ struct AdminAnnouncementsView: View {
     private func listSectionHeader(_ text: String) -> some View {
         Text(text)
             .textCase(nil)
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(AppConfig.subtleGray)
     }
 
     // MARK: - Empty State
@@ -423,7 +423,7 @@ struct ComposeAnnouncementSheet: View {
                                                     Image(systemName: "checkmark.circle.fill")
                                                         .font(.system(size: 16))
                                                         .foregroundStyle(.white)
-                                                        .background(Circle().fill(AppConfig.accentFg).frame(width: 15, height: 15))
+                                                        .background(Circle().fill(AppConfig.darkText).frame(width: 15, height: 15))
                                                         .offset(x: 3, y: 3)
                                                 }
                                             }
@@ -438,12 +438,45 @@ struct ComposeAnnouncementSheet: View {
                         // Text Color
                         editorCard {
                             sectionLabel("Text Color")
-                            Picker("Text Color", selection: $selectedTextColorMode) {
+                            Menu {
                                 ForEach(AnnouncementTextColorMode.allCases, id: \.self) { mode in
-                                    Text(mode.title).tag(mode)
+                                    Button {
+                                        selectedTextColorMode = mode
+                                    } label: {
+                                        HStack {
+                                            Text(mode.title)
+                                            if selectedTextColorMode == mode {
+                                                Spacer()
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
                                 }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "textformat")
+                                        .foregroundStyle(AppConfig.subtleGray)
+                                        .frame(width: 20)
+                                    Text("Text Color")
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(AppConfig.darkText)
+                                    Spacer()
+                                    Text(selectedTextColorMode.title)
+                                        .font(.subheadline)
+                                        .foregroundStyle(AppConfig.subtleGray)
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(AppConfig.subtleGray.opacity(0.65))
+                                }
+                                .padding(14)
+                                .background(AppConfig.surfaceLow)
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(AppConfig.outlineVariant.opacity(0.35), lineWidth: 1)
+                                )
                             }
-                            .pickerStyle(.segmented)
+                            .buttonStyle(ScaleButtonStyle())
 
                             Text("Auto adapts for readability. Use White/Black to force a style.")
                                 .font(.caption2)
@@ -579,7 +612,7 @@ struct ComposeAnnouncementSheet: View {
                                     if selectedImageData != nil || existingImageURL != nil || existingImageBase64 != nil {
                                         Image(systemName: "checkmark.circle.fill")
                                             .font(.system(size: 14))
-                                            .foregroundStyle(AppConfig.accentFg)
+                                            .foregroundStyle(AppConfig.darkText)
                                     }
                                 }
                             }
@@ -715,7 +748,7 @@ struct ComposeAnnouncementSheet: View {
                         Task { await save() }
                     }
                     .fontWeight(.semibold)
-                    .foregroundStyle(isValid ? AppConfig.accentFg : AppConfig.subtleGray)
+                    .foregroundStyle(isValid ? AppConfig.darkText : AppConfig.subtleGray)
                     .disabled(!isValid || isSaving)
                 }
             })
@@ -916,15 +949,15 @@ struct ComposeAnnouncementSheet: View {
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(.caption.weight(.semibold))
+            .font(.system(size: 19, weight: .semibold))
             .foregroundStyle(AppConfig.subtleGray)
     }
 
     private func listSectionHeader(_ text: String) -> some View {
         Text(text)
             .textCase(nil)
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(AppConfig.subtleGray)
     }
 
     @ViewBuilder

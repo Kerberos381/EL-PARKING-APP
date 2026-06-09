@@ -16,6 +16,9 @@ struct AdminCreateUserView: View {
     @State private var email         = ""
     @State private var tempPassword  = Self.generatePassword()
     @State private var selectedRole: UserRole = .user
+    @State private var selectedCompanyBadge: CompanyBadge = .none
+    @State private var didManuallySetCompanyBadge = false
+    @State private var isAutoUpdatingCompanyBadge = false
     @State private var isLoading     = false
     @State private var errorMsg: String? = nil
     @State private var createdUser: AppUser? = nil
@@ -62,7 +65,7 @@ struct AdminCreateUserView: View {
                             createUser()
                         }
                         .fontWeight(.semibold)
-                        .foregroundStyle(isFormValid ? AppConfig.accentFg : AppConfig.subtleGray)
+                        .foregroundStyle(isFormValid ? AppConfig.darkText : AppConfig.subtleGray)
                         .disabled(!isFormValid)
                     }
                 }
@@ -90,7 +93,7 @@ struct AdminCreateUserView: View {
             .padding(.top, 8)
 
             // Identity card
-            sectionCard(title: L10n.userManagement.uppercased(), icon: "person.fill") {
+            sectionCard(title: L10n.userManagement, icon: "person.fill") {
                 VStack(spacing: 8) {
                     inputRow(icon: "person", placeholder: L10n.fullName,
                              text: $name, capitalization: .words)
@@ -99,48 +102,93 @@ struct AdminCreateUserView: View {
                     }
                     inputRow(icon: "envelope", placeholder: L10n.emailAddress,
                              text: $email, keyboardType: .emailAddress, capitalization: .never)
+                    .onChange(of: email) { _, newValue in
+                        if !didManuallySetCompanyBadge {
+                            isAutoUpdatingCompanyBadge = true
+                            selectedCompanyBadge = CompanyBadge.infer(from: newValue)
+                            isAutoUpdatingCompanyBadge = false
+                        }
+                    }
                     if let msg = emailValidationMessage {
                         inlineValidation(msg, isError: true)
                     }
                 }
             }
 
+            sectionCard(title: L10n.companyBadge, icon: "building.2.fill") {
+                VStack(spacing: 8) {
+                    Menu {
+                        ForEach(CompanyBadge.allCases, id: \.rawValue) { badge in
+                            Button {
+                                Haptics.selection()
+                                selectedCompanyBadge = badge
+                                didManuallySetCompanyBadge = true
+                            } label: {
+                                HStack {
+                                    Text(companyBadgeLabel(badge))
+                                    if selectedCompanyBadge == badge {
+                                        Spacer()
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        selectionRow(
+                            title: L10n.companyBadge,
+                            value: companyBadgeLabel(selectedCompanyBadge),
+                            icon: "building.2"
+                        )
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .onAppear {
+                        if !didManuallySetCompanyBadge {
+                            isAutoUpdatingCompanyBadge = true
+                            selectedCompanyBadge = CompanyBadge.infer(from: email)
+                            isAutoUpdatingCompanyBadge = false
+                        }
+                    }
+                    .onChange(of: selectedCompanyBadge) { _, _ in
+                        guard !isAutoUpdatingCompanyBadge else { return }
+                        didManuallySetCompanyBadge = true
+                    }
+
+                    Text(L10n.companyBadgeHint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+
             // Role card
-            sectionCard(title: L10n.assignRole.uppercased(), icon: "shield.fill") {
-                HStack(spacing: 8) {
+            sectionCard(title: L10n.assignRole, icon: "shield.fill") {
+                Menu {
                     ForEach(UserRole.allCases, id: \.rawValue) { role in
-                        let sel = role == selectedRole
                         Button {
-                            guard selectedRole != role else { return }
                             Haptics.selection()
                             withAnimation(.quick) { selectedRole = role }
                         } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: roleIcon(role))
-                                    .font(.system(size: 14, weight: .semibold))
-                                Text(role.displayName)
-                                    .font(.system(size: 12, weight: .semibold))
+                            HStack {
+                                Label(role.displayName, systemImage: roleIcon(role))
+                                if selectedRole == role {
+                                    Spacer()
+                                    Image(systemName: "checkmark")
+                                }
                             }
-                            .foregroundStyle(sel ? .primary : .secondary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(sel ? AppConfig.surfaceHigh : AppConfig.cardBg)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(sel ? AppConfig.separatorSoft : AppConfig.separatorSoft, lineWidth: 1)
-                            )
                         }
-                        .buttonStyle(ScaleButtonStyle())
                     }
+                } label: {
+                    selectionRow(
+                        title: L10n.assignRole,
+                        value: selectedRole.displayName,
+                        icon: "shield"
+                    )
                 }
-                .padding(4)
-                .background(AppConfig.surfaceLow)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .buttonStyle(ScaleButtonStyle())
             }
 
             // Password card
-            sectionCard(title: L10n.tempPassword.uppercased(), icon: "lock.fill") {
+            sectionCard(title: L10n.tempPassword, icon: "lock.fill") {
                 VStack(spacing: 10) {
                     HStack(spacing: 12) {
                         Image(systemName: "key")
@@ -238,6 +286,8 @@ struct AdminCreateUserView: View {
                 credRow(icon: "key", label: L10n.tempPassword, value: tempPassword)
                 Divider()
                 credRow(icon: "shield.fill", label: L10n.assignRole, value: user.role.displayName)
+                Divider()
+                credRow(icon: "building.2.fill", label: L10n.companyBadge, value: companyBadgeLabel(user.companyBadge))
             }
             .padding(20)
             .background(AppConfig.cardBg)
@@ -347,6 +397,8 @@ struct AdminCreateUserView: View {
                 email: email.trimmingCharacters(in: .whitespaces).lowercased(),
                 tempPassword: tempPassword,
                 role: selectedRole
+                ,
+                companyBadge: selectedCompanyBadge
             )
             await MainActor.run {
                 isLoading = false
@@ -367,6 +419,15 @@ struct AdminCreateUserView: View {
         case .admin:      return "checkmark.shield.fill"
         case .privileged: return "star.fill"
         case .user:       return "person.fill"
+        }
+    }
+
+    private func companyBadgeLabel(_ badge: CompanyBadge) -> String {
+        switch badge {
+        case .omega: return "Omega"
+        case .essilorLuxottica: return "EssilorLuxottica"
+        case .grandVision: return "Grand Vision"
+        case .none: return L10n.noneLabel
         }
     }
 
@@ -418,11 +479,10 @@ struct AdminCreateUserView: View {
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppConfig.subtleGray)
                 Text(title)
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.5)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(AppConfig.subtleGray)
             }
             .padding(.horizontal, 4)
             VStack(spacing: 10) { content() }
@@ -463,6 +523,30 @@ struct AdminCreateUserView: View {
         }
         .padding(14)
         .contentShape(RoundedRectangle(cornerRadius: 14))
+        .background(AppConfig.surfaceLow)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(AppConfig.outlineVariant.opacity(0.4), lineWidth: 1))
+    }
+
+    @ViewBuilder
+    private func selectionRow(title: String, value: String, icon: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(.secondary)
+                .frame(width: 20)
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(AppConfig.darkText)
+            Spacer()
+            Text(value)
+                .font(.subheadline)
+                .foregroundStyle(AppConfig.subtleGray)
+                .lineLimit(1)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AppConfig.subtleGray.opacity(0.65))
+        }
+        .padding(14)
         .background(AppConfig.surfaceLow)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(AppConfig.outlineVariant.opacity(0.4), lineWidth: 1))

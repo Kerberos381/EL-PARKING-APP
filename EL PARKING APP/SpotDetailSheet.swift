@@ -96,7 +96,9 @@ struct SpotDetailSheet: View {
                         }
                         .foregroundStyle(AppConfig.darkText)
                         .frame(maxWidth: .infinity)
+                        .frame(minHeight: 50)
                         .padding(.vertical, 14)
+                        .contentShape(Rectangle())
                         .background(AppConfig.cardBg)
                         .clipShape(RoundedRectangle(cornerRadius: 20))
                         .overlay(RoundedRectangle(cornerRadius: 20).stroke(AppConfig.outlineVariant, lineWidth: 1))
@@ -321,6 +323,8 @@ struct SpotDetailSheet: View {
                     .foregroundStyle(AppConfig.subtleGray)
             }
             .padding(16)
+            .frame(minHeight: 52)
+            .contentShape(Rectangle())
             .background(AppConfig.cardBg)
             .clipShape(RoundedRectangle(cornerRadius: 20))
             .overlay(RoundedRectangle(cornerRadius: 20).stroke(color.opacity(0.2), lineWidth: 1.5))

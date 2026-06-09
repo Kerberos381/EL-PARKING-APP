@@ -14,10 +14,13 @@ struct AdminSpotsView: View {
     @State private var bulkMode    = false
     @State private var selectedIDs = Set<String>()
     @State private var isInitialLoading = true
+    @State private var detailSpot: ParkingSpot?
+    @State private var gridShakeOffset: CGFloat = 0
 
     private var spots:      [ParkingSpot] { bookingManager.parkingSpots }
     private var blockedIDs: Set<String>   { AppConfig.blockedSpotIDs }
     private var shouldShowLoadingSkeleton: Bool { isInitialLoading && spots.isEmpty }
+    private var showsBulkBar: Bool { bulkMode && !selectedIDs.isEmpty }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -28,6 +31,7 @@ struct AdminSpotsView: View {
                     if shouldShowLoadingSkeleton {
                         loadingSkeleton
                     } else {
+                        overlineRow
                         statsRow
                         spotsGrid
                     }
@@ -42,7 +46,10 @@ struct AdminSpotsView: View {
 
             if bulkMode {
                 bulkActionBar
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .opacity(showsBulkBar ? 1 : 0)
+                    .allowsHitTesting(showsBulkBar)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
             }
         }
         .navigationTitle(L10n.spotManagement)
@@ -56,48 +63,53 @@ struct AdminSpotsView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(bulkMode ? L10n.done : L10n.select) {
                     Haptics.action()
-                    withAnimation(.standard) {
-                        bulkMode.toggle()
-                        selectedIDs.removeAll()
-                    }
+                    bulkMode.toggle()
+                    selectedIDs.removeAll()
                 }
                 .foregroundStyle(AppConfig.darkText)
                 .fontWeight(.semibold)
             }
         }
-        .animation(.standard, value: bulkMode)
+        .sheet(item: $detailSpot) { spot in
+            spotDetailSheet(spot)
+        }
+    }
+
+    // MARK: - Overline
+
+    private var overlineRow: some View {
+        Text("EL PARK \u{00B7} ADMIN")
+            .font(.system(size: 12, weight: .semibold))
+            .tracking(1.8)
+            .textCase(.uppercase)
+            .foregroundStyle(AppConfig.subtleGray.opacity(0.75))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 2)
     }
 
     // MARK: - Stats Row
 
     private var statsRow: some View {
-        HStack(spacing: 12) {
-            statPill(value: "\(spots.count)",
-                     label: L10n.total,
-                     color: AppConfig.subtleGray)
-            statPill(value: "\(blockedIDs.count)",
-                     label: L10n.blocked,
-                     color: AppConfig.spotOccupied)
-            statPill(value: "\(spots.filter { $0.isAccessible }.count)",
-                     label: L10n.accessible,
-                     color: .blue)
+        HStack(spacing: 14) {
+            compactStat(value: "\(spots.count)", label: L10n.total, dot: AppConfig.subtleGray.opacity(0.75))
+            compactStat(value: "\(blockedIDs.count)", label: L10n.blocked, dot: AppConfig.spotOccupied)
+            compactStat(value: "\(spots.filter { $0.isAccessible }.count)", label: L10n.accessible, dot: .blue)
         }
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
-    private func statPill(value: String, label: String, color: Color) -> some View {
-        VStack(spacing: 4) {
+    private func compactStat(value: String, label: String, dot: Color) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(dot)
+                .frame(width: 8, height: 8)
             Text(value)
-                .font(.system(size: 24, weight: .black, design: .rounded))
-                .foregroundStyle(color)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(AppConfig.darkText)
             Text(label)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(AppConfig.subtleGray)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(AppConfig.subtleGray.opacity(0.9))
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .background(color.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(color.opacity(0.15), lineWidth: 1))
     }
 
     // MARK: - Spots Grid
@@ -109,6 +121,7 @@ struct AdminSpotsView: View {
                 spotCard(spot)
             }
         }
+        .offset(x: gridShakeOffset)
     }
 
     private var loadingSkeleton: some View {
@@ -145,149 +158,340 @@ struct AdminSpotsView: View {
     private func spotCard(_ spot: ParkingSpot) -> some View {
         let isBlocked  = blockedIDs.contains(spot.id)
         let isSelected = selectedIDs.contains(spot.id)
+        let isAccessible = spot.isAccessible && !isBlocked
+        let numberColor: Color = isBlocked ? AppConfig.spotOccupied : (isAccessible ? .blue : AppConfig.darkText)
+        let cardFill: Color = isBlocked
+            ? AppConfig.spotOccupied.opacity(0.04)
+            : (isAccessible ? Color.blue.opacity(0.09) : AppConfig.cardBg)
 
         ZStack {
-            // Card background
             RoundedRectangle(cornerRadius: AppConfig.radius16)
-                .fill(isBlocked ? AppConfig.spotOccupied.opacity(0.12) : AppConfig.cardBg)
+                .fill(cardFill)
                 .overlay(
                     RoundedRectangle(cornerRadius: AppConfig.radius16)
-                        .stroke(
-                            isBlocked
-                                ? AppConfig.spotOccupied.opacity(0.35)
-                                : (isSelected ? AppConfig.accent : AppConfig.accent.opacity(0.25)),
-                            lineWidth: isSelected ? 2.5 : 1.5
+                        .strokeBorder(
+                            isSelected ? Color.blue : AppConfig.separatorSoft.opacity(0.65),
+                            lineWidth: isSelected ? 2.5 : 0.8
                         )
                 )
                 .frame(height: 95)
 
-            // Spot number + status
-            VStack(spacing: 3) {
-                Text(spot.id)
-                    .font(.system(size: 30, weight: .black, design: .rounded))
-                    .foregroundStyle(isBlocked ? AppConfig.spotOccupied : AppConfig.darkText)
+            if isBlocked {
+                RoundedRectangle(cornerRadius: AppConfig.radius16)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.clear, AppConfig.spotOccupied.opacity(0.08), Color.clear],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
 
-                if isBlocked {
-                    HStack(spacing: 3) {
-                        Image(systemName: "lock.fill")
-                            .font(.system(size: 8, weight: .bold))
-                        Text(L10n.blockedBadge)
-                            .font(.system(size: 8, weight: .bold))
-                            .tracking(0.5)
-                    }
+            Text(spot.id)
+                .font(.system(size: 40, weight: .black, design: .default))
+                .monospacedDigit()
+                .kerning(-0.8)
+                .foregroundStyle(numberColor)
+
+            if isBlocked {
+                stripeOverlay
+            }
+
+            if isBlocked {
+                Image(systemName: "minus.circle.fill")
+                    .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(AppConfig.spotOccupied)
-                }
-            }
-
-            // Bulk select circle — top-left
-            if bulkMode {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(isSelected ? AppConfig.accent : AppConfig.subtleGray.opacity(0.35))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(7)
+                    .padding(8)
+            } else if isAccessible {
+                accessibleCornerBadge
             }
 
-            // Accessibility toggle — top-right
-            VStack {
-                HStack {
-                    Spacer()
-                    Button {
-                        guard !bulkMode else { return }
-                        Haptics.action()
-                        bookingManager.updateSpot(id: spot.id, isAccessible: !spot.isAccessible)
-                    } label: {
-                        Image(systemName: "figure.roll")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(spot.isAccessible ? Color.blue : AppConfig.subtleGray.opacity(0.25))
-                            .frame(width: 44, height: 44)
-                            .background(spot.isAccessible ? Color.blue.opacity(0.12) : Color.clear)
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                }
-                Spacer()
-            }
-            .padding(4)
+            selectCircle(selected: isSelected)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(8)
+                .opacity(bulkMode ? 1 : 0)
         }
         .contentShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
         .onTapGesture {
             Haptics.selection()
-            withAnimation(.standard) {
-                if bulkMode {
-                    if selectedIDs.contains(spot.id) {
-                        selectedIDs.remove(spot.id)
-                    } else {
-                        selectedIDs.insert(spot.id)
-                    }
+            if bulkMode {
+                if selectedIDs.contains(spot.id) {
+                    selectedIDs.remove(spot.id)
                 } else {
-                    bookingManager.updateSpot(id: spot.id, isBlocked: !isBlocked)
+                    let selectingBlocked = blockedIDs.contains(spot.id)
+                    let hasBlockedSelected = selectedIDs.contains { blockedIDs.contains($0) }
+                    let hasUnblockedSelected = selectedIDs.contains { !blockedIDs.contains($0) }
+                    let isMixingTypes = (selectingBlocked && hasUnblockedSelected) || (!selectingBlocked && hasBlockedSelected)
+                    if isMixingTypes {
+                        triggerInvalidSelectionFeedback()
+                        return
+                    }
+                    selectedIDs.insert(spot.id)
                 }
+            } else {
+                detailSpot = spot
             }
         }
         .animation(.standard, value: isBlocked)
         .animation(.standard, value: isSelected)
     }
 
+    private var stripeOverlay: some View {
+        RoundedRectangle(cornerRadius: AppConfig.radius16)
+            .strokeBorder(style: StrokeStyle(lineWidth: 10))
+            .foregroundStyle(Color.clear)
+            .background(
+                GeometryReader { geo in
+                    Path { path in
+                        let step: CGFloat = 14
+                        let w = geo.size.width
+                        let h = geo.size.height
+                        var x: CGFloat = -h
+                        while x < w {
+                            path.move(to: CGPoint(x: x, y: 0))
+                            path.addLine(to: CGPoint(x: x + h, y: h))
+                            x += step
+                        }
+                    }
+                    .stroke(AppConfig.spotOccupied.opacity(0.12), lineWidth: 6)
+                }
+            )
+            .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
+    }
+
+    private var accessibleCornerBadge: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.blue)
+                .frame(width: 34, height: 34)
+            Image(systemName: "figure.roll")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.white)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .offset(x: -2, y: 2)
+    }
+
+    private func selectCircle(selected: Bool) -> some View {
+        ZStack {
+            Circle()
+                .fill(selected ? Color.blue : Color.white.opacity(0.95))
+                .frame(width: 22, height: 22)
+            Circle()
+                .stroke(selected ? Color.blue : Color.black.opacity(0.18), lineWidth: 1.5)
+                .frame(width: 22, height: 22)
+            if selected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+        }
+    }
+
     // MARK: - Bulk Action Bar
 
     private var bulkActionBar: some View {
-        VStack(spacing: 0) {
-            Divider()
-            HStack(spacing: 12) {
+        let selectedBlockedCount = selectedIDs.filter { blockedIDs.contains($0) }.count
+        let hasBlockedSelection = selectedBlockedCount > 0
 
+        return HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(selectedIDs.count) selected")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("Apply an action to all")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .lineLimit(1)
+            }
+            .frame(minWidth: 86, alignment: .leading)
+
+            Spacer(minLength: 0)
+
+            if hasBlockedSelection {
                 Button {
                     Haptics.action()
-                    withAnimation {
-                        if selectedIDs.count == spots.count {
-                            selectedIDs.removeAll()
-                        } else {
-                            selectedIDs = Set(spots.map { $0.id })
-                        }
+                    for id in selectedIDs {
+                        bookingManager.updateSpot(id: id, isBlocked: false)
                     }
+                    Haptics.notify(.success)
+                    withAnimation(.standard) { selectedIDs.removeAll() }
                 } label: {
-                    Text(selectedIDs.count == spots.count ? L10n.deselectAll : L10n.selectAll)
-                        .font(.subheadline)
-                        .foregroundStyle(AppConfig.subtleGray)
+                    HStack(spacing: 6) {
+                        Image(systemName: "lock.open")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("Unblock")
+                            .font(.system(size: 13, weight: .semibold))
+                            .lineLimit(1)
+                    }
+                    .frame(minWidth: 96, minHeight: 48)
+                    .padding(.horizontal, 10)
+                    .foregroundStyle(.white)
+                    .background(Color.white.opacity(0.14))
+                    .clipShape(Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+            } else {
+                Button {
+                    Haptics.action()
+                    for id in selectedIDs {
+                        bookingManager.updateSpot(id: id, isAccessible: true)
+                    }
+                    Haptics.notify(.success)
+                    withAnimation(.standard) { selectedIDs.removeAll() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "figure.roll")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("Accessible")
+                            .font(.system(size: 13, weight: .semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .frame(minWidth: 104, minHeight: 48)
+                    .padding(.horizontal, 10)
+                    .foregroundStyle(.white)
+                    .background(Color.blue.opacity(0.32))
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(ScaleButtonStyle())
+            }
 
+            Button {
+                guard !selectedIDs.isEmpty else { return }
+                Haptics.destructive()
+                for id in selectedIDs {
+                    bookingManager.updateSpot(id: id, isBlocked: true)
+                }
+                withAnimation(.standard) { selectedIDs.removeAll() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "nosign")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Block")
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                }
+                .frame(minWidth: 88, minHeight: 48)
+                .padding(.horizontal, 10)
+                .foregroundStyle(.white.opacity(selectedIDs.isEmpty ? 0.45 : 1.0))
+                .background(AppConfig.spotOccupied.opacity(selectedIDs.isEmpty ? 0.16 : 0.32))
+                .clipShape(Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .disabled(selectedIDs.isEmpty)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+        .frame(height: 94)
+        .frame(maxWidth: .infinity)
+        .background(Color.black)
+        .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 34, style: .continuous)
+                .stroke(Color.white.opacity(0.09), lineWidth: 0.6)
+        )
+    }
+
+    private func triggerInvalidSelectionFeedback() {
+        Haptics.notify(.error)
+        ToastManager.shared.show("Select only blocked or unblocked spots.", style: .warning, duration: 2.0)
+        withAnimation(.easeInOut(duration: 0.06).repeatCount(3, autoreverses: true)) {
+            gridShakeOffset = 8
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+            gridShakeOffset = 0
+        }
+    }
+
+    // MARK: - Spot Detail
+
+    private func spotDetailSheet(_ spot: ParkingSpot) -> some View {
+        let isBlocked = blockedIDs.contains(spot.id)
+        let isAccessible = spot.isAccessible && !isBlocked
+
+        return VStack(spacing: 14) {
+            Capsule()
+                .fill(Color.black.opacity(0.2))
+                .frame(width: 36, height: 5)
+                .padding(.top, 8)
+
+            HStack(alignment: .center) {
+                Text(spot.id)
+                    .font(.system(size: 44, weight: .black))
+                    .monospacedDigit()
                 Spacer()
-
-                Button {
-                    Haptics.action()
-                    for id in selectedIDs { bookingManager.updateSpot(id: id, isBlocked: false) }
-                    withAnimation(.standard) { selectedIDs.removeAll(); bulkMode = false }
-                } label: {
-                    Text(L10n.unblock)
-                        .font(.subheadline).fontWeight(.semibold)
-                        .foregroundStyle(selectedIDs.isEmpty ? AppConfig.subtleGray : AppConfig.darkText)
-                        .padding(.horizontal, 18).padding(.vertical, 10)
-                        .background((selectedIDs.isEmpty ? AppConfig.subtleGray : AppConfig.darkText).opacity(0.12))
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .disabled(selectedIDs.isEmpty)
-
-                Button {
-                    Haptics.action()
-                    for id in selectedIDs { bookingManager.updateSpot(id: id, isBlocked: true) }
-                    withAnimation(.standard) { selectedIDs.removeAll(); bulkMode = false }
-                } label: {
-                    Text(L10n.blockSelected(selectedIDs.count))
-                        .font(.subheadline).fontWeight(.bold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 18).padding(.vertical, 10)
-                        .background(selectedIDs.isEmpty ? AppConfig.subtleGray.opacity(0.3) : AppConfig.spotOccupied)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .disabled(selectedIDs.isEmpty)
+                Text(isBlocked ? L10n.blocked : (isAccessible ? L10n.accessible : L10n.available))
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background((isBlocked ? AppConfig.spotOccupied : (isAccessible ? .blue : AppConfig.subtleGray)).opacity(0.15))
+                    .foregroundStyle(isBlocked ? AppConfig.spotOccupied : (isAccessible ? .blue : AppConfig.subtleGray))
+                    .clipShape(Capsule())
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 14)
-            .background(.ultraThinMaterial)
+
+            VStack(spacing: 12) {
+                actionRow(
+                    title: isBlocked ? "Unblock Spot" : "Block Spot",
+                    subtitle: isBlocked ? "Put spot back in rotation" : "Take spot out of rotation",
+                    icon: isBlocked ? "lock.open.fill" : "nosign",
+                    tint: isBlocked ? AppConfig.darkText : AppConfig.spotOccupied
+                ) {
+                    bookingManager.updateSpot(id: spot.id, isBlocked: !isBlocked)
+                    detailSpot = nil
+                }
+
+                actionRow(
+                    title: isAccessible ? "Remove Accessibility" : "Mark Accessible",
+                    subtitle: isAccessible ? "Remove wheelchair designation" : "Add wheelchair designation",
+                    icon: "figure.roll",
+                    tint: .blue
+                ) {
+                    bookingManager.updateSpot(id: spot.id, isAccessible: !spot.isAccessible)
+                    detailSpot = nil
+                }
+            }
+            .padding(.horizontal, 20)
+
+            Spacer()
         }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.hidden)
+        .background(AppConfig.pageBg.ignoresSafeArea())
+    }
+
+    private func actionRow(title: String, subtitle: String, icon: String, tint: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(tint.opacity(0.12))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: icon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(tint)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(AppConfig.darkText)
+                    Text(subtitle)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(AppConfig.subtleGray)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(AppConfig.cardBg)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(ScaleButtonStyle())
     }
 }
 

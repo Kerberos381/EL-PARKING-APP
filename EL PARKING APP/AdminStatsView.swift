@@ -232,9 +232,7 @@ struct AdminStatsView: View {
     private var statsHeader: some View {
         HStack {
             Text(L10n.last30Days)
-                .font(.caption)
-                .fontWeight(.bold)
-                .tracking(3)
+                .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(AppConfig.subtleGray)
             Spacer()
             HStack(spacing: 10) {
@@ -341,7 +339,7 @@ struct AdminStatsView: View {
                 value: String(format: "%.0f%%", avgDailyOccupancy),
                 label: L10n.avgOccupancy,
                 icon: "parkingsign.circle.fill",
-                color: AppConfig.accentFg
+                color: AppConfig.darkText
             )
             summaryCard(
                 value: "\(bookingManager.parkingSpots.count)",
@@ -368,7 +366,7 @@ struct AdminStatsView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 20)
+        .padding(.vertical, 16)
         .background(AppConfig.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
         .shadow(color: .black.opacity(0.03), radius: 6, y: 2)
@@ -380,9 +378,9 @@ struct AdminStatsView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
                 Image(systemName: "chart.bar.xaxis")
-                    .foregroundStyle(AppConfig.accentFg)
+                    .foregroundStyle(AppConfig.darkText)
                 Text(L10n.bookingsByDay)
-                    .font(.headline)
+                    .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(AppConfig.darkText)
             }
 
@@ -414,7 +412,7 @@ struct AdminStatsView: View {
             }
             .frame(height: 136)
         }
-        .padding(18)
+        .padding(16)
         .background(AppConfig.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
         .shadow(color: .black.opacity(0.03), radius: 6, y: 2)
@@ -426,9 +424,9 @@ struct AdminStatsView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
                 Image(systemName: "star")
-                    .foregroundStyle(AppConfig.accentFg)
+                    .foregroundStyle(AppConfig.darkText)
                 Text(L10n.mostBookedSpots)
-                    .font(.headline)
+                    .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(AppConfig.darkText)
             }
 
@@ -480,7 +478,7 @@ struct AdminStatsView: View {
                 }
             }
         }
-        .padding(18)
+        .padding(16)
         .background(AppConfig.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
         .shadow(color: .black.opacity(0.03), radius: 6, y: 2)
@@ -495,7 +493,7 @@ struct AdminStatsView: View {
                     .foregroundStyle(.orange)
                 Text("Warning Tracker")
                     .textCase(nil)
-                    .font(.headline)
+                    .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(AppConfig.darkText)
             }
 
@@ -559,7 +557,7 @@ struct AdminStatsView: View {
                 }
             }
         }
-        .padding(18)
+        .padding(16)
         .background(AppConfig.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
         .shadow(color: .black.opacity(0.03), radius: 6, y: 2)

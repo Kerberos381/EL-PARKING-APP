@@ -67,3 +67,9 @@ __MACOSX/
 
 # Web local Firebase config (public keys, but keep per-environment local)
 web/firebase-config.js
+
+# Cloud Functions dependencies are restored from package-lock.json
+functions/node_modules/
+
+# Firebase emulator output
+firestore-debug.log

@@ -75,6 +75,8 @@ struct InfoItem: Identifiable {
     var fields: [ContactField]
     var linkTitle: String
     var linkURL: String
+    var imageURL: String?
+    var imageBase64: String?
     var sortOrder: Int
     var createdAt: Date
 
@@ -89,6 +91,8 @@ struct InfoItem: Identifiable {
             "fields":    fields.map { $0.toDict() },
             "linkTitle": linkTitle,
             "linkURL":   linkURL,
+            "imageURL":  imageURL ?? NSNull(),
+            "imageBase64": imageBase64 ?? NSNull(),
             "sortOrder": sortOrder,
             "createdAt": Timestamp(date: createdAt)
         ]
@@ -107,6 +111,8 @@ struct InfoItem: Identifiable {
             fields:    rawFields.compactMap { ContactField.fromDict($0) },
             linkTitle: (data["linkTitle"] as? String) ?? "",
             linkURL:   (data["linkURL"]   as? String) ?? "",
+            imageURL:  data["imageURL"] as? String,
+            imageBase64: data["imageBase64"] as? String,
             sortOrder: (data["sortOrder"] as? Int)    ?? 0,
             createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
         )

@@ -15,6 +15,7 @@ struct AdminUsersView: View {
 
     @AppStorage("adminUsersLayoutGrid") private var useGridLayout = false
     @State private var selectedFilter: UserStatus? = nil
+    @State private var selectedCompanyFilter: CompanyBadge? = nil
     @State private var isLoading       = false
 
     init(initialFilter: UserStatus? = nil) {
@@ -67,6 +68,7 @@ struct AdminUsersView: View {
     private var filteredUsers: [AppUser] {
         var users = authManager.allUsers
         if let filter = selectedFilter { users = users.filter { $0.status == filter } }
+        if let company = selectedCompanyFilter { users = users.filter { $0.companyBadge == company } }
         if !normalizedSearchQuery.isEmpty {
             users = users.filter {
                 $0.displayName.lowercased().contains(normalizedSearchQuery) ||
@@ -84,6 +86,17 @@ struct AdminUsersView: View {
             if user.isPending { result.pending += 1 }
             if user.isActive { result.active += 1 }
             if user.isSuspended { result.suspended += 1 }
+        }
+    }
+
+    private var companyCounts: (omega: Int, essilorLuxottica: Int, grandVision: Int) {
+        authManager.allUsers.reduce(into: (0, 0, 0)) { result, user in
+            switch user.companyBadge {
+            case .omega: result.0 += 1
+            case .essilorLuxottica: result.1 += 1
+            case .grandVision: result.2 += 1
+            case .none: break
+            }
         }
     }
 
@@ -227,12 +240,12 @@ struct AdminUsersView: View {
     // MARK: - Filter Pills
 
     private var filterPills: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        VStack(spacing: 8) {
             HStack(spacing: 8) {
-                filterPill(label: L10n.all,       count: authManager.allUsers.count, filter: nil)
-                filterPill(label: L10n.pending,   count: pendingCount,   filter: .pending)
-                filterPill(label: L10n.activeFilter, count: activeCount, filter: .active)
-                filterPill(label: L10n.suspended, count: suspendedCount, filter: .suspended)
+                statusFilterMenu
+                    .frame(maxWidth: .infinity)
+                companyFilterMenu
+                    .frame(maxWidth: .infinity)
             }
             .padding(.horizontal)
         }
@@ -268,6 +281,259 @@ struct AdminUsersView: View {
             )
         }
         .buttonStyle(ScaleButtonStyle())
+    }
+
+    private var companyFilterMenu: some View {
+        Menu {
+            Button {
+                Haptics.selection()
+                withAnimation(.standard) { selectedCompanyFilter = nil }
+            } label: {
+                HStack {
+                    Text(L10n.all)
+                    if selectedCompanyFilter == nil {
+                        Spacer()
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+
+            Button {
+                Haptics.selection()
+                withAnimation(.standard) { selectedCompanyFilter = .omega }
+            } label: {
+                HStack {
+                    Text(L10n.omegaLabel)
+                    if selectedCompanyFilter == .omega {
+                        Spacer()
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+
+            Button {
+                Haptics.selection()
+                withAnimation(.standard) { selectedCompanyFilter = .essilorLuxottica }
+            } label: {
+                HStack {
+                    Text(L10n.essilorLuxotticaLabel)
+                    if selectedCompanyFilter == .essilorLuxottica {
+                        Spacer()
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+
+            Button {
+                Haptics.selection()
+                withAnimation(.standard) { selectedCompanyFilter = .grandVision }
+            } label: {
+                HStack {
+                    Text(L10n.grandVisionLabel)
+                    if selectedCompanyFilter == .grandVision {
+                        Spacer()
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Company: \(selectedCompanyChipLabel)")
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                if selectedCompanyFilter != nil {
+                    Text("\(selectedCompanyCount)")
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(AppConfig.surfaceLow)
+                        .clipShape(Capsule())
+                }
+            }
+            .foregroundStyle(AppConfig.darkText)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(minHeight: 46)
+            .contentShape(Rectangle())
+            .background(AppConfig.cardBg)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(AppConfig.separatorSoft, lineWidth: 1)
+            )
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+
+    private var statusFilterMenu: some View {
+        Menu {
+            Button {
+                Haptics.selection()
+                withAnimation(.standard) { selectedFilter = nil }
+            } label: {
+                HStack {
+                    Text(statusAllUsersLabel)
+                    if selectedFilter == nil {
+                        Spacer()
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+
+            Button {
+                Haptics.selection()
+                withAnimation(.standard) { selectedFilter = .pending }
+            } label: {
+                HStack {
+                    Text(statusPendingUsersLabel)
+                    if selectedFilter == .pending {
+                        Spacer()
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+
+            Button {
+                Haptics.selection()
+                withAnimation(.standard) { selectedFilter = .active }
+            } label: {
+                HStack {
+                    Text(statusActiveUsersLabel)
+                    if selectedFilter == .active {
+                        Spacer()
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+
+            Button {
+                Haptics.selection()
+                withAnimation(.standard) { selectedFilter = .suspended }
+            } label: {
+                HStack {
+                    Text(statusSuspendedUsersLabel)
+                    if selectedFilter == .suspended {
+                        Spacer()
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Status: \(selectedStatusChipLabel)")
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                if selectedFilter != nil {
+                    Text("\(selectedStatusCount)")
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(AppConfig.surfaceLow)
+                        .clipShape(Capsule())
+                }
+            }
+            .foregroundStyle(AppConfig.darkText)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(minHeight: 46)
+            .contentShape(Rectangle())
+            .background(AppConfig.cardBg)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(AppConfig.separatorSoft, lineWidth: 1)
+            )
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+
+    private var selectedStatusFilterLabel: String {
+        switch selectedFilter {
+        case .none: return statusAllUsersLabel
+        case .some(.pending): return statusPendingUsersLabel
+        case .some(.active): return statusActiveUsersLabel
+        case .some(.suspended): return statusSuspendedUsersLabel
+        }
+    }
+
+    private var selectedStatusCount: Int {
+        switch selectedFilter {
+        case .none: return authManager.allUsers.count
+        case .some(.pending): return pendingCount
+        case .some(.active): return activeCount
+        case .some(.suspended): return suspendedCount
+        }
+    }
+
+    private var selectedStatusChipLabel: String {
+        switch selectedFilter {
+        case .none: return L10n.all
+        case .some(.pending): return L10n.pending
+        case .some(.active): return L10n.activeFilter
+        case .some(.suspended): return L10n.suspended
+        }
+    }
+
+    private var selectedCompanyFilterLabel: String {
+        switch selectedCompanyFilter {
+        case .none:
+            return L10n.all
+        case .some(.omega):
+            return L10n.omegaLabel
+        case .some(.essilorLuxottica):
+            return L10n.essilorLuxotticaLabel
+        case .some(.grandVision):
+            return L10n.grandVisionLabel
+        case .some(.none):
+            return L10n.noneLabel
+        }
+    }
+
+    private var selectedCompanyCount: Int {
+        switch selectedCompanyFilter {
+        case .none:
+            return authManager.allUsers.count
+        case .some(.omega):
+            return companyCounts.omega
+        case .some(.essilorLuxottica):
+            return companyCounts.essilorLuxottica
+        case .some(.grandVision):
+            return companyCounts.grandVision
+        case .some(.none):
+            return authManager.allUsers.filter { $0.companyBadge == .none }.count
+        }
+    }
+
+    private var selectedCompanyChipLabel: String {
+        switch selectedCompanyFilter {
+        case .none: return L10n.all
+        case .some(.omega): return "Omega"
+        case .some(.essilorLuxottica): return "EL"
+        case .some(.grandVision): return "GV"
+        case .some(.none): return L10n.noneLabel
+        }
+    }
+
+    private var statusAllUsersLabel: String {
+        L10n.lang == .czech ? "Všichni uživatelé" : "All users"
+    }
+
+    private var statusPendingUsersLabel: String {
+        L10n.lang == .czech ? "Čekající uživatelé" : "Pending users"
+    }
+
+    private var statusActiveUsersLabel: String {
+        L10n.lang == .czech ? "Aktivní uživatelé" : "Active users"
+    }
+
+    private var statusSuspendedUsersLabel: String {
+        L10n.lang == .czech ? "Pozastavení uživatelé" : "Suspended users"
     }
 
     // MARK: - User List
@@ -398,6 +664,9 @@ struct AdminUsersView: View {
                         .foregroundStyle(AppConfig.subtleGray)
                         .lineLimit(1)
                 }
+
+                CompanyBadgeView(badge: user.companyBadge, compact: true)
+                    .padding(.top, 2)
             }
 
             HStack(spacing: 4) {
@@ -525,9 +794,9 @@ struct AdminUsersView: View {
             }
             .padding(.horizontal, 20).padding(.vertical, 14)
             .background(AppConfig.cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
-        .contentShape(Rectangle())
-    }
+            .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
+            .contentShape(Rectangle())
+        }
         .buttonStyle(ScaleButtonStyle())
     }
 
@@ -538,17 +807,48 @@ struct AdminUsersView: View {
             Divider().overlay(AppConfig.outlineVariant.opacity(0.5))
             VStack(spacing: 12) {
                 // Role picker for bulk
-                HStack(spacing: 10) {
-                    Text(L10n.activateAs)
-                        .font(.subheadline)
-                        .foregroundStyle(AppConfig.subtleGray)
-                    Picker(L10n.activateAs, selection: $bulkRole) {
-                        ForEach(UserRole.allCases, id: \.rawValue) { role in
-                            Text(role.displayName).tag(role)
+                Menu {
+                    ForEach(UserRole.allCases, id: \.rawValue) { role in
+                        Button {
+                            Haptics.selection()
+                            bulkRole = role
+                        } label: {
+                            HStack {
+                                Text(role.displayName)
+                                if bulkRole == role {
+                                    Spacer()
+                                    Image(systemName: "checkmark")
+                                }
+                            }
                         }
                     }
-                    .pickerStyle(.segmented)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "person.crop.circle.badge.checkmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(AppConfig.subtleGray)
+                            .frame(width: 20)
+                        Text(L10n.activateAs)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(AppConfig.darkText)
+                        Spacer()
+                        Text(bulkRole.displayName)
+                            .font(.subheadline)
+                            .foregroundStyle(AppConfig.subtleGray)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(AppConfig.subtleGray.opacity(0.65))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 12)
+                    .background(AppConfig.surfaceLow)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(AppConfig.separatorSoft, lineWidth: 1)
+                    )
                 }
+                .buttonStyle(ScaleButtonStyle())
 
                 // Activate button
                 Button {
@@ -646,6 +946,7 @@ struct AdminUsersView: View {
                         .font(.subheadline)
                         .foregroundStyle(AppConfig.subtleGray)
                         .lineLimit(1)
+                    CompanyBadgeView(badge: user.companyBadge, compact: false)
                     HStack(spacing: 8) {
                         statusBadge(user.status)
                         roleBadge(user.role)
@@ -715,6 +1016,8 @@ struct AdminUsersView: View {
             .foregroundStyle(AppConfig.darkText)
             .padding(.horizontal, 18)
             .padding(.vertical, 10)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
             .background(AppConfig.surfaceHigh)
             .clipShape(Capsule())
             .overlay(Capsule().stroke(AppConfig.separatorSoft, lineWidth: 1))
@@ -796,6 +1099,8 @@ struct AdminUsersView: View {
                     }
                     .foregroundStyle(AppConfig.darkText)
                     .padding(.horizontal, 14).padding(.vertical, 10)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                     .background(AppConfig.surfaceHigh)
                     .clipShape(Capsule())
                     .overlay(Capsule().stroke(AppConfig.separatorSoft, lineWidth: 1))
@@ -860,6 +1165,8 @@ struct AdminUsersView: View {
                 }
                 .foregroundStyle(AppConfig.darkText)
                 .padding(.horizontal, 18).padding(.vertical, 10)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
                 .background(AppConfig.surfaceHigh)
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(AppConfig.separatorSoft, lineWidth: 1))
@@ -895,6 +1202,8 @@ struct AdminUsersView: View {
                 }
                 .foregroundStyle(AppConfig.darkText)
                 .padding(.horizontal, 18).padding(.vertical, 10)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
                 .background(AppConfig.surfaceHigh)
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(AppConfig.separatorSoft, lineWidth: 1))
@@ -919,8 +1228,8 @@ struct AdminUsersView: View {
     private func warningSectionHeader(_ text: String) -> some View {
         Text(text)
             .textCase(nil)
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(AppConfig.subtleGray)
     }
 
     private func applyRoleChange(for user: AppUser, to role: UserRole) {
@@ -1013,9 +1322,9 @@ struct AdminUsersView: View {
                         .background(AppConfig.cardBg)
                         .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
 
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 8) {
                             Text("Vehicle")
-                                .font(.caption.weight(.semibold))
+                                .font(.system(size: 19, weight: .semibold))
                                 .foregroundStyle(AppConfig.subtleGray)
 
                             if hasVehicle {
@@ -1036,11 +1345,13 @@ struct AdminUsersView: View {
 
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Account")
-                                .font(.caption.weight(.semibold))
+                                .font(.system(size: 19, weight: .semibold))
                                 .foregroundStyle(AppConfig.subtleGray)
                             keyValueRow(label: "Created", value: liveUser.createdAt.formatted(date: .abbreviated, time: .omitted))
                             Divider().overlay(AppConfig.separatorSoft)
                             keyValueRow(label: "Email", value: liveUser.email, allowMultilineValue: true)
+                            Divider().overlay(AppConfig.separatorSoft)
+                            keyValueRow(label: L10n.companyBadge, value: companyBadgeLabel(liveUser.companyBadge))
                         }
                         .padding(16)
                         .background(AppConfig.cardBg)
@@ -1048,7 +1359,7 @@ struct AdminUsersView: View {
 
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Actions")
-                                .font(.caption.weight(.semibold))
+                                .font(.system(size: 19, weight: .semibold))
                                 .foregroundStyle(AppConfig.subtleGray)
 
                             if liveUser.status == .pending {
@@ -1062,7 +1373,7 @@ struct AdminUsersView: View {
                                 }
                             }
 
-                            detailActionButton(title: L10n.editVehicle, icon: "car.side.fill") {
+                            detailActionButton(title: L10n.editVehicle, icon: "car.side.fill", showsChevron: true) {
                                 userDetailSheetUser = nil
                                 DispatchQueue.main.async {
                                     editPlate = liveUser.registrationPlate
@@ -1073,7 +1384,7 @@ struct AdminUsersView: View {
                                 }
                             }
 
-                            detailActionButton(title: "Warnings", icon: "exclamationmark.triangle.fill") {
+                            detailActionButton(title: "Warnings", icon: "exclamationmark.triangle.fill", showsChevron: true) {
                                 userDetailSheetUser = nil
                                 DispatchQueue.main.async {
                                     strikeReason = ""
@@ -1097,23 +1408,35 @@ struct AdminUsersView: View {
                                     .disabled(liveUser.role == role)
                                 }
                             } label: {
-                                HStack(spacing: 10) {
-                                    Image(systemName: "person.crop.circle.badge.checkmark")
-                                    Text(L10n.changeRole)
-                                        .font(.subheadline.weight(.semibold))
-                                    Spacer()
-                                    Text(liveUser.role.displayName)
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(AppConfig.subtleGray)
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption2.weight(.semibold))
-                                        .foregroundStyle(AppConfig.subtleGray)
+                                detailMenuRow(
+                                    title: L10n.changeRole,
+                                    icon: "person.crop.circle.badge.checkmark",
+                                    value: liveUser.role.displayName
+                                )
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+
+                            Menu {
+                                ForEach(CompanyBadge.allCases, id: \.rawValue) { badge in
+                                    Button {
+                                        Task { await authManager.adminUpdateUserCompanyBadge(liveUser, companyBadge: badge) }
+                                    } label: {
+                                        HStack {
+                                            Text(companyBadgeLabel(badge))
+                                            Spacer()
+                                            if liveUser.companyBadge == badge {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                    .disabled(liveUser.companyBadge == badge)
                                 }
-                                .foregroundStyle(AppConfig.darkText)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 12)
-                                .background(AppConfig.surfaceLow)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            } label: {
+                                detailMenuRow(
+                                    title: L10n.companyBadge,
+                                    icon: "checkmark.seal.fill",
+                                    value: companyBadgeLabel(liveUser.companyBadge)
+                                )
                             }
                             .buttonStyle(ScaleButtonStyle())
 
@@ -1166,7 +1489,7 @@ struct AdminUsersView: View {
     private func keyValueRow(label: String, value: String, allowMultilineValue: Bool = false) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text(label)
-                .font(.caption.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray)
             Spacer(minLength: 8)
             Text(value.isEmpty ? "—" : value)
@@ -1187,7 +1510,13 @@ struct AdminUsersView: View {
         return user.carColor
     }
 
-    private func detailActionButton(title: String, icon: String, isDestructive: Bool = false, action: @escaping () -> Void) -> some View {
+    private func detailActionButton(
+        title: String,
+        icon: String,
+        isDestructive: Bool = false,
+        showsChevron: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             HStack(alignment: .center, spacing: 12) {
                 Image(systemName: icon)
@@ -1202,18 +1531,51 @@ struct AdminUsersView: View {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
                 Spacer(minLength: 0)
+                if showsChevron {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(AppConfig.subtleGray)
+                }
             }
             .foregroundStyle(isDestructive ? AppConfig.spotOccupied : AppConfig.darkText)
             .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(isDestructive ? AppConfig.spotOccupied.opacity(0.10) : AppConfig.surfaceLow)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .padding(.vertical, 10)
+            .background(isDestructive ? AppConfig.spotOccupied.opacity(0.06) : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
             .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(isDestructive ? AppConfig.spotOccupied.opacity(0.25) : AppConfig.separatorSoft, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(isDestructive ? AppConfig.spotOccupied.opacity(0.22) : Color.clear, lineWidth: 1)
             )
         }
         .buttonStyle(ScaleButtonStyle())
+    }
+
+    private func detailMenuRow(title: String, icon: String, value: String) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 28, height: 28)
+                .background(AppConfig.surfaceLow)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(AppConfig.separatorSoft, lineWidth: 1)
+                )
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppConfig.darkText)
+            Spacer(minLength: 0)
+            Text(value)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppConfig.subtleGray)
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(AppConfig.subtleGray)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     // MARK: - Activate Sheet
@@ -1498,6 +1860,15 @@ struct AdminUsersView: View {
         .background(AppConfig.surfaceLow)
         .clipShape(Capsule())
         .overlay(Capsule().stroke(AppConfig.separatorSoft, lineWidth: 1))
+    }
+
+    private func companyBadgeLabel(_ badge: CompanyBadge) -> String {
+        switch badge {
+        case .omega: return L10n.omegaLabel
+        case .essilorLuxottica: return L10n.essilorLuxotticaLabel
+        case .grandVision: return L10n.grandVisionLabel
+        case .none: return L10n.noneLabel
+        }
     }
 
     // MARK: - Strike Badge
@@ -1851,7 +2222,7 @@ struct AdminUsersView: View {
                                     withAnimation(.quick) { editColor = color.hex }
                                 } label: {
                                     Circle().fill(Color(hex: color.hex)).frame(width: 28, height: 28)
-                                        .overlay(Circle().stroke(isSelected ? AppConfig.accentFg : AppConfig.outlineVariant.opacity(0.5), lineWidth: isSelected ? 3 : 1))
+                                        .overlay(Circle().stroke(isSelected ? AppConfig.darkText : AppConfig.outlineVariant.opacity(0.5), lineWidth: isSelected ? 3 : 1))
                                         .overlay {
                                             if isSelected {
                                                 Image(systemName: "checkmark").font(.system(size: 10, weight: .semibold))
@@ -1913,7 +2284,7 @@ struct AdminUsersView: View {
                         Task { await authManager.adminUpdateUserVehicle(user, plate: plate, car: car, color: color, carType: carType, vehicleMiniaturePresetID: presetID) }
                     }
                     .fontWeight(.semibold)
-                    .foregroundStyle(AppConfig.accentFg)
+                    .foregroundStyle(AppConfig.darkText)
                 }
             }
             .onAppear {
@@ -2036,6 +2407,97 @@ struct AdminUsersView: View {
             return type.label
         }
         return user.carType
+    }
+}
+
+private struct CompanyBadgeView: View {
+    let badge: CompanyBadge
+    var compact: Bool = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        HStack(spacing: compact ? 6 : 8) {
+            ZStack {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: compact ? 18 : 22, weight: .black))
+                    .foregroundStyle(brandGradient)
+                    .overlay(
+                        Image(systemName: "checkmark")
+                            .font(.system(size: compact ? 7 : 9, weight: .black))
+                            .foregroundStyle(.white)
+                    )
+                Circle()
+                    .fill(brandAccent.opacity(0.95))
+                    .frame(width: compact ? 7 : 8, height: compact ? 7 : 8)
+                    .overlay(
+                        Circle()
+                            .stroke(.white.opacity(0.95), lineWidth: 1)
+                    )
+                    .offset(x: compact ? 6 : 8, y: compact ? 6 : 8)
+            }
+
+            Text(brandName)
+                .font(.system(size: compact ? 11 : 12, weight: .bold, design: .rounded))
+                .foregroundStyle(textColor)
+                .lineLimit(1)
+        }
+    }
+
+    private var brandName: String {
+        switch badge {
+        case .omega: return "Omega"
+        case .essilorLuxottica: return "EssilorLuxottica"
+        case .grandVision: return "Grand Vision"
+        case .none: return L10n.noneLabel
+        }
+    }
+
+    private var brandSymbol: String {
+        switch badge {
+        case .omega: return "water.waves"
+        case .essilorLuxottica: return "sparkles"
+        case .grandVision: return "eye.fill"
+        case .none: return "questionmark"
+        }
+    }
+
+    private var textColor: Color {
+        switch badge {
+        case .omega: return Color(red: 0.08, green: 0.22, blue: 0.55)
+        case .essilorLuxottica:
+            return colorScheme == .dark ? .white : .black
+        case .grandVision:
+            return colorScheme == .dark ? .white : Color(red: 0.44, green: 0.07, blue: 0.12)
+        case .none: return AppConfig.subtleGray
+        }
+    }
+
+    private var brandAccent: Color {
+        switch badge {
+        case .omega: return Color(red: 0.10, green: 0.36, blue: 0.86)
+        case .essilorLuxottica: return .black
+        case .grandVision: return Color(red: 0.90, green: 0.17, blue: 0.24)
+        case .none: return AppConfig.subtleGray
+        }
+    }
+
+    private var brandGradient: LinearGradient {
+        switch badge {
+        case .omega:
+            return LinearGradient(colors: [
+                Color(red: 0.26, green: 0.50, blue: 0.95),
+                Color(red: 0.11, green: 0.30, blue: 0.76)
+            ], startPoint: .topLeading, endPoint: .bottomTrailing)
+        case .essilorLuxottica:
+            return LinearGradient(colors: [.black, Color(white: 0.25)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        case .grandVision:
+            return LinearGradient(colors: [
+                Color(red: 0.90, green: 0.17, blue: 0.24),
+                Color(red: 0.20, green: 0.34, blue: 0.84)
+            ], startPoint: .topLeading, endPoint: .bottomTrailing)
+        case .none:
+            return LinearGradient(colors: [Color.gray.opacity(0.5), Color.gray.opacity(0.35)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        }
     }
 }
 

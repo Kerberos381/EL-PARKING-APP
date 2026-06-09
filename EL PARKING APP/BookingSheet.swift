@@ -20,6 +20,7 @@ struct BookingSheet: View {
     @EnvironmentObject var bookingManager: BookingManager
     @EnvironmentObject var deepLinkManager: DeepLinkManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var lang = LanguageManager.shared
 
     let preselectedSpot: ParkingSpot?
@@ -43,17 +44,45 @@ struct BookingSheet: View {
     @State private var showSuccess = false
     @State private var showShareOptions = false
     @State private var isSubmitting = false
+    @State private var confirmVisualState: ConfirmVisualState = .idle
     @State private var isForOthersToggle: Bool
     @State private var showSpotPicker = false
     @State private var scrollToConfirmTrigger = false
 
     // Success animation state
     @State private var cardOffset: CGFloat = 0
-    @State private var cardScale: CGFloat = 0.88
+    @State private var cardScale: CGFloat = 1.0
     @State private var cardOpacity: Double = 0
     @State private var bgOpacity: Double = 0
     @State private var actionsOpacity: Double = 0
     @State private var isDismissing = false
+
+    private enum ConfirmVisualState: Equatable {
+        case idle
+        case loading
+        case success
+        case failure
+    }
+
+    private var motionQuick: Animation {
+        reduceMotion ? Animation.linear(duration: 0.01) : .easeInOut(duration: 0.16)
+    }
+
+    private var motionStandard: Animation {
+        reduceMotion ? Animation.linear(duration: 0.01) : .easeInOut(duration: 0.18)
+    }
+
+    private var motionFade: Animation {
+        reduceMotion ? Animation.linear(duration: 0.01) : .easeOut(duration: 0.14)
+    }
+
+    private var globalSystemSpring: Animation {
+        reduceMotion ? Animation.linear(duration: 0.12) : .spring(response: 0.32, dampingFraction: 1.0)
+    }
+
+    private var successSnapSpring: Animation {
+        reduceMotion ? Animation.linear(duration: 0.12) : .spring(response: 0.30, dampingFraction: 0.75)
+    }
 
     private var isEditing: Bool { editingBooking != nil }
     private var hasPreselection: Bool { preselectedSpot != nil && editingBooking == nil }
@@ -609,17 +638,22 @@ struct BookingSheet: View {
                             .fontWeight(.semibold)
                             .foregroundStyle(AppConfig.subtleGray)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: 50)
+                    .padding(.vertical, 10)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(ScaleButtonStyle())
 
                 if showTimePickers {
                     HStack(spacing: 12) {
                         // From picker
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .center, spacing: 4) {
                             Text(L10n.from)
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(AppConfig.subtleGray)
+                                .frame(maxWidth: .infinity, alignment: .center)
                             Menu {
                                 ForEach(AppConfig.availableTimeSlots, id: \.self) { t in
                                     Button {
@@ -633,18 +667,23 @@ struct BookingSheet: View {
                                     }
                                 }
                             } label: {
-                                HStack {
+                                ZStack {
                                     Text(timeFrom)
                                         .font(.body.weight(.semibold))
                                         .foregroundStyle(AppConfig.darkText)
-                                    Spacer()
-                                    Image(systemName: "chevron.down")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(AppConfig.subtleGray)
+                                        .frame(maxWidth: .infinity, alignment: .center)
+
+                                    HStack {
+                                        Spacer()
+                                        Image(systemName: "chevron.down")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(AppConfig.subtleGray)
+                                    }
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(.horizontal, 10)
-                                .padding(.vertical, 10)
+                                .padding(.vertical, 12)
+                                .frame(minHeight: 50)
                                 .contentShape(Rectangle())
                             }
                             .frame(maxWidth: .infinity)
@@ -653,16 +692,23 @@ struct BookingSheet: View {
                         .frame(maxWidth: .infinity)
                         .frame(maxWidth: .infinity)
 
-                        Image(systemName: "arrow.right")
-                            .font(.caption)
-                            .foregroundStyle(AppConfig.subtleGray)
+                        VStack {
+                            Spacer(minLength: 0)
+                            Image(systemName: "arrow.right")
+                                .font(.caption)
+                                .foregroundStyle(AppConfig.subtleGray)
+                            Spacer(minLength: 0)
+                        }
+                        .frame(width: 20)
+                        .padding(.top, 18)
 
                         // To picker
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .center, spacing: 4) {
                             Text(L10n.to)
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(AppConfig.subtleGray)
+                                .frame(maxWidth: .infinity, alignment: .center)
                             Menu {
                                 ForEach(AppConfig.availableTimeSlots, id: \.self) { t in
                                     Button {
@@ -676,18 +722,23 @@ struct BookingSheet: View {
                                     }
                                 }
                             } label: {
-                                HStack {
+                                ZStack {
                                     Text(timeTo)
                                         .font(.body.weight(.semibold))
                                         .foregroundStyle(AppConfig.darkText)
-                                    Spacer()
-                                    Image(systemName: "chevron.down")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(AppConfig.subtleGray)
+                                        .frame(maxWidth: .infinity, alignment: .center)
+
+                                    HStack {
+                                        Spacer()
+                                        Image(systemName: "chevron.down")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(AppConfig.subtleGray)
+                                    }
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(.horizontal, 10)
-                                .padding(.vertical, 10)
+                                .padding(.vertical, 12)
+                                .frame(minHeight: 50)
                                 .contentShape(Rectangle())
                             }
                             .frame(maxWidth: .infinity)
@@ -841,27 +892,117 @@ struct BookingSheet: View {
 
     private var confirmButton: some View {
         let noSpot = selectedSpot == nil
+        let canSubmit = isValid && !isSubmitting
+
         return Button {
             Task { await submitBooking() }
         } label: {
-            HStack(spacing: 10) {
-                Image(systemName: confirmButtonIcon(noSpot: noSpot))
-                    .font(.system(size: 17, weight: .bold))
-                    .symbolRenderingMode(.hierarchical)
-                Text(isEditing ? L10n.save : noSpot ? L10n.selectASpotAbove : L10n.confirmBooking)
-                    .font(.body)
-                    .fontWeight(.bold)
+            ZStack {
+                Capsule()
+                    .fill(confirmButtonBackground(noSpot: noSpot))
+                    .overlay {
+                        if confirmVisualState == .loading && !reduceMotion {
+                            NativeSystemShimmerView()
+                        }
+                    }
+
+                ZStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: confirmButtonIcon(noSpot: noSpot))
+                            .font(.system(size: 17, weight: .bold))
+                        Text(confirmTitle(for: .idle, noSpot: noSpot))
+                            .font(.body)
+                            .fontWeight(.bold)
+                    }
+                    .opacity(confirmVisualState == .idle ? 1.0 : 0.0)
+                    .scaleEffect(confirmVisualState == .idle ? 1.0 : 0.93)
+                    .animation(globalSystemSpring, value: confirmVisualState)
+
+                    ProgressView()
+                        .tint(confirmButtonForeground(noSpot: noSpot))
+                        .opacity(confirmVisualState == .loading ? 1.0 : 0.0)
+                        .scaleEffect(confirmVisualState == .loading ? 1.0 : 0.7)
+                        .animation(globalSystemSpring, value: confirmVisualState)
+
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 18, weight: .bold))
+                        Text(confirmTitle(for: .success, noSpot: noSpot))
+                            .font(.body)
+                            .fontWeight(.bold)
+                    }
+                    .opacity(confirmVisualState == .success ? 1.0 : 0.0)
+                    .scaleEffect(confirmVisualState == .success ? 1.0 : 0.85)
+                    .animation(successSnapSpring, value: confirmVisualState)
+
+                    HStack(spacing: 8) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 18, weight: .bold))
+                        Text(confirmTitle(for: .failure, noSpot: noSpot))
+                            .font(.body)
+                            .fontWeight(.bold)
+                    }
+                    .opacity(confirmVisualState == .failure ? 1.0 : 0.0)
+                    .scaleEffect(confirmVisualState == .failure ? 1.0 : 0.85)
+                    .animation(successSnapSpring, value: confirmVisualState)
+                }
+                .foregroundStyle(confirmButtonForeground(noSpot: noSpot))
+                .padding(.horizontal, 24)
             }
-            .foregroundStyle(noSpot ? AppConfig.subtleGray : AppConfig.onAccent)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
-            .background(noSpot ? AppConfig.surfaceHigh : AppConfig.accent)
+            .frame(height: 54)
+        }
+        .buttonStyle(SystemMicroButtonStyle())
+        .disabled(!canSubmit)
+        .opacity(canSubmit ? 1 : noSpot ? 0.8 : 0.5)
+        .padding(.horizontal)
+        .animation(globalSystemSpring, value: canSubmit)
+    }
+
+    private struct SystemMicroButtonStyle: ButtonStyle {
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label
+                .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1.0)
+                .animation(.spring(response: 0.20, dampingFraction: 0.85), value: configuration.isPressed)
+        }
+    }
+
+    private struct NativeSystemShimmerView: View {
+        @State private var phase: CGFloat = 0
+
+        var body: some View {
+            GeometryReader { proxy in
+                let w = proxy.size.width
+                LinearGradient(
+                    colors: [.white.opacity(0.0), .white.opacity(0.18), .white.opacity(0.0)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: w * 0.35)
+                .offset(x: -w + (phase * (w * 2)))
+                .onAppear {
+                    withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) {
+                        phase = 1.0
+                    }
+                }
+            }
             .clipShape(Capsule())
         }
-        .buttonStyle(ScaleButtonStyle())
-        .disabled(!isValid)
-        .opacity(isValid ? 1 : noSpot ? 0.8 : 0.5)
-        .padding(.horizontal)
+    }
+
+    private func confirmTitle(for state: ConfirmVisualState, noSpot: Bool) -> String {
+        switch state {
+        case .success:
+            return isEditing ? L10n.bookingUpdated : L10n.bookingConfirmed
+        case .failure:
+            return L10n.tryAgain
+        case .loading:
+            return L10n.saving
+        case .idle:
+            return isEditing ? L10n.save : noSpot ? L10n.selectASpotAbove : L10n.confirmBooking
+        }
     }
 
     // MARK: - Helpers
@@ -869,6 +1010,26 @@ struct BookingSheet: View {
     private func confirmButtonIcon(noSpot: Bool) -> String {
         if isEditing { return "checkmark.circle.fill" }
         return noSpot ? "parkingsign" : "checkmark.circle.fill"
+    }
+
+    private func confirmButtonForeground(noSpot: Bool) -> Color {
+        if noSpot || confirmVisualState == .idle && !isValid {
+            return AppConfig.subtleGray
+        }
+        return AppConfig.onAccent
+    }
+
+    private func confirmButtonBackground(noSpot: Bool) -> Color {
+        switch confirmVisualState {
+        case .success:
+            return AppConfig.activeGreen
+        case .failure:
+            return AppConfig.spotOccupied
+        case .loading:
+            return AppConfig.accent.opacity(0.9)
+        case .idle:
+            return noSpot ? AppConfig.surfaceHigh : AppConfig.accent
+        }
     }
 
     private func sectionCard<Content: View>(title: String, icon: String, @ViewBuilder content: () -> Content) -> some View {
@@ -889,7 +1050,11 @@ struct BookingSheet: View {
             }
             content()
         }
-        .modifier(BookingCardChrome(cornerRadius: 24, horizontalPadding: 16, verticalPadding: 18))
+        .padding(18)
+        .background(AppConfig.cardBg)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .shadow(color: .black.opacity(0.06), radius: 14, y: 4)
+        .padding(.horizontal)
     }
 
     private func selectorCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
@@ -946,10 +1111,13 @@ struct BookingSheet: View {
         guard !isSubmitting else { return }
         isSubmitting = true
         defer { isSubmitting = false }
+        let submitStartedAt = Date()
+        withAnimation(motionQuick) { confirmVisualState = .loading }
 
         guard let spot = selectedSpot else {
             errorMessage = L10n.pleaseSelectSpot
             showingError = true
+            await showFailureState()
             return
         }
 
@@ -959,12 +1127,14 @@ struct BookingSheet: View {
         if advanceDays > maxAdvanceDays {
             errorMessage = L10n.tooFarInAdvance(maxAdvanceDays)
             showingError = true
+            await showFailureState()
             return
         }
 
         if timeFrom >= timeTo {
             errorMessage = L10n.endTimeAfterStart
             showingError = true
+            await showFailureState()
             return
         }
 
@@ -999,6 +1169,9 @@ struct BookingSheet: View {
                 )
             }
 
+            await ensureMinimumLoadingTime(since: submitStartedAt)
+            withAnimation(motionStandard) { confirmVisualState = .success }
+            try? await Task.sleep(for: .milliseconds(reduceMotion ? 220 : 420))
             withAnimation(.emphasis) { showSuccess = true }
             Haptics.notify(.success)
 
@@ -1008,6 +1181,25 @@ struct BookingSheet: View {
             errorMessage = msg
             showingError = true
             ToastManager.shared.show(msg, style: .error)
+            await ensureMinimumLoadingTime(since: submitStartedAt)
+            await showFailureState()
+        }
+    }
+
+    @MainActor
+    private func showFailureState() async {
+        withAnimation(motionQuick) { confirmVisualState = .failure }
+        Haptics.notify(.error)
+        try? await Task.sleep(for: .milliseconds(reduceMotion ? 220 : 460))
+        withAnimation(motionQuick) { confirmVisualState = .idle }
+    }
+
+    private func ensureMinimumLoadingTime(since start: Date) async {
+        let elapsed = Date().timeIntervalSince(start)
+        let minDuration: TimeInterval = reduceMotion ? 0.16 : 0.30
+        if elapsed < minDuration {
+            let remaining = minDuration - elapsed
+            try? await Task.sleep(for: .seconds(remaining))
         }
     }
 
@@ -1082,23 +1274,23 @@ struct BookingSheet: View {
             guard !isDismissing else { return }
             // Reset
             cardOffset = 380
-            cardScale = 0.78
+            cardScale = 1.0
             cardOpacity = 0
             bgOpacity = 0
             actionsOpacity = 0
 
             // 1. Background fades in
-            withAnimation(.motionFade) { bgOpacity = 1 }
+            withAnimation(motionFade) { bgOpacity = 1 }
 
-            // 2. Card raises up high — slow, weighty spring with slight overshoot
-            withAnimation(.motionSheet.delay(0.1)) {
-                cardOffset = -40
+            // 2. Restrained entrance (Linear-like): no bounce, slight rise/fade.
+            withAnimation((reduceMotion ? Animation.linear(duration: 0.01) : .easeOut(duration: 0.22)).delay(reduceMotion ? 0 : 0.02)) {
+                cardOffset = -22
                 cardScale = 1.0
                 cardOpacity = 1
             }
 
-            // 3. Actions fade in after card fully settles
-            withAnimation(.motionFade.delay(0.85)) {
+            // 3. Actions appear sooner so the whole confirmation feels instant
+            withAnimation((reduceMotion ? Animation.linear(duration: 0.01) : .easeOut(duration: 0.14)).delay(reduceMotion ? 0 : 0.12)) {
                 actionsOpacity = 1
             }
         }
@@ -1197,14 +1389,14 @@ struct BookingSheet: View {
         withAnimation(.quick) { actionsOpacity = 0 }
 
         // Card flies down and shrinks — like it's landing in the list
-        withAnimation(.motionSheet.delay(0.1)) {
+        withAnimation((reduceMotion ? Animation.linear(duration: 0.01) : .easeIn(duration: 0.18)).delay(reduceMotion ? 0 : 0.01)) {
             cardOffset = 700
-            cardScale = 0.12
+            cardScale = 1.0
             cardOpacity = 0
         }
-        withAnimation(.motionFade.delay(0.1)) { bgOpacity = 0 }
+        withAnimation((reduceMotion ? Animation.linear(duration: 0.01) : .easeOut(duration: 0.10)).delay(reduceMotion ? 0 : 0.01)) { bgOpacity = 0 }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + (reduceMotion ? 0.05 : 0.23)) {
             deepLinkManager.navigate(to: .myBookings)
             dismiss()
         }
@@ -1429,10 +1621,21 @@ struct CancelSuccessOverlay: View {
     let timeTo: String
     let onDismiss: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     @State private var cardOffset: CGFloat = 380
     @State private var cardScale: CGFloat = 0.78
     @State private var cardOpacity: Double = 0
     @State private var bgOpacity: Double = 0
+    @State private var didDismiss = false
+
+    private var motionStandard: Animation {
+        reduceMotion ? Animation.linear(duration: 0.01) : .easeInOut(duration: 0.18)
+    }
+
+    private var motionFade: Animation {
+        reduceMotion ? Animation.linear(duration: 0.01) : .easeOut(duration: 0.14)
+    }
 
     var body: some View {
         ZStack {
@@ -1456,11 +1659,18 @@ struct CancelSuccessOverlay: View {
             }
         }
         .onAppear {
-            cardOffset = 380; cardScale = 0.78; cardOpacity = 0; bgOpacity = 0
+            cardOffset = 380; cardScale = 1.0; cardOpacity = 0; bgOpacity = 0
+            didDismiss = false
 
-            withAnimation(.motionFade) { bgOpacity = 1 }
-            withAnimation(.motionSheet.delay(0.1)) {
-                cardOffset = -40; cardScale = 1.0; cardOpacity = 1
+            withAnimation(motionFade) { bgOpacity = 1 }
+            withAnimation((reduceMotion ? Animation.linear(duration: 0.01) : .easeOut(duration: 0.22)).delay(reduceMotion ? 0 : 0.02)) {
+                cardOffset = -18; cardScale = 1.0; cardOpacity = 1
+            }
+            Task {
+                try? await Task.sleep(for: .seconds(reduceMotion ? 1.0 : 1.8))
+                if !didDismiss {
+                    dismissCard()
+                }
             }
         }
         // Both "Done" and "Undo" on the toast dismiss this overlay
@@ -1547,13 +1757,19 @@ struct CancelSuccessOverlay: View {
     }
 
     private func dismissCard() {
+        guard !didDismiss else { return }
         Haptics.action()
-        // Card floats up and expands softly — dissolves rather than crumples
-        withAnimation(.motionSheet.delay(0.05)) {
-            cardOffset = -560; cardScale = 1.10; cardOpacity = 0
+        didDismiss = true
+        withAnimation(motionStandard) {
+            bgOpacity = 0
+            cardOpacity = 0
+            cardScale = 1.0
+            cardOffset = 28
         }
-        withAnimation(.motionFade.delay(0.05)) { bgOpacity = 0 }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { onDismiss() }
+        Task {
+            try? await Task.sleep(for: .milliseconds(reduceMotion ? 60 : 130))
+            onDismiss()
+        }
     }
 }
 

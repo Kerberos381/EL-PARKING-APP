@@ -51,10 +51,10 @@ struct AppEmptyStateCard: View {
                         Text(actionTitle)
                             .font(.subheadline.bold())
                     }
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AppConfig.onAccent)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
-                    .background(AppConfig.darkText)
+                    .background(AppConfig.accent)
                     .clipShape(Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())

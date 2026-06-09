@@ -11,6 +11,7 @@ import SwiftUI
 struct LoginView: View {
     @EnvironmentObject var authManager: AuthManager
     @ObservedObject private var lang = LanguageManager.shared
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var showEmailForm   = false   // collapsed by default when biometrics available
     @State private var email           = ""
@@ -33,41 +34,27 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.039, green: 0.039, blue: 0.055)
-                .ignoresSafeArea()
-
-            RadialGradient(
-                colors: [AppConfig.accent.opacity(0.12), Color.clear],
-                center: .top,
-                startRadius: 10,
-                endRadius: 380
-            )
-            .ignoresSafeArea()
+            backgroundColor.ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 36) {
-                    logoSection
-
-                    VStack(spacing: 14) {
-                        if showBiometricButton && !showEmailForm {
-                            biometricCard
-                        } else {
-                            formCard
-                        }
-
-                        privacyPolicyLink
+                VStack(spacing: 22) {
+                    if showBiometricButton && !showEmailForm {
+                        logoSection
+                        biometricCard
+                    } else {
+                        logoSection
+                        formCard
                     }
                 }
-                .padding(.bottom, 60)
+                .frame(maxWidth: 560)
+                .padding(.horizontal, 20)
+                .padding(.top, 34)
+                .padding(.bottom, 32)
             }
             .scrollDismissesKeyboard(.immediately)
         }
-        .onAppear {
-            // Auto-trigger biometric on appear if credentials are saved
-            if showBiometricButton {
-                Task { await authManager.loginWithBiometrics() }
-            }
-        }
+        // Do not auto-trigger biometric on appear.
+        // User must explicitly tap the biometric button to sign in.
         .alert(L10n.resetPassword, isPresented: $showForgotPassword) {
             TextField(L10n.emailAddress, text: $email)
                 .textInputAutocapitalization(.never)
@@ -92,28 +79,33 @@ struct LoginView: View {
     // MARK: - Logo
 
     private var logoSection: some View {
-        VStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(AppConfig.accent.opacity(0.15))
-                    .frame(width: 90, height: 90)
-                Circle()
-                    .stroke(AppConfig.accent.opacity(0.25), lineWidth: 1.5)
-                    .frame(width: 90, height: 90)
-                Image(systemName: "parkingsign")
-                    .font(.system(size: 38, weight: .bold))
-                    .foregroundStyle(.white)
+        VStack(spacing: 10) {
+            Group {
+                if UIImage(named: "AppIconImage") != nil {
+                    Image("AppIconImage")
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Image(systemName: "parkingsign")
+                        .resizable()
+                        .scaledToFit()
+                        .padding(18)
+                }
             }
-            .padding(.top, 64)
+            .frame(width: 84, height: 84)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.20 : 0.08), radius: 14, y: 6)
+            .padding(.top, 20)
 
             Text("EL Parking")
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
+                .font(.system(size: 32, weight: .bold, design: .rounded))
+                .foregroundStyle(primaryTextColor)
+                .tracking(0.2)
 
             Text("EssilorLuxottica")
-                .font(.system(size: 13, weight: .semibold))
-                .tracking(2)
-                .foregroundStyle(.white.opacity(0.35))
+                .font(.system(size: 12, weight: .medium))
+                .tracking(1.6)
+                .foregroundStyle(secondaryTextColor)
         }
     }
 
@@ -123,7 +115,16 @@ struct LoginView: View {
         VStack(spacing: 28) {
             // Biometric button
             Button {
-                Task { await authManager.loginWithBiometrics() }
+                Task {
+                    let ok = await authManager.loginWithBiometrics()
+                    if !ok {
+                        await MainActor.run {
+                            withAnimation(.standard) {
+                                showEmailForm = true
+                            }
+                        }
+                    }
+                }
             } label: {
                 VStack(spacing: 16) {
                     ZStack {
@@ -188,6 +189,7 @@ struct LoginView: View {
                 }
 
                 Button {
+                    keychain.deleteCredentials()
                     withAnimation(.standard) {
                         showEmailForm = true
                     }
@@ -196,6 +198,15 @@ struct LoginView: View {
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundStyle(.white.opacity(0.4))
+                }
+                .buttonStyle(ScaleButtonStyle())
+
+                Button {
+                    showForgotPassword = true
+                } label: {
+                    Text(L10n.forgotPassword)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.35))
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -213,7 +224,7 @@ struct LoginView: View {
     // MARK: - Email / Password Form Card
 
     private var formCard: some View {
-        VStack(spacing: 22) {
+        VStack(spacing: 18) {
 
             // Back button when biometric card exists
             if showBiometricButton && showEmailForm {
@@ -229,16 +240,18 @@ struct LoginView: View {
                         Text(L10n.back)
                     }
                     .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(secondaryTextColor)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
 
-            Text(L10n.welcomeBack)
-                .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(.white)
+            Text(L10n.signIn)
+                .font(.system(size: 32, weight: .bold, design: .rounded))
+                .foregroundStyle(primaryTextColor)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .minimumScaleFactor(0.85)
+                .lineLimit(1)
 
             VStack(spacing: 10) {
                 inputField(icon: "envelope", placeholder: L10n.emailAddress, text: $email,
@@ -252,15 +265,27 @@ struct LoginView: View {
                     .focused($focusedField, equals: .password)
             }
 
+            HStack {
+                Spacer()
+                Button {
+                    showForgotPassword = true
+                } label: {
+                    Text(L10n.forgotPassword)
+                        .font(.subheadline)
+                        .foregroundStyle(secondaryTextColor)
+                }
+                .buttonStyle(ScaleButtonStyle())
+            }
+
             // Biometric hint for new users
             if !showBiometricButton && keychain.canUseBiometrics {
                 HStack(spacing: 6) {
                     Image(systemName: keychain.biometricIcon)
                         .font(.caption)
-                        .foregroundStyle(.white.opacity(0.45))
+                        .foregroundStyle(secondaryTextColor)
                     Text(L10n.biometricSetupInfo(keychain.biometricName))
                         .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.35))
+                        .foregroundStyle(secondaryTextColor)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -282,55 +307,48 @@ struct LoginView: View {
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.red.opacity(0.2), lineWidth: 1))
             }
 
-            // Primary action button
             Button {
                 Task { await authManager.login(email: email, password: password) }
             } label: {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .fill(isFormValid ? AppConfig.accent : AppConfig.accent.opacity(0.4))
                     if authManager.isLoading {
                         ProgressView().tint(.black).scaleEffect(0.9)
                     } else {
                         Text(L10n.signIn)
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.system(size: 21, weight: .bold, design: .rounded))
                             .foregroundStyle(.black)
                     }
                 }
-                .frame(height: 54)
+                .frame(height: 60)
             }
             .buttonStyle(ScaleButtonStyle())
             .disabled(authManager.isLoading || !isFormValid)
 
-            Button {
-                showForgotPassword = true
-            } label: {
-                Text(L10n.forgotPassword)
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.4))
-            }
-            .buttonStyle(ScaleButtonStyle())
+            privacyPolicyLink
         }
         .padding(24)
         .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Color.clear)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.08), lineWidth: 1))
+            RoundedRectangle(cornerRadius: 32)
+                .fill(cardColor)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 32, style: .continuous)
+                        .stroke(borderColor, lineWidth: 1)
+                )
+                .shadow(color: shadowColor, radius: 14, y: 6)
         )
-        .padding(.horizontal, 20)
+        .frame(maxWidth: 480)
     }
 
     private var privacyPolicyLink: some View {
         Link(destination: AppConfig.privacyPolicyURL) {
-            HStack(spacing: 6) {
-                Image(systemName: "hand.raised")
-                    .font(.system(size: 13, weight: .semibold))
-                Text(L10n.privacyPolicy)
-                    .font(.footnote.weight(.medium))
-            }
-            .foregroundStyle(.white.opacity(0.45))
+            Text(L10n.privacyPolicy)
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(secondaryTextColor)
+                .underline(false)
         }
+        .padding(.top, 2)
     }
 
     // MARK: - Form Validation
@@ -361,19 +379,27 @@ struct LoginView: View {
                             onSubmit: (() -> Void)? = nil) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .foregroundStyle(.white.opacity(0.45))
+                .foregroundStyle(secondaryTextColor)
                 .frame(width: 20)
             TextField(placeholder, text: text)
                 .textInputAutocapitalization(capitalization)
                 .autocorrectionDisabled()
                 .keyboardType(keyboardType)
-                .foregroundStyle(.white)
+                .foregroundStyle(primaryTextColor)
                 .submitLabel(submitLabel)
                 .onSubmit { onSubmit?() }
         }
-        .padding(14)
+        .padding(.horizontal, 16)
+        .frame(height: 58)
         .contentShape(RoundedRectangle(cornerRadius: 14))
-        .appGlassField()
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(fieldColor)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(borderColor, lineWidth: 1)
+                )
+        )
     }
 
     @ViewBuilder
@@ -382,33 +408,69 @@ struct LoginView: View {
                                onSubmit: (() -> Void)? = nil) -> some View {
         HStack(spacing: 12) {
             Image(systemName: "lock")
-                .foregroundStyle(.white.opacity(0.45))
+                .foregroundStyle(secondaryTextColor)
                 .frame(width: 20)
             if showPassword {
                 TextField(placeholder, text: text)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(primaryTextColor)
                     .submitLabel(submitLabel)
                     .onSubmit { onSubmit?() }
             } else {
                 SecureField(placeholder, text: text)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(primaryTextColor)
                     .submitLabel(submitLabel)
                     .onSubmit { onSubmit?() }
             }
             Button { showPassword.toggle() } label: {
                 Image(systemName: showPassword ? "eye.slash" : "eye")
-                    .foregroundStyle(.white.opacity(0.35))
-                    .font(.system(size: 15))
+                    .foregroundStyle(secondaryTextColor)
+                    .font(.system(size: 18, weight: .semibold))
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
         }
-        .padding(14)
+        .padding(.horizontal, 16)
+        .frame(height: 58)
         .contentShape(RoundedRectangle(cornerRadius: 14))
-        .appGlassField()
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(fieldColor)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(borderColor, lineWidth: 1)
+                )
+        )
+    }
+
+    private var backgroundColor: Color {
+        colorScheme == .dark ? Color(red: 0.06, green: 0.06, blue: 0.07) : Color(red: 0.96, green: 0.96, blue: 0.97)
+    }
+
+    private var cardColor: Color {
+        colorScheme == .dark ? Color(red: 0.14, green: 0.14, blue: 0.16) : .white
+    }
+
+    private var fieldColor: Color {
+        colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.04)
+    }
+
+    private var borderColor: Color {
+        colorScheme == .dark ? Color.white.opacity(0.16) : Color.black.opacity(0.08)
+    }
+
+    private var primaryTextColor: Color {
+        colorScheme == .dark ? .white : Color(red: 0.09, green: 0.09, blue: 0.11)
+    }
+
+    private var secondaryTextColor: Color {
+        colorScheme == .dark ? Color.white.opacity(0.62) : Color.black.opacity(0.48)
+    }
+
+    private var shadowColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.25) : Color.black.opacity(0.08)
     }
 }
 

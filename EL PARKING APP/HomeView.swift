@@ -103,7 +103,8 @@ struct HomeView: View {
 
                                     Spacer()
 
-                                    ThemeToggleButton()
+                                    Color.clear
+                                        .frame(width: 44, height: 44)
                                         .padding(.top, 8)
                                 }
                                 .padding(.horizontal)
@@ -166,7 +167,7 @@ struct HomeView: View {
             .navigationDestination(isPresented: $navigateToMyBookings) {
                 MyBookingsView()
             }
-            .sheet(isPresented: $showingBookingSheet) {
+            .fullScreenCover(isPresented: $showingBookingSheet) {
                 BookingSheet(
                     preselectedSpot: nil,
                     isForOthers: false
@@ -184,7 +185,7 @@ struct HomeView: View {
                     }
                 }
             }
-            .sheet(item: $bookingToEdit) { booking in
+            .fullScreenCover(item: $bookingToEdit) { booking in
                 BookingSheet(
                     preselectedSpot: AppConfig.allParkingSpots.first(where: { $0.label == booking.spot }),
                     isForOthers: booking.email != bookingManager.currentUserEmail,
@@ -234,7 +235,7 @@ struct HomeView: View {
             if error == nil {
                 Haptics.notify(.success)
                 cancelledBooking = info
-                withAnimation(.easeIn(duration: 0.2)) { showCancelSuccess = true }
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) { showCancelSuccess = true }
                 ToastManager.shared.showUndo(
                     message: "Spot \(booking.spotNumber) cancelled"
                 ) {
@@ -1293,7 +1294,7 @@ struct HomeView: View {
         let tertiaryTextColor: Color = useLightText ? .white.opacity(0.68) : .black.opacity(0.65)
         let metaTextColor: Color = useLightText ? .white.opacity(0.56) : .black.opacity(0.56)
         let overlayColors: [Color] = isImageBacked
-            ? [.clear, .black.opacity(0.58)]
+            ? [.clear, .black.opacity(0.22), .black.opacity(0.74)]
             : (useLightText ? [.clear, .black.opacity(0.55)] : [.clear, .white.opacity(0.60)])
 
         return VStack(alignment: .leading, spacing: 0) {
@@ -1382,6 +1383,7 @@ struct HomeView: View {
                     }
                     .padding(20)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .modifier(TextReadabilityUnderlay(enabled: isImageBacked))
                     .background(
                         LinearGradient(
                             colors: overlayColors,
@@ -1646,7 +1648,7 @@ struct HomeView: View {
         let badgeTextColor: Color = useLightText ? .white.opacity(0.76) : .black.opacity(0.72)
         let closeIconColor: Color = useLightText ? .white.opacity(0.86) : .black.opacity(0.86)
         let headerOverlayColors: [Color] = isImageBacked
-            ? [.clear, .clear, .black.opacity(0.54)]
+            ? [.clear, .black.opacity(0.20), .black.opacity(0.72)]
             : (useLightText ? [.clear, .clear, .black.opacity(0.50)] : [.clear, .clear, .white.opacity(0.60)])
         return GeometryReader { proxy in
             ZStack(alignment: .topTrailing) {
@@ -1717,6 +1719,7 @@ struct HomeView: View {
                             .padding(24)
                             .padding(.bottom, 4)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .modifier(TextReadabilityUnderlay(enabled: isImageBacked))
                             .background(
                                 LinearGradient(
                                     colors: headerOverlayColors,
@@ -1845,21 +1848,46 @@ struct HomeView: View {
     }
 
     private func infoTodayStyleCard(_ item: InfoItem, isHero: Bool) -> some View {
-        let hasDetails = canOpenInfoDetail(item)
+        let hasDetails = AppConfig.enableHomeInfoDetailSheet
         let gradient = infoCardGradient(for: item)
+        let isImageBacked = item.imageURL != nil || infoInlineImage(item) != nil
 
         return VStack(alignment: .leading, spacing: 0) {
             if isHero {
                 ZStack(alignment: .bottomLeading) {
-                    Rectangle()
-                        .fill(gradient)
-                        .frame(height: 220)
-                        .overlay(alignment: .topTrailing) {
-                            Image(systemName: item.icon)
-                                .font(.system(size: 84, weight: .regular))
-                                .foregroundStyle(.white.opacity(0.18))
-                                .padding(16)
+                    if let imageURL = item.imageURL, let url = URL(string: imageURL) {
+                        AsyncImage(url: url) { phase in
+                            if let img = phase.image {
+                                Color.black
+                                    .frame(height: 220)
+                                    .overlay { img.resizable().scaledToFill() }
+                                    .clipped()
+                            } else {
+                                Rectangle()
+                                    .fill(gradient)
+                                    .frame(height: 220)
+                            }
                         }
+                    } else if let inlineImage = infoInlineImage(item) {
+                        Color.black
+                            .frame(height: 220)
+                            .overlay {
+                                Image(uiImage: inlineImage)
+                                    .resizable()
+                                    .scaledToFill()
+                            }
+                            .clipped()
+                    } else {
+                        Rectangle()
+                            .fill(gradient)
+                            .frame(height: 220)
+                            .overlay(alignment: .topTrailing) {
+                                Image(systemName: item.icon)
+                                    .font(.system(size: 84, weight: .regular))
+                                    .foregroundStyle(.white.opacity(0.18))
+                                    .padding(16)
+                            }
+                    }
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text(item.title)
@@ -1892,6 +1920,7 @@ struct HomeView: View {
                     }
                     .padding(20)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .modifier(TextReadabilityUnderlay(enabled: isImageBacked))
                     .background(
                         LinearGradient(
                             colors: [.clear, .black.opacity(0.45)],
@@ -1909,13 +1938,41 @@ struct HomeView: View {
                 .padding(.horizontal)
             } else {
                 HStack(spacing: 14) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(gradient)
+                    if let imageURL = item.imageURL, let url = URL(string: imageURL) {
+                        AsyncImage(url: url) { phase in
+                            if let img = phase.image {
+                                img
+                                    .resizable()
+                                    .scaledToFill()
+                                    .background(Color.black)
+                            } else {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .fill(gradient)
+                                    Image(systemName: item.icon)
+                                        .font(.system(size: 24, weight: .semibold))
+                                        .foregroundStyle(.white.opacity(0.92))
+                                }
+                            }
+                        }
+                        .frame(width: 70, height: 70)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    } else if let inlineImage = infoInlineImage(item) {
+                        Image(uiImage: inlineImage)
+                            .resizable()
+                            .scaledToFill()
+                            .background(Color.black)
                             .frame(width: 70, height: 70)
-                        Image(systemName: item.icon)
-                            .font(.system(size: 24, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.92))
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    } else {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(gradient)
+                                .frame(width: 70, height: 70)
+                            Image(systemName: item.icon)
+                                .font(.system(size: 24, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.92))
+                        }
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
@@ -1955,7 +2012,7 @@ struct HomeView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            guard hasDetails, AppConfig.enableHomeInfoDetailSheet else { return }
+            guard AppConfig.enableHomeInfoDetailSheet else { return }
             Haptics.selection()
             selectedInfoItem = item
         }
@@ -2007,7 +2064,7 @@ struct HomeView: View {
     }
 
     private func infoCard(_ item: InfoItem) -> some View {
-        let hasDetails = canOpenInfoDetail(item)
+        let hasDetails = AppConfig.enableHomeInfoDetailSheet
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 ZStack {
@@ -2048,125 +2105,206 @@ struct HomeView: View {
         )
         .contentShape(Rectangle())
         .onTapGesture {
-            guard hasDetails, AppConfig.enableHomeInfoDetailSheet else { return }
+            guard AppConfig.enableHomeInfoDetailSheet else { return }
             Haptics.selection()
             selectedInfoItem = item
         }
     }
 
     private func canOpenInfoDetail(_ item: InfoItem) -> Bool {
-        !item.fields.isEmpty ||
-        !item.details.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        !item.linkURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        _ = item
+        return AppConfig.enableHomeInfoDetailSheet
     }
 
     private func infoDetailSheet(_ item: InfoItem) -> some View {
-        NavigationStack {
-            ZStack {
-                AppConfig.pageBg.ignoresSafeArea()
+        let gradient = infoCardGradient(for: item)
+        let isImageBacked = item.imageURL != nil || infoInlineImage(item) != nil
+        return GeometryReader { proxy in
+            ZStack(alignment: .topTrailing) {
+                AppConfig.pageBg
+                    .ignoresSafeArea()
+
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 20) {
-
-                        // Header — matches announcement detail style
-                        VStack(alignment: .leading, spacing: 14) {
-                            HStack(alignment: .top, spacing: 14) {
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 17)
-                                        .fill(AppConfig.accent.opacity(0.12))
-                                        .frame(width: 64, height: 64)
-                                    Image(systemName: item.icon)
-                                        .font(.system(size: 26, weight: .semibold))
-                                        .foregroundStyle(AppConfig.accentFg)
-                                }
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 17)
-                                        .stroke(AppConfig.separatorSoft, lineWidth: 1)
-                                )
-
-                                Text(item.createdAt.formatShort())
-                                    .font(.caption2)
-                                    .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
-                                    .padding(.top, 6)
-                            }
-
-                            Text(item.title)
-                                .font(.title3.weight(.bold))
-                                .foregroundStyle(AppConfig.darkText)
-                        }
-
-                        Divider()
-
-                        // Body
-                        if !item.body.isEmpty {
-                            Text(item.body)
-                                .font(.body)
-                                .foregroundStyle(AppConfig.darkText)
-                                .lineSpacing(3)
-                        }
-
-                        // Structured fields
-                        if !item.fields.isEmpty {
-                            VStack(spacing: 0) {
-                                ForEach(Array(item.fields.enumerated()), id: \.element.id) { idx, field in
-                                    infoFieldRow(field)
-                                    if idx < item.fields.count - 1 {
-                                        Divider().padding(.leading, 52)
+                    VStack(spacing: 0) {
+                        // Hero header — mirrors announcement detail style
+                        ZStack(alignment: .bottomLeading) {
+                            if let imageURL = item.imageURL, let url = URL(string: imageURL) {
+                                AsyncImage(url: url) { phase in
+                                    if let img = phase.image {
+                                        Color.black
+                                            .frame(height: 340)
+                                            .overlay { img.resizable().scaledToFill() }
+                                            .clipped()
+                                    } else {
+                                        Rectangle()
+                                            .fill(gradient)
+                                            .frame(maxWidth: .infinity)
+                                            .frame(height: 340)
                                     }
                                 }
+                            } else if let inlineImage = infoInlineImage(item) {
+                                Color.black
+                                    .frame(height: 340)
+                                    .overlay {
+                                        Image(uiImage: inlineImage)
+                                            .resizable()
+                                            .scaledToFill()
+                                    }
+                                    .clipped()
+                            } else {
+                                Rectangle()
+                                    .fill(gradient)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 340)
+                                    .overlay(alignment: .topTrailing) {
+                                        Image(systemName: item.icon)
+                                            .font(.system(size: 150, weight: .semibold))
+                                            .foregroundStyle(.white.opacity(0.14))
+                                            .rotationEffect(.degrees(-10))
+                                            .offset(x: 28, y: -10)
+                                    }
+                                    .clipped()
                             }
-                            .background(AppConfig.cardBg)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppConfig.separatorSoft, lineWidth: 1))
+
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("INFO")
+                                    .font(.caption2.weight(.heavy))
+                                    .tracking(1.5)
+                                    .foregroundStyle(.white.opacity(0.76))
+
+                                Text(item.title)
+                                    .font(.title.weight(.bold))
+                                    .foregroundStyle(.white)
+
+                                Text(item.createdAt.relativeTime())
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.white.opacity(0.82))
+                                    .lineLimit(1)
+                            }
+                            .padding(24)
+                            .padding(.bottom, 4)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .modifier(TextReadabilityUnderlay(enabled: isImageBacked))
+                            .background(
+                                LinearGradient(
+                                    colors: [.clear, .black.opacity(0.20), .black.opacity(0.66)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
                         }
 
-                        // Legacy free-text details
-                        if !item.details.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            Text(item.details)
-                                .font(.body)
-                                .foregroundStyle(AppConfig.darkText)
-                                .lineSpacing(2)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(14)
-                                .background(AppConfig.cardBg)
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(AppConfig.separatorSoft, lineWidth: 1))
-                        }
-
-                        // Link button — capsule style matching app design
-                        if let url = URL(string: item.linkURL), !item.linkURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            Button {
-                                Haptics.selection()
-                                openURL(url)
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "arrow.up.right.square")
-                                    Text(item.linkTitle.isEmpty ? "Open link" : item.linkTitle)
+                        // Article body
+                        VStack(alignment: .leading, spacing: 20) {
+                            // Meta + actions row (same pattern as announcements)
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(AppConfig.surfaceLow)
+                                        .frame(width: 44, height: 44)
+                                    Image(systemName: item.icon)
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundStyle(AppConfig.accentFg)
                                 }
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(AppConfig.onAccent)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                                .background(AppConfig.accent)
-                                .clipShape(Capsule())
-                            }
-                            .buttonStyle(ScaleButtonStyle())
-                        }
 
-                        Spacer(minLength: 32)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(L10n.info)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(AppConfig.darkText)
+                                    Text(item.createdAt, style: .date)
+                                        .font(.caption)
+                                        .foregroundStyle(AppConfig.subtleGray)
+                                }
+
+                                Spacer()
+
+                                ShareLink(item: "\(item.title)\n\n\(item.body)") {
+                                    Image(systemName: "square.and.arrow.up")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(AppConfig.accentFg)
+                                        .frame(width: 36, height: 36)
+                                        .background(AppConfig.surfaceLow)
+                                        .clipShape(Circle())
+                                }
+                            }
+
+                            Divider()
+
+                            if !item.body.isEmpty {
+                                Text(item.body)
+                                    .font(.body)
+                                    .foregroundStyle(AppConfig.darkText)
+                                    .lineSpacing(4)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            if !item.fields.isEmpty {
+                                VStack(spacing: 0) {
+                                    ForEach(Array(item.fields.enumerated()), id: \.element.id) { idx, field in
+                                        infoFieldRow(field)
+                                        if idx < item.fields.count - 1 {
+                                            Divider().padding(.leading, 52)
+                                        }
+                                    }
+                                }
+                                .background(AppConfig.cardBg)
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppConfig.separatorSoft, lineWidth: 1))
+                            }
+
+                            if !item.details.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                Text(item.details)
+                                    .font(.body)
+                                    .foregroundStyle(AppConfig.darkText)
+                                    .lineSpacing(2)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(14)
+                                    .background(AppConfig.cardBg)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(AppConfig.separatorSoft, lineWidth: 1))
+                            }
+
+                            if let url = URL(string: item.linkURL), !item.linkURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                Button {
+                                    Haptics.selection()
+                                    openURL(url)
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "arrow.up.right.square")
+                                        Text(item.linkTitle.isEmpty ? "Open link" : item.linkTitle)
+                                    }
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(AppConfig.onAccent)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .background(AppConfig.accent)
+                                    .clipShape(Capsule())
+                                }
+                                .buttonStyle(ScaleButtonStyle())
+                            }
+
+                            Spacer(minLength: 24)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+                        .padding(.bottom, max(24, proxy.safeAreaInsets.bottom + 12))
                     }
-                    .padding()
                 }
-            }
-            .navigationTitle(item.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    ShareLink(item: "\(item.title)\n\n\(item.body)") {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(AppConfig.accentFg)
-                    }
+                .background(AppConfig.pageBg)
+
+                Button {
+                    selectedInfoItem = nil
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .heavy))
+                        .foregroundStyle(Color(white: 0.6))
+                        .frame(width: 42, height: 42)
+                        .background(Color(white: 0.19))
+                        .clipShape(Circle())
                 }
+                .shadow(color: .black.opacity(0.3), radius: 6, y: 2)
+                .padding(.trailing, 18)
+                .padding(.top, 14)
             }
         }
         .presentationDetents([.large])
@@ -2224,6 +2362,19 @@ struct HomeView: View {
     }
 
     private func announcementInlineImage(_ item: Announcement) -> UIImage? {
+        #if canImport(UIKit)
+        guard let base64 = item.imageBase64,
+              let data = Data(base64Encoded: base64),
+              let image = UIImage(data: data) else {
+            return nil
+        }
+        return image
+        #else
+        return nil
+        #endif
+    }
+
+    private func infoInlineImage(_ item: InfoItem) -> UIImage? {
         #if canImport(UIKit)
         guard let base64 = item.imageBase64,
               let data = Data(base64Encoded: base64),
@@ -2302,6 +2453,22 @@ struct ScaleButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .opacity(configuration.isPressed ? 0.92 : 1.0)
             .animation(.quick, value: configuration.isPressed)
+    }
+}
+
+private struct TextReadabilityUnderlay: ViewModifier {
+    let enabled: Bool
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.black.opacity(0.30))
+                )
+        } else {
+            content
+        }
     }
 }
 

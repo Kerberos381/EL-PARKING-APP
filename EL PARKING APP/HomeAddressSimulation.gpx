@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="EL Parking App" xmlns="http://www.topografix.com/GPX/1/1">
+    <!-- HOME: Švehlova 3333/19, Praha 10 -->
+    <wpt lat="50.05631" lon="14.51451">
+        <name>HOME - Svehlova 3333/19 Praha 10</name>
+    </wpt>
+
+    <trk>
+        <name>HOME Approach</name>
+        <trkseg>
+            <trkpt lat="50.06050" lon="14.50900">
+                <time>2026-05-20T08:00:00Z</time>
+            </trkpt>
+            <trkpt lat="50.05890" lon="14.51130">
+                <time>2026-05-20T08:01:00Z</time>
+            </trkpt>
+            <trkpt lat="50.05750" lon="14.51310">
+                <time>2026-05-20T08:02:00Z</time>
+            </trkpt>
+            <trkpt lat="50.05631" lon="14.51451">
+                <time>2026-05-20T08:03:00Z</time>
+            </trkpt>
+        </trkseg>
+    </trk>
+</gpx>

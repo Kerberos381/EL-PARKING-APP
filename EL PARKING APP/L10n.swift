@@ -96,6 +96,7 @@ struct L10n {
     static var signOut:     String { isCzech ? "Odhlásit se" : "Sign Out" }
     static var saving:      String { isCzech ? "Ukládám…"  : "Saving…" }
     static var saved:       String { isCzech ? "Uloženo!"  : "Saved!" }
+    static var tryAgain:    String { isCzech ? "Zkusit znovu" : "Try again" }
 
     // ─────────────────────────────────────────────────────────────────────────
     // MARK: Home Screen
@@ -358,6 +359,12 @@ struct L10n {
     static var tapToTurnOff:    String { isCzech ? "Klepnutím deaktivujte"    : "Tap to turn off" }
     static var signInWithoutPwd:String { isCzech ? "Přihlásit bez hesla"      : "Sign in without a password" }
     static var forgetDevice:    String { isCzech ? "Zapomenout toto zařízení" : "Forget this device" }
+    static var faceIDAppLock: String {
+        isCzech ? "Face ID zámek aplikace" : "Face ID App Lock"
+    }
+    static var forgetSavedSignInDevice: String {
+        isCzech ? "Zapomenout uložené přihlášení na tomto zařízení" : "Forget saved sign-in on this device"
+    }
 
     static var bookingReminders:    String { isCzech ? "Připomenutí rezervací"              : "Booking Reminders" }
     static var notifyBeforeBooking: String { isCzech ? "Upozornit před zahájením rezervace" : "Notify me before my booking starts" }
@@ -894,6 +901,12 @@ struct L10n {
     static var copyToClipboard:         String { isCzech ? "Kopírovat do schránky"            : "Copy to Clipboard" }
     static var passwordTooShort:        String { isCzech ? "Heslo musí mít alespoň 6 znaků"  : "Password must be at least 6 characters" }
     static var assignRole:              String { isCzech ? "Přiřadit roli"                   : "Assign Role" }
+    static var companyBadge:            String { isCzech ? "Firemní značka"                   : "Company Badge" }
+    static var companyBadgeHint:        String { isCzech ? "Doplňuje se automaticky podle domény e-mailu, ale správce ji může změnit." : "Auto-detected from email domain, but admins can override it." }
+    static var noneLabel:               String { isCzech ? "Žádná"                            : "None" }
+    static var omegaLabel:              String { isCzech ? "Omega"                            : "Omega" }
+    static var essilorLuxotticaLabel:   String { isCzech ? "EssilorLuxottica"                 : "EssilorLuxottica" }
+    static var grandVisionLabel:        String { isCzech ? "Grand Vision"                     : "Grand Vision" }
     static var userCreated:             String { isCzech ? "Uživatel vytvořen!"               : "User created!" }
     static var credentialsEmailSubject: String { isCzech ? "EL Parking – Přihlašovací údaje" : "EL Parking – Your login credentials" }
 

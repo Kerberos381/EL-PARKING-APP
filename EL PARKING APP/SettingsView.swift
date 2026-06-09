@@ -46,6 +46,8 @@ struct SettingsView: View {
     @State private var lastSavedColor:   String = ""
     @State private var lastSavedCarType: String = ""
     @State private var lastSavedPreferredVocative: String = ""
+    @State private var selectedCompanyBadge: CompanyBadge = .none
+    @State private var lastSavedCompanyBadge: CompanyBadge = .none
     @State private var selectedVehicleMake = ""
     @State private var selectedVehicleModel = ""
     @State private var showCustomPicker  = false  // notification custom time picker
@@ -54,6 +56,9 @@ struct SettingsView: View {
     @State private var biometricsAvailable = false
     @State private var biometricDisplayName = "Biometrics"
     @State private var hasSavedBiometricCredentials = false
+    // Native settings pattern: no global edit mode.
+    private let useNativeSettingsRevamp = true
+    @State private var nativeReminderInterval: NativeReminderInterval = .oneHour
 
     private var isShortcutsOwner: Bool {
         let email = bookingManager.currentUserEmail.lowercased()
@@ -72,7 +77,10 @@ struct SettingsView: View {
     private var profileIsDirty: Bool {
         bookingManager.preferredVocative.trimmingCharacters(in: .whitespacesAndNewlines)
             != lastSavedPreferredVocative.trimmingCharacters(in: .whitespacesAndNewlines)
+            || selectedCompanyBadge != lastSavedCompanyBadge
     }
+
+    private var hasUnsavedSettingsChanges: Bool { vehicleIsDirty || profileIsDirty }
 
     private var theme: AppTheme {
         AppTheme(rawValue: themeRaw) ?? .system
@@ -172,28 +180,12 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
-
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: SettingsSpace.xl) {
-                        profileCard
-                        languageSection
-                        themeSection
-                        notificationsSection
-                        carInfoSection
-                        if isShortcutsOwner { shortcutsSection }
-                        accountSection
-                        rulesSection
-                        statsSection
-                        dataSection
-                        signOutSection
-                        footerSection
-                    }
-                    .padding(.bottom, 100)
+            Group {
+                if useNativeSettingsRevamp {
+                    nativeSettingsLayout
+                } else {
+                    legacySettingsLayout
                 }
-                .transition(.opacity)
-                .scrollDismissesKeyboard(.immediately)
             }
             .navigationTitle(L10n.settings)
             .navigationBarTitleDisplayMode(.large)
@@ -203,13 +195,12 @@ struct SettingsView: View {
                 lastSavedColor   = bookingManager.carColor
                 lastSavedCarType = bookingManager.carType
                 lastSavedPreferredVocative = bookingManager.preferredVocative
+                selectedCompanyBadge = authManager.currentUser?.companyBadge ?? .none
+                lastSavedCompanyBadge = selectedCompanyBadge
                 syncVehicleMakeModelFromDescription()
                 refreshBiometricState()
             }
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    ThemeToggleButton()
-                }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button(L10n.done) {
@@ -218,7 +209,7 @@ struct SettingsView: View {
                             to: nil, from: nil, for: nil)
                     }
                     .fontWeight(.semibold)
-                    .foregroundStyle(AppConfig.accentFg)
+                    .foregroundStyle(AppConfig.darkText)
                 }
             }
             .alert(L10n.clearAllBookings, isPresented: $showingClearAlert) {
@@ -262,6 +253,360 @@ struct SettingsView: View {
         }
     }
 
+    private var legacySettingsLayout: some View {
+        ZStack {
+            Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
+
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: SettingsSpace.xl) {
+                    themeSection
+                    profileCard
+                    languageSection
+                    notificationsSection
+                    carInfoSection
+                    if isShortcutsOwner { shortcutsSection }
+                    accountSection
+                    rulesSection
+                    statsSection
+                    dataSection
+                    signOutSection
+                    footerSection
+                }
+                .padding(.bottom, 100)
+            }
+            .transition(.opacity)
+            .scrollDismissesKeyboard(.immediately)
+        }
+    }
+
+    private var nativeSettingsLayout: some View {
+        List {
+            Section {
+                profileCard
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                    .listRowBackground(Color.clear)
+            }
+
+            Section("Appearance") {
+                Menu {
+                    ForEach(AppTheme.allCases, id: \.rawValue) { option in
+                        Button {
+                            themeRaw = option.rawValue
+                        } label: {
+                            HStack {
+                                Label(option.label, systemImage: option.icon)
+                                if theme == option {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    nativeValueRow(L10n.appearance, value: theme.label, enabled: true)
+                }
+                .tint(AppConfig.darkText)
+            }
+
+            Section("Language") {
+                Menu {
+                    ForEach(AppLanguage.allCases, id: \.rawValue) { lang in
+                        Button {
+                            langManager.language = lang
+                        } label: {
+                            HStack {
+                                Text("\(lang.flag) \(lang.displayName)")
+                                if langManager.language == lang {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    nativeValueRow(L10n.language, value: "\(langManager.language.flag) \(langManager.language.displayName)", enabled: true)
+                }
+                .tint(AppConfig.darkText)
+            }
+
+            Section("Vehicle") {
+                Button {
+                    Haptics.selection()
+                    showVehiclePresetSheet = true
+                } label: {
+                    nativeValueRow(
+                        "Choose Icon",
+                        value: selectedVehiclePreset?.title ?? "Choose Icon",
+                        enabled: true
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Menu {
+                    ForEach(CarData.makes, id: \.self) { make in
+                        Button(make) {
+                            selectedVehicleMake = make
+                            selectedVehicleModel = ""
+                            bookingManager.carDescription = make
+                        }
+                    }
+                } label: {
+                    nativeValueRow("Make", value: selectedVehicleMake.isEmpty ? "Choose make" : selectedVehicleMake, enabled: true)
+                }
+
+                Menu {
+                    if selectedVehicleMake.isEmpty {
+                        Button("Select make first") {}.disabled(true)
+                    } else {
+                        ForEach(CarData.models(for: selectedVehicleMake), id: \.self) { model in
+                            Button(model) {
+                                selectedVehicleModel = model
+                                bookingManager.carDescription = CarData.compose(make: selectedVehicleMake, model: model)
+                            }
+                        }
+                    }
+                } label: {
+                    nativeValueRow("Model", value: selectedVehicleModel.isEmpty ? "Choose model" : selectedVehicleModel, enabled: true)
+                }
+
+                NavigationLink {
+                    TextEditDetailView(
+                        title: L10n.regPlate,
+                        text: $bookingManager.registrationPlate,
+                        capitalization: .characters
+                    )
+                } label: {
+                    LabeledContent(L10n.regPlate, value: bookingManager.registrationPlate.isEmpty ? L10n.regPlatePlaceholder : bookingManager.registrationPlate)
+                }
+            }
+
+            if isShortcutsOwner {
+                Section("Shortcuts") {
+                    Text("Set favorite spot and default booking time for quick Siri or shortcut actions.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    Menu {
+                        Button("None") { favoriteSpotID = "" }
+                        ForEach(AppConfig.allParkingSpots, id: \.id) { spot in
+                            Button(spot.label) { favoriteSpotID = spot.id }
+                        }
+                    } label: {
+                        nativeValueRow("Favorite Spot",
+                                       value: favoriteSpotID.isEmpty ? "None" : (AppConfig.allParkingSpots.first(where: { $0.id == favoriteSpotID })?.label ?? favoriteSpotID),
+                                       enabled: true)
+                    }
+
+                    Menu {
+                        ForEach(AppConfig.availableTimeSlots, id: \.self) { slot in
+                            Button(slot) { favoriteFromTime = slot }
+                        }
+                    } label: {
+                        nativeValueRow("From", value: favoriteFromTime, enabled: true)
+                    }
+
+                    Menu {
+                        ForEach(AppConfig.availableTimeSlots, id: \.self) { slot in
+                            Button(slot) { favoriteToTime = slot }
+                        }
+                    } label: {
+                        nativeValueRow("To", value: favoriteToTime, enabled: true)
+                    }
+                }
+            }
+
+            Section("Notifications") {
+                Toggle(isOn: $reminderEnabled.animation(.spring(response: 0.3, dampingFraction: 0.8))) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L10n.bookingReminders)
+                                .font(.body)
+                            Text(L10n.notifyBeforeBooking)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: "bell.badge.fill")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .tint(AppConfig.darkText.opacity(0.7))
+                .onChange(of: reminderEnabled) { _, _ in
+                    bookingManager.scheduleDailyReminders()
+                }
+
+                if reminderEnabled {
+                    NavigationLink {
+                        ReminderIntervalPickerView(selectedInterval: $nativeReminderInterval) { picked in
+                            switch picked {
+                            case .thirtyMinutes:
+                                reminderMinutesBefore = 30
+                                bookingManager.scheduleDailyReminders()
+                            case .oneHour:
+                                reminderMinutesBefore = 60
+                                bookingManager.scheduleDailyReminders()
+                            case .custom:
+                                showCustomPicker = true
+                            }
+                        }
+                    } label: {
+                        LabeledContent("Remind Me", value: nativeReminderIntervalDisplay)
+                    }
+                }
+            }
+
+            Section("Security") {
+                if biometricsAvailable {
+                    Toggle(L10n.faceIDAppLock, isOn: $biometricEnabled)
+                        .tint(AppConfig.darkText.opacity(0.7))
+                        .onChange(of: biometricEnabled) { _, _ in toggleBiometric() }
+                    if hasSavedBiometricCredentials && biometricEnabled {
+                        Button(role: .destructive) {
+                            KeychainManager.shared.deleteCredentials()
+                            hasSavedBiometricCredentials = false
+                            biometricEnabled = false
+                        } label: {
+                            Text(L10n.forgetSavedSignInDevice)
+                        }
+                    }
+                }
+            }
+
+            Section("Account") {
+                LabeledContent(L10n.name, value: bookingManager.currentUserName)
+                LabeledContent(L10n.email, value: bookingManager.currentUserEmail)
+
+                Menu {
+                    ForEach(CompanyBadge.allCases, id: \.rawValue) { badge in
+                        Button {
+                            selectedCompanyBadge = badge
+                            Task {
+                                await authManager.updateProfile(
+                                    displayName: bookingManager.currentUserName,
+                                    plate: bookingManager.registrationPlate,
+                                    carDescription: bookingManager.carDescription,
+                                    carColor: bookingManager.carColor,
+                                    carType: bookingManager.carType,
+                                    vehicleMiniaturePresetID: bookingManager.vehicleMiniaturePresetID,
+                                    preferredVocative: bookingManager.preferredVocative,
+                                    companyBadge: selectedCompanyBadge
+                                )
+                            }
+                        } label: {
+                            HStack {
+                                Text(companyBadgeLabel(badge))
+                                if selectedCompanyBadge == badge { Image(systemName: "checkmark") }
+                            }
+                        }
+                    }
+                } label: {
+                    nativeValueRow(L10n.companyBadge, value: companyBadgeLabel(selectedCompanyBadge), enabled: true)
+                }
+                .tint(AppConfig.darkText)
+
+                NavigationLink {
+                    TextEditDetailView(
+                        title: L10n.greetingName,
+                        text: $bookingManager.preferredVocative,
+                        capitalization: .words
+                    )
+                } label: {
+                    LabeledContent(L10n.greetingName, value: bookingManager.preferredVocative.isEmpty ? L10n.greetingNameHint : bookingManager.preferredVocative)
+                }
+
+                Button {
+                    showChangePassword = true
+                } label: {
+                    nativeValueRow(L10n.changePassword, value: "", enabled: true)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Section(L10n.bookingRules) {
+                LabeledContent(L10n.personalAdvance, value: "\(AppConfig.selfBookingMaxAdvanceDays) days")
+                LabeledContent(L10n.forOthersAdvance, value: "\(AppConfig.othersBookingMaxAdvanceDays) days")
+                LabeledContent(L10n.maxPerDay, value: "\(AppConfig.selfBookingMaxPerDay)")
+            }
+
+            Section(L10n.statistics) {
+                let myCount = bookingManager.getBookingsForUser(bookingManager.currentUserEmail).count
+                LabeledContent(L10n.myBookingsCount, value: "\(myCount)")
+                LabeledContent(L10n.totalBookings, value: "\(bookingManager.bookings.count)")
+            }
+
+            Section(L10n.data) {
+                Button(role: .destructive) { showingClearAlert = true } label: {
+                    Text(L10n.clearAllBookings)
+                }
+            }
+
+            Section("Session") {
+                Button {
+                    authManager.signOut()
+                } label: {
+                    Text(L10n.signOut)
+                        .foregroundStyle(AppConfig.darkText)
+                }
+                .buttonStyle(.plain)
+                Button(role: .destructive) { showDeleteAccount = true } label: {
+                    Text(L10n.deleteAccount)
+                }
+            }
+
+            Section {
+                VStack(spacing: 4) {
+                    Text("EL PARKING")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Color(uiColor: .systemGroupedBackground))
+        .onAppear {
+            nativeReminderInterval = nativeIntervalFromMinutes(reminderMinutesBefore)
+        }
+        .onChange(of: reminderMinutesBefore) { _, newValue in
+            nativeReminderInterval = nativeIntervalFromMinutes(newValue)
+        }
+    }
+
+    private func nativeValueRow(_ title: String, value: String, enabled: Bool) -> some View {
+        HStack {
+            Text(title)
+                .foregroundStyle(AppConfig.darkText)
+            Spacer()
+            Text(value)
+                .foregroundStyle(enabled ? Color.secondary : Color.secondary.opacity(0.7))
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(enabled ? Color.secondary.opacity(0.7) : Color.secondary.opacity(0.35))
+        }
+    }
+
+    private var nativeReminderIntervalDisplay: String {
+        switch nativeReminderInterval {
+        case .thirtyMinutes:
+            return "30 min before"
+        case .oneHour:
+            return "1 hour before"
+        case .custom:
+            return reminderSummary
+        }
+    }
+
+    private func nativeIntervalFromMinutes(_ minutes: Int) -> NativeReminderInterval {
+        switch minutes {
+        case 30: return .thirtyMinutes
+        case 60: return .oneHour
+        default: return .custom
+        }
+    }
+
     // MARK: - Custom Reminder Picker Sheet
 
     private var customPickerSheet: some View {
@@ -288,7 +633,7 @@ struct SettingsView: View {
                 Text(reminderSummary)
                     .font(.title3)
                     .fontWeight(.bold)
-                    .foregroundStyle(AppConfig.accentFg)
+                    .foregroundStyle(AppConfig.darkText)
 
                 Spacer()
             }
@@ -301,7 +646,7 @@ struct SettingsView: View {
                         bookingManager.scheduleDailyReminders()
                     }
                     .fontWeight(.semibold)
-                    .foregroundStyle(AppConfig.accentFg)
+                    .foregroundStyle(AppConfig.darkText)
                 }
             }
             .background(AppConfig.pageBg.ignoresSafeArea())
@@ -331,52 +676,9 @@ struct SettingsView: View {
                         .foregroundStyle(AppConfig.subtleGray)
                 }
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(AppConfig.subtleGray.opacity(0.5))
             }
             .padding(18)
 
-            if biometricsAvailable {
-                Divider().overlay(AppConfig.separatorSoft)
-                    .padding(.horizontal, 16)
-
-                Toggle(isOn: $biometricEnabled) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(biometricDisplayName)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(AppConfig.darkText)
-                        Text(L10n.signInWithoutPwd)
-                            .font(.caption2)
-                            .foregroundStyle(AppConfig.subtleGray)
-                    }
-                }
-                .toggleStyle(.switch)
-                .tint(AppConfig.darkText)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .onChange(of: biometricEnabled) { _, _ in
-                    toggleBiometric()
-                }
-
-                if hasSavedBiometricCredentials && biometricEnabled {
-                    Divider().overlay(AppConfig.separatorSoft)
-                        .padding(.horizontal, 16)
-                    Button {
-                        KeychainManager.shared.deleteCredentials()
-                        hasSavedBiometricCredentials = false
-                        biometricEnabled = false
-                    } label: {
-                        Text(L10n.forgetDevice)
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(AppConfig.spotOccupied.opacity(0.8))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                }
-            }
         }
         .frame(maxWidth: .infinity)
         .background(Color(uiColor: .secondarySystemGroupedBackground))
@@ -386,7 +688,6 @@ struct SettingsView: View {
                 .stroke(AppConfig.separatorSoft.opacity(0.35), lineWidth: 0.5)
         )
         .shadow(color: .black.opacity(0.018), radius: 4, y: 1)
-        .padding(.horizontal)
         .padding(.top, 8)
     }
 
@@ -469,36 +770,31 @@ struct SettingsView: View {
 
     private var languageSection: some View {
         settingsSection(title: L10n.language, icon: "globe", iconTint: .blue) {
-            HStack(spacing: 0) {
+            Menu {
                 ForEach(AppLanguage.allCases, id: \.rawValue) { lang in
-                    let isSelected = langManager.language == lang
                     Button {
-                        if !isSelected { Haptics.selection() }
-                        withAnimation(.standard) {
-                            langManager.language = lang
+                        if langManager.language != lang {
+                            Haptics.selection()
                         }
+                        langManager.language = lang
                     } label: {
-                        HStack(spacing: 6) {
-                            Text(lang.flag).font(.subheadline)
-                            Text(lang.displayName)
-                                .font(.caption.weight(.semibold))
+                        HStack {
+                            Text("\(lang.flag) \(lang.displayName)")
+                            if langManager.language == lang {
+                                Image(systemName: "checkmark")
+                            }
                         }
-                        .foregroundStyle(AppConfig.darkText)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(isSelected ? AppConfig.surfaceHigh : Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(isSelected ? AppConfig.separatorStrong : Color.clear, lineWidth: 1)
-                        )
                     }
-                    .buttonStyle(ScaleButtonStyle())
                 }
+            } label: {
+                settingsActionRow(
+                    title: "\(L10n.language): \(langManager.language.flag) \(langManager.language.displayName)",
+                    icon: "globe",
+                    tint: .blue,
+                    textTint: AppConfig.darkText
+                )
             }
-            .padding(6)
-            .background(AppConfig.surfaceLow)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .buttonStyle(ScaleButtonStyle())
         }
     }
 
@@ -506,37 +802,31 @@ struct SettingsView: View {
 
     private var themeSection: some View {
         settingsSection(title: L10n.appearance, icon: "paintpalette.fill", iconTint: .purple) {
-            HStack(spacing: 0) {
+            Menu {
                 ForEach(AppTheme.allCases, id: \.rawValue) { option in
-                    let isSelected = theme == option
                     Button {
-                        if !isSelected { Haptics.selection() }
-                        withAnimation(.standard) {
-                            themeRaw = option.rawValue
+                        if theme != option {
+                            Haptics.selection()
                         }
+                        themeRaw = option.rawValue
                     } label: {
-                        VStack(spacing: 4) {
-                            Image(systemName: option.icon)
-                                .font(.caption.weight(.semibold))
-                            Text(option.label)
-                                .font(.caption2.weight(.semibold))
+                        HStack {
+                            Label(option.label, systemImage: option.icon)
+                            if theme == option {
+                                Image(systemName: "checkmark")
+                            }
                         }
-                        .foregroundStyle(AppConfig.darkText)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(isSelected ? AppConfig.surfaceHigh : Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(isSelected ? AppConfig.separatorStrong : Color.clear, lineWidth: 1)
-                        )
                     }
-                    .buttonStyle(ScaleButtonStyle())
                 }
+            } label: {
+                settingsActionRow(
+                    title: "\(L10n.appearance): \(theme.label)",
+                    icon: "paintpalette.fill",
+                    tint: .purple,
+                    textTint: AppConfig.darkText
+                )
             }
-            .padding(6)
-            .background(AppConfig.surfaceLow)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .buttonStyle(ScaleButtonStyle())
         }
     }
 
@@ -544,17 +834,14 @@ struct SettingsView: View {
 
     private var notificationsSection: some View {
         settingsSection(title: L10n.notifications, icon: "bell.badge.fill", iconTint: .red) {
-            VStack(spacing: 14) {
-
-                // Enable toggle
+            VStack(spacing: 0) {
                 HStack(spacing: 14) {
                     settingsIconTile(
                         icon: reminderEnabled ? "bell.badge.fill" : "bell.slash.fill",
                         tint: .red,
-                        size: 28,
-                        iconSize: 13
+                        size: 24,
+                        iconSize: 11
                     )
-
                     VStack(alignment: .leading, spacing: 2) {
                         Text(L10n.bookingReminders)
                             .font(.subheadline.weight(.semibold))
@@ -563,98 +850,40 @@ struct SettingsView: View {
                             .font(.caption2)
                             .foregroundStyle(AppConfig.subtleGray)
                     }
-
                     Spacer()
-
                     Toggle("", isOn: $reminderEnabled)
                         .labelsHidden()
-                        .tint(AppConfig.accent.opacity(0.55))
+                        .tint(AppConfig.darkText.opacity(0.55))
                 }
+                .padding(.vertical, 8)
                 .onChange(of: reminderEnabled) { _, _ in
                     Haptics.selection()
                     bookingManager.scheduleDailyReminders()
                 }
 
                 if reminderEnabled {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "clock.arrow.circlepath")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(AppConfig.subtleGray)
-                            Text(L10n.notifyMe)
-                                .font(.system(size: 10, weight: .bold))
-                                .tracking(1.2)
-                                .foregroundStyle(AppConfig.subtleGray)
-                            Spacer()
-                            Text(reminderSummary)
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(AppConfig.darkText)
+                    Divider().overlay(AppConfig.separatorSoft)
+                    Picker("", selection: $reminderMinutesBefore) {
+                        ForEach(reminderOptions, id: \.minutes) { option in
+                            Text("\(option.label) \(option.sublabel)").tag(option.minutes)
                         }
-
-                        // Quick presets
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
-                            ForEach(reminderOptions, id: \.minutes) { option in
-                                let selected = reminderMinutesBefore == option.minutes
-                                Button {
-                                    withAnimation(.quick) {
-                                        reminderMinutesBefore = option.minutes
-                                    }
-                                    bookingManager.scheduleDailyReminders()
-                                } label: {
-                                    HStack(spacing: 0) {
-                                        Text(option.label)
-                                            .font(.system(size: 13, weight: .semibold))
-                                            .foregroundStyle(AppConfig.darkText)
-                                        Text(" \(option.sublabel)")
-                                            .font(.system(size: 11))
-                                            .foregroundStyle(AppConfig.subtleGray)
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 9)
-                                    .background(selected ? AppConfig.surfaceHigh : Color.clear)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(selected ? AppConfig.separatorStrong : AppConfig.outlineVariant.opacity(0.35), lineWidth: 1)
-                                    )
-                                }
-                                .buttonStyle(ScaleButtonStyle())
-                            }
-                        }
-                        .padding(4)
-                        .background(AppConfig.surfaceLow)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                        // Custom time picker row
-                        Button { showCustomPicker = true } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: "slider.horizontal.3")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(AppConfig.subtleGray)
-                                    .frame(width: 24)
-                                Text(L10n.custom)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(AppConfig.darkText)
-                                Spacer()
-                                Text(isCustomValue ? reminderSummary : L10n.setCustomTime)
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(isCustomValue ? AppConfig.darkText : AppConfig.subtleGray)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(AppConfig.subtleGray.opacity(0.5))
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 9)
-                            .background(isCustomValue ? AppConfig.surfaceHigh : Color.clear)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(isCustomValue ? AppConfig.separatorStrong : AppConfig.outlineVariant.opacity(0.35), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(ScaleButtonStyle())
                     }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .pickerStyle(.segmented)
+                    .padding(.vertical, 8)
+                    .onChange(of: reminderMinutesBefore) { _, _ in
+                        bookingManager.scheduleDailyReminders()
+                    }
+
+                    Divider().overlay(AppConfig.separatorSoft)
+                    Button { showCustomPicker = true } label: {
+                        settingsActionRow(
+                            title: "\(L10n.custom): \(isCustomValue ? reminderSummary : L10n.setCustomTime)",
+                            icon: "slider.horizontal.3",
+                            tint: .gray,
+                            textTint: AppConfig.darkText
+                        )
+                    }
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
         }
@@ -663,36 +892,20 @@ struct SettingsView: View {
     // MARK: - Car Info Section
 
     private var carInfoSection: some View {
-        settingsSection(title: L10n.vehicle, icon: "car.fill", iconTint: .green) {
+        settingsSection(title: L10n.vehicle, icon: "car.fill", iconTint: AppConfig.darkText) {
             VStack(spacing: 16) {
-                VStack(spacing: 12) {
-                    VehicleMiniatureView(
-                        carType: bookingManager.carType,
-                        colorHex: selectedVehicleColorHex,
-                        description: bookingManager.carDescription,
-                        presetID: bookingManager.vehicleMiniaturePresetID.isEmpty ? nil : bookingManager.vehicleMiniaturePresetID
+                Button {
+                    Haptics.selection()
+                    showVehiclePresetSheet = true
+                } label: {
+                    iconPickerRow(
+                        title: langManager.language == .czech ? "Ikona" : "Choose Icon",
+                        value: selectedVehiclePreset?.title ?? "Choose Icon",
+                        isPlaceholder: selectedVehiclePreset == nil
                     )
-                    .frame(width: 228, height: 116)
-                    .frame(maxWidth: .infinity, alignment: .center)
-
-                    VStack(spacing: 3) {
-                        Text(selectedVehicleModel.isEmpty ? (langManager.language == .czech ? "Přidejte vozidlo" : "Add a Vehicle") : selectedVehicleModel)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(AppConfig.darkText)
-                        Text(langManager.language == .czech ? "Správa modelu, SPZ a miniatury vozu" : "Manage model, license plate and vehicle miniature")
-                            .font(.system(size: 13))
-                            .foregroundStyle(AppConfig.subtleGray)
-                    }
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 14)
-                .frame(maxWidth: .infinity)
-                .background(AppConfig.surfaceLow)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(AppConfig.outlineVariant.opacity(0.3), lineWidth: 1)
-                )
+                .buttonStyle(ScaleButtonStyle())
+                .disabled(false)
 
                 VStack(spacing: 10) {
                     Menu {
@@ -748,21 +961,11 @@ struct SettingsView: View {
                         text: $bookingManager.registrationPlate,
                         capitalization: .characters
                     )
+                    .disabled(false)
                 }
+                .opacity(1)
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Button {
-                        Haptics.selection()
-                        showVehiclePresetSheet = true
-                    } label: {
-                        iconPickerRow(
-                            title: langManager.language == .czech ? "Ikona" : "Icon",
-                            value: selectedVehiclePreset?.title ?? "Choose Icon",
-                            isPlaceholder: selectedVehiclePreset == nil
-                        )
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-
                     DisclosureGroup(isExpanded: $showVehicleColorPicker) {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 38))], spacing: 8) {
                             ForEach(AppConfig.carColors, id: \.hex) { color in
@@ -773,7 +976,7 @@ struct SettingsView: View {
                                     ZStack {
                                         Circle().fill(Color(hex: color.hex)).frame(width: 30, height: 30)
                                             .overlay(Circle().stroke(
-                                                isSelected ? AppConfig.accentFg.opacity(0.85) : AppConfig.outlineVariant.opacity(0.4),
+                                                isSelected ? AppConfig.darkText.opacity(0.55) : AppConfig.outlineVariant.opacity(0.4),
                                                 lineWidth: isSelected ? 2 : 1
                                             ))
                                         if isSelected {
@@ -816,102 +1019,10 @@ struct SettingsView: View {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(AppConfig.outlineVariant.opacity(0.35), lineWidth: 1)
                     )
+                    .disabled(false)
                 }
-
-                // Save row
-                HStack(spacing: 10) {
-                    if vehicleIsDirty {
-                        HStack(spacing: 5) {
-                            Circle().fill(.orange).frame(width: 6, height: 6)
-                            Text(L10n.unsavedChanges).font(.caption2).foregroundStyle(AppConfig.subtleGray)
-                        }
-                        .transition(.opacity.combined(with: .move(edge: .leading)))
-                    }
-                    Spacer()
-                    Button { saveVehicle() } label: {
-                        ZStack {
-                            Capsule().fill(vehicleIsDirty ? AppConfig.accent : AppConfig.surfaceLow)
-                            switch vehicleSaveState {
-                            case .idle:
-                                HStack(spacing: 6) {
-                                    Image(systemName: "square.and.arrow.down").font(.system(size: 12, weight: .bold))
-                                    Text(vehicleIsDirty ? L10n.save : L10n.saved).font(.subheadline).fontWeight(.bold)
-                                }
-                                .foregroundStyle(vehicleIsDirty ? AppConfig.onAccent : AppConfig.subtleGray)
-                            case .saving:
-                                HStack(spacing: 6) {
-                                    ProgressView().scaleEffect(0.75).tint(AppConfig.onAccent)
-                                    Text(L10n.saving).font(.subheadline).fontWeight(.bold).foregroundStyle(AppConfig.onAccent)
-                                }
-                            case .saved:
-                                HStack(spacing: 6) {
-                                    Image(systemName: "checkmark.circle.fill").font(.system(size: 13))
-                                    Text(L10n.saved).font(.subheadline).fontWeight(.bold)
-                                }
-                                .foregroundStyle(AppConfig.activeGreen)
-                            }
-                        }
-                        .frame(height: 38).padding(.horizontal, 18)
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .disabled(vehicleSaveState == .saving || !vehicleIsDirty)
-                    .animation(.standard, value: vehicleSaveState)
-                    .animation(.standard, value: vehicleIsDirty)
-                }
-                .padding(.top, 4)
-                .animation(.standard, value: vehicleIsDirty)
+                .opacity(1)
             }
-        }
-    }
-
-    private func saveVehicle() {
-        bookingManager.carColor = selectedVehicleColorHex
-        vehicleSaveState = .saving
-        bookingManager.saveUserProfile()
-        Task {
-            await authManager.updateProfile(
-                displayName:    bookingManager.currentUserName,
-                plate:          bookingManager.registrationPlate,
-                carDescription: bookingManager.carDescription,
-                carColor:       bookingManager.carColor,
-                carType:        bookingManager.carType,
-                vehicleMiniaturePresetID: bookingManager.vehicleMiniaturePresetID,
-                preferredVocative: bookingManager.preferredVocative
-            )
-            withAnimation(.standard) {
-                vehicleSaveState   = .saved
-                lastSavedPlate     = bookingManager.registrationPlate
-                lastSavedCar       = bookingManager.carDescription
-                lastSavedColor     = bookingManager.carColor
-                lastSavedCarType   = bookingManager.carType
-                lastSavedPreferredVocative = bookingManager.preferredVocative
-            }
-            try? await Task.sleep(for: .seconds(2))
-            withAnimation(.standard) { vehicleSaveState = .idle }
-        }
-    }
-
-    private func saveGreetingName() {
-        profileSaveState = .saving
-        bookingManager.preferredVocative = bookingManager.preferredVocative
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        bookingManager.saveUserProfile()
-        Task {
-            await authManager.updateProfile(
-                displayName: bookingManager.currentUserName,
-                plate: bookingManager.registrationPlate,
-                carDescription: bookingManager.carDescription,
-                carColor: bookingManager.carColor,
-                carType: bookingManager.carType,
-                vehicleMiniaturePresetID: bookingManager.vehicleMiniaturePresetID,
-                preferredVocative: bookingManager.preferredVocative
-            )
-            withAnimation(.standard) {
-                lastSavedPreferredVocative = bookingManager.preferredVocative
-                profileSaveState = .saved
-            }
-            try? await Task.sleep(for: .seconds(1.4))
-            withAnimation(.standard) { profileSaveState = .idle }
         }
     }
 
@@ -931,7 +1042,7 @@ struct SettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(12)
-                .background(AppConfig.accentFg.opacity(0.06))
+                .background(AppConfig.surfaceLow)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 Divider()
@@ -995,6 +1106,8 @@ struct SettingsView: View {
                                     .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
                             }
                             .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
                             .background(AppConfig.surfaceLow)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppConfig.outlineVariant.opacity(0.4), lineWidth: 1))
@@ -1024,6 +1137,8 @@ struct SettingsView: View {
                                     .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
                             }
                             .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
                             .background(AppConfig.surfaceLow)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppConfig.outlineVariant.opacity(0.4), lineWidth: 1))
@@ -1035,7 +1150,7 @@ struct SettingsView: View {
                 if !favoriteSpotID.isEmpty {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(AppConfig.activeGreen)
+                            .foregroundStyle(AppConfig.darkText)
                             .font(.caption)
                         Text("Ready — say \"Book a spot in EL Parking\" to Siri")
                             .font(.caption)
@@ -1069,6 +1184,32 @@ struct SettingsView: View {
                 )
                 Divider().overlay(AppConfig.separatorSoft)
 
+                Menu {
+                    ForEach(CompanyBadge.allCases, id: \.rawValue) { badge in
+                        Button {
+                            selectedCompanyBadge = badge
+                        } label: {
+                            HStack {
+                                Text(companyBadgeLabel(badge))
+                                Spacer()
+                                if selectedCompanyBadge == badge {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    settingsActionRow(
+                        title: "\(L10n.companyBadge): \(companyBadgeLabel(selectedCompanyBadge))",
+                        icon: "checkmark.seal.fill",
+                        tint: .orange,
+                        textTint: AppConfig.darkText
+                    )
+                }
+                .buttonStyle(ScaleButtonStyle())
+
+                Divider().overlay(AppConfig.separatorSoft)
+
                 VStack(alignment: .leading, spacing: 8) {
                     inputField(
                         icon: "text.quote",
@@ -1083,23 +1224,7 @@ struct SettingsView: View {
                         .padding(.horizontal, 4)
                 }
                 .padding(.vertical, 12)
-
-                Divider().overlay(AppConfig.separatorSoft)
-
-                Button {
-                    saveGreetingName()
-                } label: {
-                    settingsActionRow(
-                        title: profileSaveState == .saving
-                            ? L10n.saving
-                            : (profileSaveState == .saved ? L10n.saved : L10n.save),
-                        icon: profileSaveState == .saved ? "checkmark.circle.fill" : "square.and.arrow.down.fill",
-                        tint: profileSaveState == .saved ? AppConfig.activeGreen : AppConfig.accent,
-                        textTint: profileSaveState == .saved ? AppConfig.activeGreen : AppConfig.darkText
-                    )
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .disabled(profileSaveState == .saving || !profileIsDirty)
+                .opacity(1)
 
                 Divider().overlay(AppConfig.separatorSoft)
 
@@ -1135,6 +1260,15 @@ struct SettingsView: View {
         .padding(.vertical, 12)
     }
 
+    private func companyBadgeLabel(_ badge: CompanyBadge) -> String {
+        switch badge {
+        case .omega: return L10n.omegaLabel
+        case .essilorLuxottica: return L10n.essilorLuxotticaLabel
+        case .grandVision: return L10n.grandVisionLabel
+        case .none: return L10n.noneLabel
+        }
+    }
+
     // MARK: - Rules Section
 
     private var rulesSection: some View {
@@ -1145,12 +1279,13 @@ struct SettingsView: View {
                 infoRow(icon: "1.circle", label: L10n.maxPerDay, value: "\(AppConfig.selfBookingMaxPerDay)")
                 infoRow(icon: "clock", label: L10n.defaultTime, value: "\(AppConfig.defaultTimeFrom) – \(AppConfig.defaultTimeTo)")
                 infoRow(icon: "moon.fill", label: L10n.autoAdvanceAfter, value: "\(AppConfig.autoAdvanceHour):00")
-                Divider().padding(.vertical, 4).overlay(Color.white.opacity(0.06))
+                Divider().overlay(AppConfig.separatorSoft)
                 Button { showOnboarding = true } label: {
                     settingsActionRow(
                         title: "App Tutorial",
                         icon: "graduationcap.fill",
-                        tint: AppConfig.darkText
+                        tint: AppConfig.darkText,
+                        showsChevron: false
                     )
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -1182,7 +1317,8 @@ struct SettingsView: View {
                         title: L10n.clearAllBookings,
                         icon: "trash.fill",
                         tint: AppConfig.spotOccupied.opacity(0.78),
-                        emphasizeDestructive: true
+                        emphasizeDestructive: true,
+                        showsChevron: false
                     )
                 } else {
                     HStack(spacing: 12) {
@@ -1192,9 +1328,6 @@ struct SettingsView: View {
                         Text(L10n.clearAllBookings)
                             .foregroundStyle(AppConfig.spotOccupied)
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(AppConfig.subtleGray)
                     }
                     .padding(.vertical, 4)
                 }
@@ -1211,13 +1344,14 @@ struct SettingsView: View {
                 settingsSection(title: L10n.account, icon: "rectangle.portrait.and.arrow.right", iconTint: .gray) {
                     VStack(spacing: 10) {
                         Button {
-                            // Keep Keychain credentials so Face ID still works on next sign-in
                             authManager.signOut()
                         } label: {
                             settingsActionRow(
                                 title: L10n.signOut,
                                 icon: "rectangle.portrait.and.arrow.right",
-                                tint: AppConfig.subtleGray
+                                tint: AppConfig.subtleGray,
+                                textTint: AppConfig.darkText,
+                                showsChevron: false
                             )
                         }
                         .buttonStyle(ScaleButtonStyle())
@@ -1229,7 +1363,8 @@ struct SettingsView: View {
                                 title: L10n.deleteAccount,
                                 icon: "person.crop.circle.badge.xmark",
                                 tint: AppConfig.spotOccupied.opacity(0.78),
-                                emphasizeDestructive: true
+                                emphasizeDestructive: true,
+                                showsChevron: false
                             )
                         }
                         .buttonStyle(ScaleButtonStyle())
@@ -1238,7 +1373,6 @@ struct SettingsView: View {
             } else {
                 VStack(spacing: 12) {
                     Button {
-                        // Keep Keychain credentials so Face ID still works on next sign-in
                         authManager.signOut()
                     } label: {
                         HStack(spacing: 10) {
@@ -1247,11 +1381,8 @@ struct SettingsView: View {
                             Text(L10n.signOut)
                                 .fontWeight(.semibold)
                             Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundStyle(AppConfig.subtleGray)
                         }
-                        .foregroundStyle(AppConfig.spotOccupied)
+                        .foregroundStyle(AppConfig.darkText)
                         .padding(18)
                         .background(AppConfig.cardBg)
                         .clipShape(RoundedRectangle(cornerRadius: 20))
@@ -1268,9 +1399,6 @@ struct SettingsView: View {
                             Text(L10n.deleteAccount)
                                 .fontWeight(.semibold)
                             Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundStyle(AppConfig.subtleGray)
                         }
                         .foregroundStyle(AppConfig.spotOccupied.opacity(0.7))
                         .padding(18)
@@ -1376,6 +1504,7 @@ struct SettingsView: View {
             Image(systemName: icon)
                 .font(.system(size: iconSize, weight: .semibold))
                 .foregroundStyle(.white)
+                .frame(width: iconSize + 2, height: iconSize + 2, alignment: .center)
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
@@ -1386,25 +1515,30 @@ struct SettingsView: View {
         icon: String,
         tint: Color,
         textTint: Color? = nil,
-        emphasizeDestructive: Bool = false
+        emphasizeDestructive: Bool = false,
+        showsChevron: Bool = true
     ) -> some View {
         _ = emphasizeDestructive
         return HStack(spacing: SettingsSpace.md) {
             settingsIconTile(icon: icon, tint: tint, size: 28, iconSize: 13)
+                .frame(width: 28, height: 28, alignment: .center)
 
             Text(title)
                 .font(SettingsType.rowTitle)
-                .foregroundStyle(textTint ?? tint)
+                .foregroundStyle(textTint ?? AppConfig.darkText)
 
             Spacer()
 
-            Image(systemName: "chevron.right")
-                .font(SettingsType.rowChevron)
-                .foregroundStyle(AppConfig.subtleGray.opacity(0.7))
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(SettingsType.rowChevron)
+                    .foregroundStyle(AppConfig.subtleGray.opacity(0.7))
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
+        .frame(minHeight: 44)
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
         .background(Color.clear)
     }
 
@@ -1415,11 +1549,9 @@ struct SettingsView: View {
         isPlaceholder: Bool,
         makerLogo: String? = nil
     ) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: icon)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(AppConfig.subtleGray)
-                .frame(width: 24)
+        HStack(spacing: SettingsSpace.md) {
+            settingsIconTile(icon: icon, tint: .gray, size: 28, iconSize: 13)
+                .frame(width: 28, height: 28, alignment: .center)
             Text(title)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(AppConfig.darkText)
@@ -1439,6 +1571,8 @@ struct SettingsView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 15)
+        .frame(minHeight: 52)
+        .contentShape(Rectangle())
         .background(AppConfig.surfaceLow)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppConfig.outlineVariant.opacity(0.35), lineWidth: 1))
@@ -1449,11 +1583,9 @@ struct SettingsView: View {
         value: String,
         isPlaceholder: Bool
     ) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(AppConfig.subtleGray)
-                .frame(width: 24)
+        HStack(spacing: SettingsSpace.md) {
+            settingsIconTile(icon: "sparkles", tint: .gray, size: 28, iconSize: 13)
+                .frame(width: 28, height: 28, alignment: .center)
             Text(title)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(AppConfig.darkText)
@@ -1468,6 +1600,8 @@ struct SettingsView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 15)
+        .frame(minHeight: 52)
+        .contentShape(Rectangle())
         .background(AppConfig.surfaceLow)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppConfig.outlineVariant.opacity(0.35), lineWidth: 1))
@@ -1621,7 +1755,7 @@ private struct ChangePasswordSheet: View {
                                         Image(systemName: "checkmark.circle.fill")
                                         Text(L10n.passwordChanged).fontWeight(.semibold)
                                     }
-                                    .foregroundStyle(AppConfig.activeGreen)
+                                    .foregroundStyle(AppConfig.darkText)
                                 } else {
                                     Text(L10n.changePassword)
                                         .fontWeight(.bold)
@@ -1630,7 +1764,7 @@ private struct ChangePasswordSheet: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(canSubmit ? AppConfig.accent : AppConfig.surfaceHigh)
+                            .background(canSubmit ? AppConfig.darkText : AppConfig.surfaceHigh)
                             .clipShape(RoundedRectangle(cornerRadius: 16))
                         }
                         .buttonStyle(ScaleButtonStyle())
@@ -1644,17 +1778,17 @@ private struct ChangePasswordSheet: View {
                             Button { Task { await sendReset() } } label: {
                                 Text(L10n.forgotCurrentPassword)
                                     .font(.subheadline)
-                                    .foregroundStyle(AppConfig.accentFg)
+                                    .foregroundStyle(AppConfig.darkText)
                             }
                             .buttonStyle(ScaleButtonStyle())
 
                             if resetSent {
                                 HStack(spacing: 6) {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(AppConfig.activeGreen)
+                                        .foregroundStyle(AppConfig.darkText)
                                     Text(L10n.checkYourEmail)
                                         .font(.subheadline)
-                                        .foregroundStyle(AppConfig.activeGreen)
+                                        .foregroundStyle(AppConfig.darkText)
                                 }
                                 .transition(.opacity.combined(with: .move(edge: .top)))
                             }
@@ -1671,13 +1805,13 @@ private struct ChangePasswordSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L10n.cancel) { dismiss() }
-                        .foregroundStyle(AppConfig.accentFg)
+                        .foregroundStyle(AppConfig.darkText)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button(L10n.done) { pwdFocus = nil }
                         .fontWeight(.semibold)
-                        .foregroundStyle(AppConfig.accentFg)
+                        .foregroundStyle(AppConfig.darkText)
                 }
             }
         }
@@ -1691,7 +1825,7 @@ private struct ChangePasswordSheet: View {
         HStack(spacing: 14) {
             Image(systemName: "lock.fill")
                 .font(.body)
-                .foregroundStyle(AppConfig.accentFg)
+                .foregroundStyle(AppConfig.darkText)
                 .frame(width: 28)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -1747,6 +1881,92 @@ private struct ChangePasswordSheet: View {
     private func sendReset() async {
         let ok = await authManager.resetPassword(email: email)
         if ok { withAnimation { resetSent = true } }
+    }
+}
+
+private enum NativeReminderInterval: String, CaseIterable {
+    case thirtyMinutes = "30 minutes before"
+    case oneHour = "1 hour before"
+    case custom = "Custom..."
+}
+
+private struct ReminderIntervalPickerView: View {
+    @Binding var selectedInterval: NativeReminderInterval
+    let onSelect: (NativeReminderInterval) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        List {
+            ForEach(NativeReminderInterval.allCases, id: \.self) { interval in
+                Button {
+                    selectedInterval = interval
+                    onSelect(interval)
+                    dismiss()
+                } label: {
+                    HStack {
+                        Text(interval.rawValue)
+                            .foregroundStyle(AppConfig.darkText)
+                        Spacer()
+                        if selectedInterval == interval {
+                            Image(systemName: "checkmark")
+                                .font(.body.bold())
+                                .foregroundStyle(AppConfig.darkText)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .listStyle(.insetGrouped)
+        .tint(AppConfig.darkText)
+        .navigationTitle("Remind Me")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct TextEditDetailView: View {
+    let title: String
+    @Binding var text: String
+    var capitalization: TextInputAutocapitalization = .never
+
+    @State private var inputBuffer: String = ""
+    @Environment(\.dismiss) private var dismiss
+
+    init(title: String, text: Binding<String>, capitalization: TextInputAutocapitalization = .never) {
+        self.title = title
+        self._text = text
+        self.capitalization = capitalization
+        self._inputBuffer = State(initialValue: text.wrappedValue)
+    }
+
+    var body: some View {
+        Form {
+            Section(header: Text("Edit \(title)")) {
+                TextField("Enter \(title.lowercased())", text: $inputBuffer)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(capitalization)
+                    .submitLabel(.done)
+                    .onSubmit { saveAndExit() }
+            }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(L10n.cancel) { dismiss() }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(L10n.done) { saveAndExit() }
+                    .fontWeight(.bold)
+                    .disabled(inputBuffer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+    }
+
+    private func saveAndExit() {
+        text = inputBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
+        dismiss()
     }
 }
 

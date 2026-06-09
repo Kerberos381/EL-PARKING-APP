@@ -144,4 +144,37 @@ struct AppReleaseNotes {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
         return all.first { $0.version == v }
     }
+
+    /// Intro shown once for each user/device on first authenticated launch.
+    static var firstLaunchIntro: AppRelease {
+        AppRelease(
+            version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
+            features: [
+                ReleaseFeature(
+                    icon: "sparkles",
+                    color: "accent",
+                    title: L10n.lang == .czech ? "Vítejte v EL Parking" : "Welcome to EL Parking",
+                    description: L10n.lang == .czech
+                        ? "Rychlé rezervace, chytrá připomenutí a přehled parkování v jednom čistém prostoru."
+                        : "Fast booking, smart reminders, and clear parking visibility in one focused app."
+                ),
+                ReleaseFeature(
+                    icon: "calendar.badge.plus",
+                    color: "blue",
+                    title: L10n.lang == .czech ? "Rezervujte za pár sekund" : "Book in Seconds",
+                    description: L10n.lang == .czech
+                        ? "Vyberte místo, čas a potvrďte. Aplikace hlídá kolize za vás."
+                        : "Pick a spot, choose time, and confirm. Collision checks are handled for you."
+                ),
+                ReleaseFeature(
+                    icon: "bell.badge.fill",
+                    color: "orange",
+                    title: L10n.lang == .czech ? "Mějte vše pod kontrolou" : "Stay in Control",
+                    description: L10n.lang == .czech
+                        ? "Nastavte si notifikace přesně podle sebe a mějte denní plán vždy po ruce."
+                        : "Tune reminders to your workflow and keep your daily plan always within reach."
+                )
+            ]
+        )
+    }
 }

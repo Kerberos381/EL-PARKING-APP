@@ -729,7 +729,9 @@ class BookingManager: ObservableObject {
             date:      newDate,
             fromTime:  newTimeFrom,
             toTime:    newTimeTo,
-            createdBy: existing.createdBy
+            createdBy: existing.createdBy,
+            createdAt: existing.createdAt,
+            groupID:   existing.groupID
         )
 
         // Update spot_lock: remove old slot from old lock, add new slot to new lock
@@ -1633,7 +1635,7 @@ extension Booking {
             "fromTime":    fromTime,
             "toTime":      toTime,
             "createdBy":   createdBy,
-            "createdAt":   Timestamp(date: Date()),
+            "createdAt":   Timestamp(date: createdAt),
             "expiresAt":   Timestamp(date: ttlExpirationDate())
         ]
         if let gid = groupID { dict["groupID"] = gid.uuidString }

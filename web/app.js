@@ -962,9 +962,45 @@ async function updateUserAdminFields(user, patch) {
       ...patch,
       updatedAt: serverTimestamp(),
     });
+    const updates = [];
+    if (typeof patch.status === "string") updates.push(`status → ${titleCase(patch.status)}`);
+    if (typeof patch.role === "string") updates.push(`role → ${titleCase(patch.role)}`);
+    if (updates.length) {
+      await enqueueUserNotificationByUid(user.uid, {
+        title: "Account Updated",
+        body: `Admin changed your ${updates.join(", ")}.`,
+      });
+    }
   } catch (error) {
     alert(error?.message || "User update failed.");
   }
+}
+
+function findUserUidByEmail(email) {
+  const normalized = String(email || "").trim().toLowerCase();
+  if (!normalized) return "";
+  const found = state.users.find((user) => String(user.email || "").trim().toLowerCase() === normalized);
+  return found?.uid || "";
+}
+
+async function enqueueUserNotificationByUid(uid, { title, body }) {
+  const safeUid = String(uid || "").trim();
+  const safeTitle = String(title || "").trim();
+  const safeBody = String(body || "").trim();
+  if (!safeUid || !safeTitle || !safeBody) return;
+  const notifRef = doc(collection(db, "users", safeUid, "notifications"));
+  await setDoc(notifRef, {
+    title: safeTitle,
+    body: safeBody,
+    delivered: false,
+    createdAt: serverTimestamp(),
+  });
+}
+
+async function enqueueUserNotificationByEmail(email, payload) {
+  const uid = findUserUidByEmail(email);
+  if (!uid) return;
+  await enqueueUserNotificationByUid(uid, payload);
 }
 
 async function updateSpotAdminFields(spot, patch) {
@@ -1740,6 +1776,11 @@ async function onSaveBookingEdit(event) {
       fromTime: nextFrom,
       toTime: nextTo,
     });
+    const actor = state.profile?.displayName || state.user?.email || "Admin";
+    await enqueueUserNotificationByEmail(booking.email, {
+      title: "Booking Updated",
+      body: `${actor} changed your booking to spot ${extractSpotNumber(nextSpot)} on ${formatLongDate(dayStart(nextDateYmd))} (${nextFrom}–${nextTo}).`,
+    });
     closeBookingEditModal();
   } catch (err) {
     ui.bookingEditError.textContent = err?.message || "Booking update failed.";
@@ -1776,6 +1817,10 @@ async function onBookSubmit(event) {
       fromTime,
       toTime,
     };
+    await enqueueUserNotificationByUid(state.user.uid, {
+      title: "Booking Confirmed",
+      body: `Spot ${extractSpotNumber(spot)} on ${formatLongDate(date)} (${fromTime}–${toTime}) was booked.`,
+    });
     ui.bookError.textContent = "";
     showBookingSuccessModal(spot, date, fromTime, toTime);
   } catch (err) {
@@ -1987,6 +2032,14 @@ async function cancelBooking(booking) {
       const updated = lockState.slots.filter((slot) => String(slot.bookingId || "") !== booking.id);
       transaction.set(lockRef, { slots: updated }, { merge: true });
       transaction.delete(bookingRef);
+    });
+    const actorIsAdmin = isAdminLike() && myEmail !== ownerEmail;
+    const cancelBody = actorIsAdmin
+      ? `Admin cancelled your booking for spot ${extractSpotNumber(booking.spot)} on ${formatLongDate(booking.bookingDate)} (${booking.fromTime}–${booking.toTime}).`
+      : `Your booking for spot ${extractSpotNumber(booking.spot)} on ${formatLongDate(booking.bookingDate)} (${booking.fromTime}–${booking.toTime}) was cancelled.`;
+    await enqueueUserNotificationByEmail(booking.email, {
+      title: "Booking Cancelled",
+      body: cancelBody,
     });
     closeSpotDetailsModal();
   } catch (err) {

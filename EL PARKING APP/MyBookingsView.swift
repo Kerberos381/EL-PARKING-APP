@@ -290,7 +290,7 @@ struct MyBookingsView: View {
         .navigationTitle(L10n.myBookings)
         .navigationBarTitleDisplayMode(.large)
             // Single-booking edit — item-based avoids blank-sheet race
-            .sheet(item: $bookingToEdit) { booking in
+            .fullScreenCover(item: $bookingToEdit) { booking in
                 BookingSheet(
                     preselectedSpot: AppConfig.allParkingSpots
                         .first(where: { $0.label == booking.spot }),
@@ -959,7 +959,7 @@ extension MyBookingsView {
             if error == nil {
                 Haptics.notify(.success)
                 cancelledBooking = info
-                withAnimation(.easeIn(duration: 0.2)) { showCancelSuccess = true }
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) { showCancelSuccess = true }
                 ToastManager.shared.showUndo(
                     message: "Spot \(b.spotNumber) cancelled"
                 ) {

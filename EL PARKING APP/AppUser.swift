@@ -38,6 +38,36 @@ enum UserStatus: String, Codable, CaseIterable {
     }
 }
 
+enum CompanyBadge: String, Codable, CaseIterable {
+    case omega = "omega"
+    case essilorLuxottica = "essilorLuxottica"
+    case grandVision = "grandVision"
+    case none = "none"
+
+    var displayName: String {
+        switch self {
+        case .omega: return "Omega"
+        case .essilorLuxottica: return "EssilorLuxottica"
+        case .grandVision: return "Grand Vision"
+        case .none: return "None"
+        }
+    }
+
+    static func infer(from email: String) -> CompanyBadge {
+        let domainPart = email
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .split(separator: "@")
+            .last
+            .map(String.init) ?? ""
+
+        if domainPart.contains("omega") { return .omega }
+        if domainPart.contains("essilor") || domainPart.contains("luxottica") { return .essilorLuxottica }
+        if domainPart.contains("grandvision") || domainPart.contains("grand-vision") { return .grandVision }
+        return .none
+    }
+}
+
 // MARK: - StrikeEntry
 
 struct StrikeEntry: Identifiable, Codable, Equatable {
@@ -89,6 +119,7 @@ struct AppUser: Identifiable, Codable, Equatable {
     var vehicleMiniaturePresetID: String = ""
     /// Optional manual vocative override for Czech greeting (e.g. "Katko", "Jane").
     var preferredVocative: String = ""
+    var companyBadge: CompanyBadge = .none
     var createdAt: Date
     var rejectionReason: String?
     /// True when the user has passed the invite/access gate for app data.
@@ -142,6 +173,7 @@ struct AppUser: Identifiable, Codable, Equatable {
             "carType":                  carType,
             "vehicleMiniaturePresetID": vehicleMiniaturePresetID,
             "preferredVocative":        preferredVocative,
+            "companyBadge":             companyBadge.rawValue,
             "createdAt":                Timestamp(date: createdAt),
             "inviteAccepted":           inviteAccepted,
             "needsFinishRegistration":  needsFinishRegistration
@@ -178,6 +210,8 @@ struct AppUser: Identifiable, Codable, Equatable {
         let strikeHistory   = (data["strikeHistory"] as? [[String: Any]] ?? [])
             .compactMap { StrikeEntry.fromFirestore($0) }
             .sorted { $0.assignedAt < $1.assignedAt }
+        let companyBadge = CompanyBadge(rawValue: (data["companyBadge"] as? String) ?? "")
+            ?? CompanyBadge.infer(from: email)
 
         return AppUser(
             uid:                     uid,
@@ -193,6 +227,7 @@ struct AppUser: Identifiable, Codable, Equatable {
                 ?? (data["vehiclePresetId"] as? String)
                 ?? "",
             preferredVocative:       data["preferredVocative"] as? String ?? "",
+            companyBadge:            companyBadge,
             createdAt:               createdAt,
             rejectionReason:         rejectionReason,
             inviteAccepted:          data["inviteAccepted"] as? Bool ?? true,

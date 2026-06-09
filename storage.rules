@@ -1,0 +1,40 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid));
+    }
+
+    function hasAppAccess() {
+      return signedIn()
+        && userDoc().data.status == 'active'
+        && userDoc().data.get('inviteAccepted', true) == true
+        && userDoc().data.get('needsFinishRegistration', false) == false;
+    }
+
+    function isAdmin() {
+      return hasAppAccess() && userDoc().data.role == 'admin';
+    }
+
+    function isValidAnnouncementImage() {
+      return request.resource != null
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /announcements/{imageName} {
+      allow read: if hasAppAccess();
+      allow create, update: if isAdmin() && isValidAnnouncementImage();
+      allow delete: if isAdmin();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

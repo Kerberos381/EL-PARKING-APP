@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="EL Parking App" xmlns="http://www.topografix.com/GPX/1/1">
+    <wpt lat="50.097098416842265" lon="14.459462896988791">
+        <name>EL Parking Destination</name>
+    </wpt>
+
+    <trk>
+        <name>EL Parking Approach</name>
+        <trkseg>
+            <trkpt lat="50.094900000000000" lon="14.454800000000000">
+                <time>2026-05-20T08:00:00Z</time>
+            </trkpt>
+            <trkpt lat="50.095900000000000" lon="14.456900000000000">
+                <time>2026-05-20T08:01:00Z</time>
+            </trkpt>
+            <trkpt lat="50.096500000000000" lon="14.458300000000000">
+                <time>2026-05-20T08:02:00Z</time>
+            </trkpt>
+            <trkpt lat="50.097098416842265" lon="14.459462896988791">
+                <time>2026-05-20T08:03:00Z</time>
+            </trkpt>
+        </trkseg>
+    </trk>
+</gpx>

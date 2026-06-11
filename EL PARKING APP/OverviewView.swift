@@ -13,6 +13,7 @@ struct OverviewView: View {
     @ObservedObject private var lang = LanguageManager.shared
     @State private var selectedDate = Calendar.current.startOfDay(for: Date())
     @Namespace private var datePillSelectionNS
+    @Namespace private var spotZoomNS
     @State private var bookingToCancel: Booking?
     @State private var showCancelAlert = false
     @State private var spotBookingDetail: Booking?
@@ -171,6 +172,10 @@ struct OverviewView: View {
                 SpotDetailSheet(booking: booking)
                     .environmentObject(bookingManager)
                     .environmentObject(authManager)
+                    .navigationTransition(.zoom(
+                        sourceID: AppConfig.allParkingSpots.first(where: { $0.label == booking.spot })?.id ?? booking.spot,
+                        in: spotZoomNS
+                    ))
             }
             .fullScreenCover(item: $preselectedSpot) { spot in
                 BookingSheet(
@@ -178,6 +183,7 @@ struct OverviewView: View {
                     preselectedDate: selectedDate,
                     isForOthers: false
                 )
+                .navigationTransition(.zoom(sourceID: spot.id, in: spotZoomNS))
             }
             .confirmationDialog(L10n.cancelBooking, isPresented: $showCancelAlert, titleVisibility: .visible) {
                 Button(L10n.cancelBooking, role: .destructive) {
@@ -283,8 +289,11 @@ struct OverviewView: View {
                     }
                 }
             }
-            .padding(.horizontal)
+            .scrollTargetLayout()
         }
+        // Magnetic snapping: pills dock onto the leading edge when scrolling settles.
+        .contentMargins(.horizontal, 16, for: .scrollContent)
+        .scrollTargetBehavior(.viewAligned)
     }
 
     private func datePill(date: Date, offset: Int) -> some View {
@@ -405,6 +414,7 @@ struct OverviewView: View {
                 ) {
                     handleSpotTap(spot, status: spotStatusByID[spot.id] ?? .available)
                 }
+                .matchedTransitionSource(id: spot.id, in: spotZoomNS)
             }
         }
         .padding(.horizontal)

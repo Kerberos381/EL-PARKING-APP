@@ -153,6 +153,7 @@ class ToastManager: ObservableObject {
 
 struct ToastOverlay: View {
     @ObservedObject var manager: ToastManager
+    @Namespace private var toastGlassNS
 
     @State private var bannerPulse: Double = 0.72
     @State private var showBackOnline = false
@@ -324,18 +325,20 @@ struct ToastOverlay: View {
             .regular.tint(AppConfig.activeGreen.opacity(0.18)),
             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
+        .glassEffectID("undo-banner", in: toastGlassNS)
     }
 
     // MARK: - Toast Card
 
     private func toastCard(_ toast: Toast) -> some View {
-        ToastCardView(toast: toast, manager: manager)
+        ToastCardView(toast: toast, manager: manager, glassNS: toastGlassNS)
     }
 }
 
 private struct ToastCardView: View {
     let toast: Toast
     let manager: ToastManager
+    let glassNS: Namespace.ID
 
     @State private var iconScale: CGFloat = 1.0
 
@@ -375,6 +378,9 @@ private struct ToastCardView: View {
             .regular.tint(toast.style.color.opacity(0.18)),
             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
+        // Same container as the undo banner — glass merges/splits like
+        // droplets as toasts stack and dismiss.
+        .glassEffectID(toast.id, in: glassNS)
     }
 }
 

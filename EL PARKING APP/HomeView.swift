@@ -31,6 +31,7 @@ struct HomeView: View {
     @Environment(\.openURL) private var openURL
     @ObservedObject private var lang = LanguageManager.shared
     @State private var showingBookingSheet  = false
+    @Namespace private var homeZoomNS
     @State private var selectedDate         = Date.smartDefaultDate()
     @State private var bookingToEdit:         Booking?
     @State private var bookingToCancel:       Booking?
@@ -164,12 +165,14 @@ struct HomeView: View {
                     preselectedDate: bestQuickBookDate(for: spot),
                     isForOthers: false
                 )
+                .navigationTransition(.zoom(sourceID: "home-quick-spot", in: homeZoomNS))
             }
             .fullScreenCover(isPresented: $showingBookingSheet) {
                 BookingSheet(
                     preselectedSpot: nil,
                     isForOthers: false
                 )
+                .navigationTransition(.zoom(sourceID: "home-book-tile", in: homeZoomNS))
             }
             .overlay {
                 if showCancelSuccess, let info = cancelledBooking {
@@ -617,6 +620,7 @@ struct HomeView: View {
             }
             .buttonStyle(BouncyTileStyle())
             .modifier(cascadeIn(0))
+            .matchedTransitionSource(id: "home-book-tile", in: homeZoomNS)
 
             VStack(spacing: 10) {
                 smallTile(title: L10n.myBookings) {
@@ -640,6 +644,7 @@ struct HomeView: View {
                     }
                 }
                 .modifier(cascadeIn(2))
+                .matchedTransitionSource(id: "home-quick-spot", in: homeZoomNS)
             }
         }
         .padding(.horizontal)

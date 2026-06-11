@@ -6,6 +6,11 @@
 	<array>
 		<string>com.StivMalakjan.EL-PARKING-APP.notificationSync</string>
 	</array>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+		<string>telephony</string>
+	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

@@ -10,6 +10,7 @@ import Foundation
 #if canImport(UIKit)
 import UIKit
 import QuartzCore
+import CoreHaptics
 
 enum Haptics {
     private static let lock = NSLock()
@@ -60,6 +61,53 @@ enum Haptics {
         generator.prepare()
         generator.notificationOccurred(type)
     }
+
+    /// Soft tick after a pull-to-refresh completes.
+    static func refreshCompleted() {
+        guard shouldFire(key: "refreshCompleted", debounce: 0.5) else { return }
+        let generator = UIImpactFeedbackGenerator(style: .soft)
+        generator.prepare()
+        generator.impactOccurred(intensity: 0.6)
+    }
+
+    /// Two-beat "thunk … tick" for the booking-confirmed moment, timed so the
+    /// thunk lands as the car settles into the spot. Falls back to the system
+    /// success notification when the device lacks a haptic engine.
+    static func parked() {
+        guard shouldFire(key: "parked", debounce: 0.5) else { return }
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else {
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            return
+        }
+        do {
+            let engine = try CHHapticEngine()
+            try engine.start()
+
+            let thunk = CHHapticEvent(
+                eventType: .hapticTransient,
+                parameters: [
+                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.35)
+                ],
+                relativeTime: 0
+            )
+            let tick = CHHapticEvent(
+                eventType: .hapticTransient,
+                parameters: [
+                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.55),
+                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.85)
+                ],
+                relativeTime: 0.14
+            )
+
+            let pattern = try CHHapticPattern(events: [thunk, tick], parameters: [])
+            let player = try engine.makePlayer(with: pattern)
+            try player.start(atTime: 0)
+            engine.notifyWhenPlayersFinished { _ in .stopEngine }
+        } catch {
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+    }
 }
 
 #else
@@ -69,6 +117,8 @@ enum Haptics {
     static func destructive() {}
     static func impact(_ style: Int = 0) {}
     static func notify(_ type: Int) {}
+    static func refreshCompleted() {}
+    static func parked() {}
 }
 
 #endif

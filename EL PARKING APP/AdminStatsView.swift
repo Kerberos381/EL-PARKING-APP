@@ -104,9 +104,10 @@ struct AdminStatsView: View {
                     .padding(.horizontal)
                     .padding(.bottom, 100)
                 }
+                .scrollEdgeEffectStyle(.soft, for: .top)
                 .refreshable {
-                    Haptics.selection()
                     await loadStats()
+                    Haptics.refreshCompleted()
                 }
             }
         }
@@ -131,8 +132,8 @@ struct AdminStatsView: View {
                     SkeletonBlock(height: 11, cornerRadius: 6)
                         .frame(width: 120, alignment: .leading)
                     Spacer()
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color(uiColor: .tertiarySystemFill))
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(AppConfig.tertiaryFillBg)
                         .frame(width: 36, height: 36)
                         .shimmering(active: true)
                 }
@@ -154,7 +155,7 @@ struct AdminStatsView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 20)
                         .background(AppConfig.cardBg)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
                     }
                 }
 
@@ -168,7 +169,7 @@ struct AdminStatsView: View {
                             VStack(spacing: 6) {
                                 SkeletonBlock(height: 10, cornerRadius: 5).frame(width: 14)
                                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(Color(uiColor: .tertiarySystemFill))
+                                    .fill(AppConfig.tertiaryFillBg)
                                     .frame(height: CGFloat(barHeight))
                                     .shimmering(active: true)
                                 SkeletonBlock(height: 10, cornerRadius: 5).frame(width: 14)
@@ -180,7 +181,7 @@ struct AdminStatsView: View {
                 }
                 .padding(18)
                 .background(AppConfig.cardBg)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
 
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(spacing: 8) {
@@ -200,7 +201,7 @@ struct AdminStatsView: View {
                 }
                 .padding(18)
                 .background(AppConfig.cardBg)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
             }
             .padding(.horizontal)
             .padding(.bottom, 100)
@@ -232,7 +233,7 @@ struct AdminStatsView: View {
     private var statsHeader: some View {
         HStack {
             Text(L10n.last30Days)
-                .font(.system(size: 19, weight: .semibold))
+                .font(.title3.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray)
             Spacer()
             HStack(spacing: 10) {
@@ -249,7 +250,7 @@ struct AdminStatsView: View {
                                 .fill(AppConfig.spotOccupied.opacity(0.16))
                                 .frame(width: 44, height: 44)
                             Image(systemName: "trash.fill")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(AppConfig.spotOccupied)
                         }
                     }
@@ -271,7 +272,7 @@ struct AdminStatsView: View {
                                 .fill(AppConfig.surfaceHigh)
                                 .frame(width: 44, height: 44)
                             Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -333,7 +334,7 @@ struct AdminStatsView: View {
                 value: "\(uniqueUsers)",
                 label: L10n.activeUsersStat,
                 icon: "person.2.fill",
-                color: .blue
+                color: AppConfig.infoTint
             )
             summaryCard(
                 value: String(format: "%.0f%%", avgDailyOccupancy),
@@ -361,7 +362,7 @@ struct AdminStatsView: View {
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
             Text(label)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray)
                 .multilineTextAlignment(.center)
         }
@@ -369,7 +370,7 @@ struct AdminStatsView: View {
         .padding(.vertical, 16)
         .background(AppConfig.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
-        .shadow(color: .black.opacity(0.03), radius: 6, y: 2)
+        .cardShadow()
     }
 
     // MARK: - Day of Week Chart
@@ -380,7 +381,7 @@ struct AdminStatsView: View {
                 Image(systemName: "chart.bar.xaxis")
                     .foregroundStyle(AppConfig.darkText)
                 Text(L10n.bookingsByDay)
-                    .font(.system(size: 19, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                     .foregroundStyle(AppConfig.darkText)
             }
 
@@ -392,7 +393,7 @@ struct AdminStatsView: View {
                 ForEach(data, id: \.day) { item in
                     VStack(spacing: 6) {
                         Text(item.count > 0 ? "\(item.count)" : "")
-                            .font(.system(size: 10, weight: .bold).monospacedDigit())
+                            .font(.caption2.weight(.bold).monospacedDigit())
                             .foregroundStyle(AppConfig.darkText)
 
                         RoundedRectangle(cornerRadius: 8)
@@ -404,7 +405,7 @@ struct AdminStatsView: View {
                             .frame(height: max(4, CGFloat(item.count) / CGFloat(max(1, maxCount)) * 96))
 
                         Text(item.day)
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.caption2.weight(.semibold))
                             .foregroundStyle(AppConfig.subtleGray)
                     }
                     .frame(maxWidth: .infinity)
@@ -415,7 +416,7 @@ struct AdminStatsView: View {
         .padding(16)
         .background(AppConfig.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
-        .shadow(color: .black.opacity(0.03), radius: 6, y: 2)
+        .cardShadow()
     }
 
     // MARK: - Top Spots Chart
@@ -426,7 +427,7 @@ struct AdminStatsView: View {
                 Image(systemName: "star")
                     .foregroundStyle(AppConfig.darkText)
                 Text(L10n.mostBookedSpots)
-                    .font(.system(size: 19, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                     .foregroundStyle(AppConfig.darkText)
             }
 
@@ -441,7 +442,7 @@ struct AdminStatsView: View {
                         HStack(spacing: 12) {
                             // Rank badge
                             Text("\(index + 1)")
-                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .font(.system(.caption, design: .rounded, weight: .black))
                                 .foregroundStyle(index == 0 ? AppConfig.onAccent : AppConfig.subtleGray)
                                 .frame(width: 28, height: 28)
                                 .background(index == 0 ? AppConfig.accent : AppConfig.surfaceHigh)
@@ -470,7 +471,7 @@ struct AdminStatsView: View {
 
                             // Count
                             Text("\(item.count)")
-                                .font(.system(size: 13, weight: .bold, design: .rounded).monospacedDigit())
+                                .font(.system(.footnote, design: .rounded, weight: .bold).monospacedDigit())
                                 .foregroundStyle(AppConfig.darkText)
                                 .frame(width: 28, alignment: .trailing)
                         }
@@ -481,7 +482,7 @@ struct AdminStatsView: View {
         .padding(16)
         .background(AppConfig.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
-        .shadow(color: .black.opacity(0.03), radius: 6, y: 2)
+        .cardShadow()
     }
 
     // MARK: - Suspension Stats Section
@@ -490,16 +491,16 @@ struct AdminStatsView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(AppConfig.warning)
                 Text("Warning Tracker")
                     .textCase(nil)
-                    .font(.system(size: 19, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                     .foregroundStyle(AppConfig.darkText)
             }
 
             // Quick summary pills
             HStack(spacing: 10) {
-                suspensionPill(value: totalActiveStrikes,  label: "Active\nWarnings", color: .orange)
+                suspensionPill(value: totalActiveStrikes,  label: "Active\nWarnings", color: AppConfig.warning)
                 suspensionPill(value: currentlySuspended,  label: "Suspended\nNow",   color: AppConfig.spotOccupied)
                 suspensionPill(value: lifetimeSuspensions, label: "Total\nBans",       color: AppConfig.subtleGray)
             }
@@ -536,14 +537,14 @@ struct AdminStatsView: View {
                                     ForEach(1...3, id: \.self) { i in
                                         Circle()
                                             .fill(i <= user.strikes
-                                                  ? (user.strikes == 3 ? AppConfig.spotOccupied : .orange)
+                                                  ? (user.strikes == 3 ? AppConfig.spotOccupied : AppConfig.warning)
                                                   : AppConfig.surfaceHigh)
                                             .frame(width: 8, height: 8)
                                     }
                                 }
                                 if user.suspensionCount > 0 {
                                     Text("\(user.suspensionCount)× suspended")
-                                        .font(.system(size: 10, weight: .semibold))
+                                        .font(.caption2.weight(.semibold))
                                         .foregroundStyle(AppConfig.spotOccupied)
                                 }
                             }
@@ -560,7 +561,7 @@ struct AdminStatsView: View {
         .padding(16)
         .background(AppConfig.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
-        .shadow(color: .black.opacity(0.03), radius: 6, y: 2)
+        .cardShadow()
     }
 
     private func suspensionPill(value: Int, label: String, color: Color) -> some View {
@@ -569,7 +570,7 @@ struct AdminStatsView: View {
                 .font(.system(size: 24, weight: .black, design: .rounded))
                 .foregroundStyle(value > 0 ? color : AppConfig.subtleGray)
             Text(label)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.caption2.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray)
                 .multilineTextAlignment(.center)
         }

@@ -112,6 +112,70 @@ struct AppConfig {
     /// Maximum days in advance admins can book for others
     static let adminBookingMaxAdvanceDays: Int = 10
 
+    // MARK: - Company Spot Policy (GrandVision reservation, from 22 June 2026)
+
+    /// Spots reserved for GrandVision users.
+    static let grandVisionSpotIDs: Set<String> = ["74", "75", "76"]
+
+    /// Date the policy takes effect.
+    static let companySpotPolicyStart: Date = {
+        var c = DateComponents(); c.year = 2026; c.month = 6; c.day = 22
+        return Calendar.current.date(from: c) ?? .distantFuture
+    }()
+
+    /// Same-day bookings open to everyone from this local hour.
+    static let sameDayReleaseHour = 8
+
+    static func companySpotPolicyActive(now: Date = Date()) -> Bool {
+        now >= companySpotPolicyStart
+    }
+
+    /// Same-day release: bookings FOR today are open to all groups after 08:00.
+    static func sameDayReleaseApplies(bookingDate: Date, now: Date = Date()) -> Bool {
+        Calendar.current.isDate(bookingDate, inSameDayAs: now)
+            && Calendar.current.component(.hour, from: now) >= sameDayReleaseHour
+    }
+
+    /// Whether `company` may book `spotID` on `bookingDate`. Admins are exempt.
+    static func companyMayBook(
+        spotID: String,
+        company: CompanyBadge,
+        isAdmin: Bool,
+        bookingDate: Date,
+        now: Date = Date()
+    ) -> Bool {
+        guard companySpotPolicyActive(now: now), !isAdmin else { return true }
+        if sameDayReleaseApplies(bookingDate: bookingDate, now: now) { return true }
+        let isGVSpot = grandVisionSpotIDs.contains(spotID)
+        return isGVSpot ? company == .grandVision : company != .grandVision
+    }
+
+    /// Non-admins don't see spots they can't book (no teasing); admins see all.
+    static func spotVisible(
+        spotID: String,
+        company: CompanyBadge,
+        isAdmin: Bool,
+        bookingDate: Date,
+        now: Date = Date()
+    ) -> Bool {
+        isAdmin || companyMayBook(spotID: spotID, company: company, isAdmin: isAdmin,
+                                  bookingDate: bookingDate, now: now)
+    }
+
+    /// Ownership badges shown on a spot cell for the given viewer.
+    /// GV spots are tagged for everyone outside GrandVision (incl. admins);
+    /// shared spots are tagged EL+Omega for GrandVision viewers.
+    static func spotGroupBadges(
+        spotID: String,
+        viewerCompany: CompanyBadge,
+        isAdmin: Bool
+    ) -> [CompanyBadge] {
+        if grandVisionSpotIDs.contains(spotID) {
+            return viewerCompany == .grandVision && !isAdmin ? [] : [.grandVision]
+        }
+        return viewerCompany == .grandVision ? [.essilorLuxottica, .omega] : []
+    }
+
     // MARK: - Location Information
 
     static let locationName = "Rohanske nabrezi 721/39, Praha"
@@ -122,6 +186,8 @@ struct AppConfig {
     static let proximityReminderRadiusMeters: Double = 500
     static let proximityReminderHoursAfterStart: Int = 2
     static let appTitle = "EL Parking"
+    /// Production release date shown in Settings. Update on each store release.
+    static let releaseDate = "10. 6. 2026"
     static let companyName = "EssilorLuxottica"
 
     // MARK: - Car Colors
@@ -151,14 +217,13 @@ struct AppConfig {
         "a2fbd416f3c3a7e71506bc88890fe1bb2853afa0e7348395d1ad0da75732e1f8", // luxottica.com
         "1c0d91e0243bd27642ba27cdf1e15f0596e1daefe498a193e5c5ce14e293c476", // essilorluxottica.id
         "e3eadea231b5f76178f350deb37c8b6a1af02fb9786887ad15b9a8d60a18ea07", // omega-optix.cz
-        "591bfe88c880df9685d3e298cac2271681a78e017441426ae3d5bd6c73cd3db7", // gmail.com
     ]
 
     // MARK: - Registration Secret Phrase
     // SHA-256 hash of the phrase — the actual phrase is NOT in the binary.
     // To change: echo -n "yourphrase" | shasum -a 256
     private static let registrationPhraseHash =
-        "2d77efbe262c54aef4f567463ea881586655138d1e55125aca24ef3f4d480099"
+        "28629eb4bd850c5056c199fa0f766e718f6dc5d6750f936be40bfdb08c7188e4"
 
     static func isRegistrationPhraseValid(_ phrase: String) -> Bool {
         let trimmed = phrase.trimmingCharacters(in: .whitespaces).lowercased()
@@ -173,6 +238,22 @@ struct AppConfig {
         return allowedEmailDomainHashes.contains(hash)
     }
 
+    // MARK: - Palette Style (user-selectable: Default / Calm)
+
+    /// "Calm" swaps signal colors for a muted Nordic palette — pine, clay,
+    /// ochre, warm paper — while Default keeps the original signal colors.
+    enum AppPalette: Int, CaseIterable {
+        case standard = 0
+        case calm = 1
+
+        var label: String { self == .calm ? L10n.paletteCalm : L10n.paletteDefault }
+        var icon: String { self == .calm ? "leaf" : "paintpalette" }
+    }
+
+    static var isCalmPalette: Bool {
+        UserDefaults.standard.integer(forKey: "appPalette") == AppPalette.calm.rawValue
+    }
+
     // MARK: - Design System Colors (Kinetic Sanctuary — Adaptive Light/Dark)
 
     /// Helper to create adaptive colors
@@ -182,17 +263,32 @@ struct AppConfig {
         })
     }
 
-    // Accent aligned with native iOS toggle green
-    static let accent = Color(uiColor: .systemGreen)
-    static let accentDim = Color(uiColor: .systemGreen).opacity(0.85)
+    // Calm palette anchors
+    private static let calmPine    = UIColor(red: 74/255,  green: 107/255, blue: 93/255,  alpha: 1)   // #4A6B5D
+    private static let calmSage    = UIColor(red: 127/255, green: 160/255, blue: 140/255, alpha: 1)   // #7FA08C
+    private static let calmClay    = UIColor(red: 192/255, green: 112/255, blue: 79/255,  alpha: 1)   // #C0704F
+    private static let calmOchre   = UIColor(red: 201/255, green: 155/255, blue: 79/255,  alpha: 1)   // #C99B4F
+
+    // Accent — Default: native iOS toggle green. Calm: pine/sage.
+    static var accent: Color {
+        isCalmPalette
+            ? adaptive(
+                light: UIColor(red: 94/255, green: 142/255, blue: 116/255, alpha: 1),  // #5E8E74 soft sage-pine
+                dark: calmSage
+              )
+            : Color(uiColor: .systemGreen)
+    }
+    static var accentDim: Color { accent.opacity(0.85) }
 
     // Accent used as a FOREGROUND (icon / text) color.
-    // In dark mode: bright lime — pops on dark backgrounds.
-    // In light mode: same lime hue, ~30% darker — still feels like the brand green, just visible on white.
-    static let accentFg = adaptive(
-        light: UIColor.systemGreen,
-        dark: UIColor.systemGreen
-    )
+    static var accentFg: Color {
+        isCalmPalette
+            ? adaptive(
+                light: UIColor(red: 68/255, green: 115/255, blue: 94/255, alpha: 1),    // #44735E
+                dark: UIColor(red: 159/255, green: 188/255, blue: 168/255, alpha: 1)    // #9FBCA8
+              )
+            : adaptive(light: UIColor.systemGreen, dark: UIColor.systemGreen)
+    }
 
     // Primary text: near-black in light, near-white in dark
     static let darkText = adaptive(
@@ -201,27 +297,55 @@ struct AppConfig {
     )
 
     // Cards: white in light, dark elevated surface in dark
-    static let cardBg = adaptive(
-        light: .white,
-        dark: UIColor(red: 28/255, green: 30/255, blue: 32/255, alpha: 1)           // #1c1e20
-    )
+    static var cardBg: Color {
+        isCalmPalette
+            ? adaptive(
+                light: .white,
+                dark: UIColor(red: 35/255, green: 34/255, blue: 32/255, alpha: 1)    // #232220 warm
+              )
+            : adaptive(
+                light: .white,
+                dark: UIColor(red: 28/255, green: 30/255, blue: 32/255, alpha: 1)    // #1c1e20
+              )
+    }
 
-    // Page background
-    static let pageBg = adaptive(
-        light: UIColor(red: 248/255, green: 249/255, blue: 250/255, alpha: 1),      // #f8f9fa
-        dark: UIColor(red: 14/255, green: 15/255, blue: 16/255, alpha: 1)            // #0e0f10
-    )
+    // Page background — Calm: warm "paper" instead of cool gray
+    static var pageBg: Color {
+        isCalmPalette
+            ? adaptive(
+                light: UIColor(red: 244/255, green: 244/255, blue: 241/255, alpha: 1), // #f4f4f1 neutral off-white
+                dark: UIColor(red: 29/255, green: 28/255, blue: 26/255, alpha: 1)      // #1d1c1a warm charcoal
+              )
+            : adaptive(
+                light: UIColor(red: 242/255, green: 243/255, blue: 245/255, alpha: 1), // #f2f3f5 subtle gray
+                dark: UIColor(red: 14/255, green: 15/255, blue: 16/255, alpha: 1)      // #0e0f10
+              )
+    }
 
     // Surface hierarchy
-    static let surfaceLow = adaptive(
-        light: UIColor(red: 243/255, green: 244/255, blue: 245/255, alpha: 1),      // #f3f4f5
-        dark: UIColor(red: 22/255, green: 24/255, blue: 26/255, alpha: 1)            // #16181a
-    )
+    static var surfaceLow: Color {
+        isCalmPalette
+            ? adaptive(
+                light: UIColor(red: 239/255, green: 239/255, blue: 234/255, alpha: 1), // #efefea
+                dark: UIColor(red: 27/255, green: 26/255, blue: 24/255, alpha: 1)      // #1b1a18
+              )
+            : adaptive(
+                light: UIColor(red: 243/255, green: 244/255, blue: 245/255, alpha: 1), // #f3f4f5
+                dark: UIColor(red: 22/255, green: 24/255, blue: 26/255, alpha: 1)      // #16181a
+              )
+    }
 
-    static let surfaceHigh = adaptive(
-        light: UIColor(red: 231/255, green: 232/255, blue: 233/255, alpha: 1),      // #e7e8e9
-        dark: UIColor(red: 38/255, green: 40/255, blue: 42/255, alpha: 1)            // #26282a
-    )
+    static var surfaceHigh: Color {
+        isCalmPalette
+            ? adaptive(
+                light: UIColor(red: 229/255, green: 229/255, blue: 224/255, alpha: 1), // #e5e5e0
+                dark: UIColor(red: 42/255, green: 40/255, blue: 38/255, alpha: 1)      // #2a2826
+              )
+            : adaptive(
+                light: UIColor(red: 231/255, green: 232/255, blue: 233/255, alpha: 1), // #e7e8e9
+                dark: UIColor(red: 38/255, green: 40/255, blue: 42/255, alpha: 1)      // #26282a
+              )
+    }
 
     // Secondary text
     static let subtleGray = adaptive(
@@ -234,15 +358,72 @@ struct AppConfig {
         dark: UIColor(red: 60/255, green: 62/255, blue: 66/255, alpha: 1)            // #3c3e42
     )
 
-    // Status colors (same both modes — high contrast by nature)
-    static let spotAvailable = Color(red: 76/255, green: 175/255, blue: 80/255)
-    static let spotOccupied = Color(red: 186/255, green: 26/255, blue: 26/255)     // #ba1a1a
-    static let spotMine = Color(red: 255/255, green: 179/255, blue: 0/255)
+    // Status colors — Default: signal. Calm: earth (sage / clay / ochre).
+    static var spotAvailable: Color {
+        isCalmPalette
+            ? Color(red: 110/255, green: 144/255, blue: 128/255)                    // #6E9080 sage
+            : Color(red: 76/255, green: 175/255, blue: 80/255)
+    }
+    static var spotOccupied: Color {
+        isCalmPalette
+            ? Color(uiColor: calmClay)                                              // #C0704F clay
+            : Color(red: 186/255, green: 26/255, blue: 26/255)                      // #ba1a1a
+    }
+    static var spotMine: Color {
+        isCalmPalette
+            ? Color(uiColor: calmOchre)                                             // #C99B4F ochre
+            : Color(red: 255/255, green: 179/255, blue: 0/255)
+    }
     static let spotBlocked = adaptive(
         light: UIColor(red: 189/255, green: 189/255, blue: 189/255, alpha: 1),
         dark: UIColor(red: 80/255, green: 80/255, blue: 80/255, alpha: 1)
     )
-    static let activeGreen = Color(red: 56/255, green: 176/255, blue: 0/255)
+    static var activeGreen: Color {
+        isCalmPalette
+            ? Color(red: 94/255, green: 132/255, blue: 104/255)                     // #5E8468 pine-bright
+            : Color(red: 56/255, green: 176/255, blue: 0/255)
+    }
+
+    // Grouped-screen backgrounds — Settings, admin, detail screens. Default
+    // matches system grouped colors exactly; Calm gets the warm neutrals.
+    static var groupedPageBg: Color {
+        isCalmPalette
+            ? adaptive(
+                light: UIColor(red: 244/255, green: 244/255, blue: 241/255, alpha: 1), // #f4f4f1
+                dark: UIColor(red: 29/255, green: 28/255, blue: 26/255, alpha: 1)      // #1d1c1a
+              )
+            : Color(uiColor: .systemGroupedBackground)
+    }
+    static var groupedCardBg: Color {
+        isCalmPalette
+            ? adaptive(
+                light: .white,
+                dark: UIColor(red: 35/255, green: 34/255, blue: 32/255, alpha: 1)      // #232220
+              )
+            : Color(uiColor: .secondarySystemGroupedBackground)
+    }
+    static var tertiaryFillBg: Color {
+        isCalmPalette
+            ? adaptive(
+                light: UIColor(red: 234/255, green: 234/255, blue: 229/255, alpha: 1), // #eaeae5
+                dark: UIColor(red: 44/255, green: 42/255, blue: 39/255, alpha: 1)      // #2c2a27
+              )
+            : Color(uiColor: .tertiarySystemFill)
+    }
+
+    // Semantic signal tints — route ALL ad-hoc .orange / .red / .blue UI
+    // colors through these so the Calm palette reaches every surface.
+    static var warning: Color {
+        isCalmPalette ? Color(uiColor: calmOchre) : .orange
+    }
+    static var danger: Color {
+        isCalmPalette ? Color(uiColor: calmClay) : Color(uiColor: .systemRed)
+    }
+    static var infoTint: Color {
+        isCalmPalette
+            ? Color(red: 102/255, green: 128/255, blue: 148/255)                    // #668094 fog blue
+            : Color(uiColor: .systemBlue)
+    }
 
     // On-accent text (for text ON green buttons)
     static let onAccent = adaptive(
@@ -251,7 +432,12 @@ struct AppConfig {
     )
 
     // Obsidian card background (used for hero cards — same in both modes)
-    static let obsidian = Color(red: 26/255, green: 28/255, blue: 30/255)          // #1A1C1E
+    // Calm: "forest at dusk" — barely-green charcoal that ties hero to brand.
+    static var obsidian: Color {
+        isCalmPalette
+            ? Color(red: 34/255, green: 40/255, blue: 31/255)                       // #22281F forest
+            : Color(red: 26/255, green: 28/255, blue: 30/255)                       // #1A1C1E
+    }
 
     // Selected pill bg (date pills, filter pills)
     static let pillSelected = adaptive(
@@ -275,26 +461,30 @@ struct AppConfig {
     static let enableHomeAnnouncementPriorityStack = true
     static let enableHomeAnnouncementDetailSheet = true
     static let enableHomeMotionConsistency = true
-    static let enableHomePremiumEmptyStates = false
-    static let enableHomeWidgetTeaserCard = true
     static let enableHomeInfoDetailSheet = true
     static let enableHomeAppleAnnouncementsStyle = true
     static let enableAdminAnnouncementsUnifiedStyle = true
     static let enableSettingsGroupedTone = true
     static let enableBookingPremiumGlass = true
+    /// Native ContentUnavailableView empty states; set false to revert to the legacy card style.
+    static let enableNativeEmptyStates = true
 }
 
 // MARK: - Animation Tokens
 
 extension Animation {
+    // Apple's named springs (.snappy / .smooth / .spring(duration:bounce:))
+    // are the system-tuned curves used across iOS 17+; preferring them keeps
+    // the app's motion identical in feel to native controls.
+
     /// Selection feedback — taps, toggles, pressed states.
-    static let motionSelection = Animation.spring(response: 0.24, dampingFraction: 0.86)
+    static let motionSelection = Animation.snappy(duration: 0.26, extraBounce: 0.0)
     /// Standard transition — cards, list state changes, in-screen transitions.
-    static let motionStandard = Animation.spring(response: 0.32, dampingFraction: 0.86)
+    static let motionStandard = Animation.smooth(duration: 0.34, extraBounce: 0.0)
     /// Confirm transition — success/important outcome animations.
-    static let motionConfirm = Animation.spring(response: 0.42, dampingFraction: 0.78)
+    static let motionConfirm = Animation.spring(duration: 0.45, bounce: 0.22)
     /// Sheet-like movement — larger modal/sheet choreography.
-    static let motionSheet = Animation.spring(response: 0.55, dampingFraction: 0.82)
+    static let motionSheet = Animation.smooth(duration: 0.55, extraBounce: 0.0)
     /// Fade helper for staged opacity transitions.
     static let motionFade = Animation.easeOut(duration: 0.30)
 

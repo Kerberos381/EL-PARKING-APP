@@ -144,7 +144,7 @@ struct AdminBulkImportView: View {
                         dismiss()
                     }
                     .foregroundStyle(Color.blue)
-                    .font(.system(size: 18, weight: .regular))
+                    .font(.title3.weight(.regular))
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -162,7 +162,7 @@ struct AdminBulkImportView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("EL PARK  ·  PEOPLE")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .tracking(3)
                     .foregroundStyle(AppConfig.subtleGray.opacity(0.75))
 
@@ -194,21 +194,21 @@ struct AdminBulkImportView: View {
                 if !rows.isEmpty {
                     HStack(spacing: 14) {
                         Text("\(rows.count) PEOPLE")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.subheadline.weight(.semibold))
                             .tracking(2)
                             .foregroundStyle(AppConfig.subtleGray)
                         Text("• \(readyCount) ready")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(Color.blue)
                         if invalidCount > 0 {
                             Text("• \(invalidCount) invalid")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(AppConfig.spotOccupied)
                         }
                         if duplicateCount > 0 {
                             Text("• \(duplicateCount) duplicate")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.orange)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(AppConfig.warning)
                         }
                     }
                 }
@@ -229,7 +229,7 @@ struct AdminBulkImportView: View {
                     Image(systemName: "doc.on.clipboard")
                     Text("Enter manually")
                 }
-                .font(.system(size: 16, weight: .semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(mode == .manual ? AppConfig.darkText : AppConfig.subtleGray)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
@@ -246,7 +246,7 @@ struct AdminBulkImportView: View {
                     Image(systemName: "square.and.arrow.up")
                     Text("Upload file")
                 }
-                .font(.system(size: 16, weight: .semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(mode == .upload ? AppConfig.darkText : AppConfig.subtleGray)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
@@ -276,7 +276,7 @@ struct AdminBulkImportView: View {
                             .foregroundStyle(uploadAccent)
                     }
                     Text("Drag a file here")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(AppConfig.darkText)
                     HStack(spacing: 4) {
                         Text("or")
@@ -284,18 +284,18 @@ struct AdminBulkImportView: View {
                         Text("choose from device")
                             .foregroundStyle(uploadAccent)
                     }
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     Text("CSV  ·  JSON  ·  TXT")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.caption.weight(.bold))
                         .tracking(2)
                         .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
                 .background(AppConfig.cardBg)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 20)
+                    RoundedRectangle(cornerRadius: 16)
                         .stroke(AppConfig.separatorSoft, style: StrokeStyle(lineWidth: 2, dash: [7, 6]))
                 )
             }
@@ -322,7 +322,7 @@ struct AdminBulkImportView: View {
                 Image(systemName: "arrow.down")
                 Text(title)
             }
-            .font(.system(size: 14, weight: .medium))
+            .font(.subheadline.weight(.medium))
             .foregroundStyle(uploadAccent)
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
@@ -342,11 +342,7 @@ struct AdminBulkImportView: View {
             }
         }
         .background(AppConfig.cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(AppConfig.separatorSoft.opacity(0.6), lineWidth: 1)
-        )
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     private var addAnotherButton: some View {
@@ -356,9 +352,9 @@ struct AdminBulkImportView: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                 Text("Add another")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.body.weight(.semibold))
                 Spacer()
             }
             .foregroundStyle(uploadAccent)
@@ -366,10 +362,6 @@ struct AdminBulkImportView: View {
             .padding(.vertical, 14)
             .background(AppConfig.cardBg)
             .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(AppConfig.separatorSoft.opacity(0.6), lineWidth: 1)
-            )
         }
         .buttonStyle(.plain)
     }
@@ -380,13 +372,13 @@ struct AdminBulkImportView: View {
             VStack(spacing: 0) {
                 HStack(spacing: 12) {
                     Text("Name")
-                        .font(.system(size: 17, weight: .regular))
+                        .font(.body.weight(.regular))
                         .foregroundStyle(AppConfig.darkText)
                         .frame(width: 56, alignment: .leading)
 
                     TextField("Full name", text: binding(for: row.id, keyPath: \.name))
                         .textInputAutocapitalization(.words)
-                        .font(.system(size: 17, weight: .regular))
+                        .font(.body.weight(.regular))
                         .foregroundStyle(AppConfig.darkText)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -398,7 +390,7 @@ struct AdminBulkImportView: View {
 
                 HStack(spacing: 12) {
                     Text("Email")
-                        .font(.system(size: 17, weight: .regular))
+                        .font(.body.weight(.regular))
                         .foregroundStyle(AppConfig.darkText)
                         .frame(width: 56, alignment: .leading)
 
@@ -406,7 +398,7 @@ struct AdminBulkImportView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.emailAddress)
-                        .font(.system(size: 17, weight: .regular))
+                        .font(.body.weight(.regular))
                         .foregroundStyle(validation == .invalidEmail || validation == .missingEmail || validation == .duplicate ? AppConfig.spotOccupied : AppConfig.subtleGray)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -430,12 +422,12 @@ struct AdminBulkImportView: View {
                                 .frame(width: 30, height: 30)
                             if row.emailLoginDetails {
                                 Image(systemName: "checkmark")
-                                    .font(.system(size: 14, weight: .bold))
+                                    .font(.subheadline.weight(.bold))
                                     .foregroundStyle(.white)
                             }
                         }
                         Text("Email login details")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.body.weight(.medium))
                             .foregroundStyle(AppConfig.subtleGray)
                     }
                 }
@@ -444,7 +436,7 @@ struct AdminBulkImportView: View {
 
             if validation != .valid && validation != .empty {
                 Text(errorText(for: validation))
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AppConfig.spotOccupied)
             }
         }
@@ -458,7 +450,7 @@ struct AdminBulkImportView: View {
             removeRow(id)
         } label: {
             Image(systemName: "xmark")
-                .font(.system(size: 15, weight: .bold))
+                .font(.subheadline.weight(.bold))
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.7))
                 .frame(width: 36, height: 36)
                 .background(AppConfig.surfaceLow)
@@ -473,7 +465,7 @@ struct AdminBulkImportView: View {
                 Image(systemName: "key")
                     .foregroundStyle(AppConfig.subtleGray)
                 Text(row.password)
-                    .font(.system(size: 18, weight: .semibold, design: .monospaced))
+                    .font(.system(.title3, design: .monospaced, weight: .semibold))
                     .foregroundStyle(AppConfig.darkText)
             }
             .padding(.horizontal, 12)
@@ -487,7 +479,7 @@ struct AdminBulkImportView: View {
                 UIPasteboard.general.string = row.password
             } label: {
                 Image(systemName: "doc.on.doc")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(AppConfig.subtleGray)
                     .frame(width: 30, height: 30)
             }
@@ -498,7 +490,7 @@ struct AdminBulkImportView: View {
                 regeneratePassword(row.id)
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(AppConfig.subtleGray)
                     .frame(width: 30, height: 30)
             }
@@ -514,7 +506,7 @@ struct AdminBulkImportView: View {
                 Task { await registerUsers() }
             } label: {
                 Text("Register  \(readyCount) users")
-                    .font(.system(size: 17, weight: .bold))
+                    .font(.body.weight(.bold))
                     .minimumScaleFactor(0.9)
                     .lineLimit(1)
                     .foregroundStyle(canRegister ? .white : AppConfig.subtleGray)
@@ -542,7 +534,7 @@ struct AdminBulkImportView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("EL PARK  ·  PEOPLE")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .tracking(3)
                     .foregroundStyle(AppConfig.subtleGray.opacity(0.75))
 
@@ -565,7 +557,7 @@ struct AdminBulkImportView: View {
                             .font(.system(size: 30, weight: .bold))
                             .minimumScaleFactor(0.8)
                         Text("Resend or copy credentials for anyone below.")
-                            .font(.system(size: 15, weight: .medium))
+                            .font(.subheadline.weight(.medium))
                             .foregroundStyle(AppConfig.subtleGray)
                             .multilineTextAlignment(.center)
                     }
@@ -580,15 +572,15 @@ struct AdminBulkImportView: View {
                                 .frame(width: 48, height: 48)
                                 .overlay(
                                     Text(initials(for: user.name, fallbackEmail: user.email))
-                                        .font(.system(size: 18, weight: .semibold))
+                                        .font(.title3.weight(.semibold))
                                         .foregroundStyle(uploadAccent)
                                 )
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(user.name)
-                                    .font(.system(size: 17, weight: .semibold))
+                                    .font(.body.weight(.semibold))
                                 Text(user.email)
-                                    .font(.system(size: 14, weight: .medium, design: .monospaced))
+                                    .font(.system(.subheadline, design: .monospaced, weight: .medium))
                                     .foregroundStyle(AppConfig.subtleGray)
                             }
                             Spacer()
@@ -611,7 +603,7 @@ struct AdminBulkImportView: View {
                                     Image(systemName: "envelope")
                                     Text("Resend")
                                 }
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(user.emailLoginDetails ? AppConfig.subtleGray : AppConfig.subtleGray.opacity(0.55))
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 8)
@@ -630,18 +622,14 @@ struct AdminBulkImportView: View {
                     }
                 }
                 .background(AppConfig.cardBg)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(AppConfig.separatorSoft.opacity(0.6), lineWidth: 1)
-                )
+                .clipShape(RoundedRectangle(cornerRadius: 16))
 
                 Button {
                     Haptics.selection()
                     resetForm()
                 } label: {
                     Text("Register more people")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(uploadAccent)
                         .frame(maxWidth: .infinity)
                 }

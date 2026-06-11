@@ -262,23 +262,13 @@ struct AdminUsersView: View {
                 Text(label)
                     .fontWeight(isSelected ? .semibold : .medium)
                 if count > 0 {
-                    Text("\(count)")
-                        .font(.caption2)
-                        .fontWeight(isSelected ? .semibold : .medium)
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(isSelected ? Color(uiColor: .tertiarySystemFill) : AppConfig.surfaceLow)
-                        .clipShape(Capsule())
+                    PillCountBadge(count: count, emphasized: isSelected)
                 }
             }
             .font(.subheadline)
             .foregroundStyle(isSelected ? Color.primary : Color.secondary)
             .padding(.horizontal, 14).padding(.vertical, 8)
-            .background(isSelected ? Color(uiColor: .tertiarySystemGroupedBackground) : AppConfig.cardBg)
-            .clipShape(Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(isSelected ? Color(uiColor: .separator) : AppConfig.separatorSoft, lineWidth: 1)
-            )
+            .capsulePillChrome(isSelected: isSelected)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -339,18 +329,13 @@ struct AdminUsersView: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "line.3.horizontal.decrease.circle")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.footnote.weight(.semibold))
                 Text("Company: \(selectedCompanyChipLabel)")
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                 if selectedCompanyFilter != nil {
-                    Text("\(selectedCompanyCount)")
-                        .font(.caption2.weight(.semibold))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(AppConfig.surfaceLow)
-                        .clipShape(Capsule())
+                    PillCountBadge(count: selectedCompanyCount)
                 }
             }
             .foregroundStyle(AppConfig.darkText)
@@ -358,12 +343,7 @@ struct AdminUsersView: View {
             .padding(.vertical, 10)
             .frame(minHeight: 46)
             .contentShape(Rectangle())
-            .background(AppConfig.cardBg)
-            .clipShape(Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(AppConfig.separatorSoft, lineWidth: 1)
-            )
+            .capsulePillChrome()
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -424,18 +404,13 @@ struct AdminUsersView: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "line.3.horizontal.decrease.circle")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.footnote.weight(.semibold))
                 Text("Status: \(selectedStatusChipLabel)")
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
                 if selectedFilter != nil {
-                    Text("\(selectedStatusCount)")
-                        .font(.caption2.weight(.semibold))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(AppConfig.surfaceLow)
-                        .clipShape(Capsule())
+                    PillCountBadge(count: selectedStatusCount)
                 }
             }
             .foregroundStyle(AppConfig.darkText)
@@ -443,12 +418,7 @@ struct AdminUsersView: View {
             .padding(.vertical, 10)
             .frame(minHeight: 46)
             .contentShape(Rectangle())
-            .background(AppConfig.cardBg)
-            .clipShape(Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(AppConfig.separatorSoft, lineWidth: 1)
-            )
+            .capsulePillChrome()
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -589,9 +559,10 @@ struct AdminUsersView: View {
             .padding(.horizontal)
             .padding(.bottom, isSelecting && !selectedUIDs.isEmpty ? 120 : 100)
         }
+        .scrollEdgeEffectStyle(.soft, for: .top)
         .refreshable {
-            Haptics.selection()
             await refresh()
+            Haptics.refreshCompleted()
         }
     }
 
@@ -612,9 +583,10 @@ struct AdminUsersView: View {
             .padding(.horizontal)
             .padding(.bottom, 100)
         }
+        .scrollEdgeEffectStyle(.soft, for: .top)
         .refreshable {
-            Haptics.selection()
             await refresh()
+            Haptics.refreshCompleted()
         }
     }
 
@@ -674,8 +646,8 @@ struct AdminUsersView: View {
                 gridRoleBadge(user.role)
                 if user.strikes > 0 {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.orange)
+                        .font(.caption2)
+                        .foregroundStyle(AppConfig.warning)
                 }
             }
         }
@@ -684,13 +656,13 @@ struct AdminUsersView: View {
         .frame(maxWidth: .infinity)
         .background(AppConfig.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
-        .shadow(color: .black.opacity(0.03), radius: 7, y: 2)
+        .cardShadow()
     }
 
     private func gridStatusDot(_ status: UserStatus) -> some View {
         let color: Color = {
             switch status {
-            case .pending:   return .orange
+            case .pending:   return AppConfig.warning
             case .active:    return AppConfig.activeGreen
             case .suspended: return AppConfig.spotOccupied
             }
@@ -702,7 +674,7 @@ struct AdminUsersView: View {
 
     private func gridRoleBadge(_ role: UserRole) -> some View {
         Text(role.displayName)
-            .font(.system(size: 10, weight: .semibold))
+            .font(.caption2.weight(.semibold))
             .foregroundStyle(AppConfig.subtleGray)
     }
 
@@ -723,7 +695,7 @@ struct AdminUsersView: View {
         VStack(spacing: 0) {
             HStack(alignment: .top, spacing: 16) {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color(uiColor: .tertiarySystemFill))
+                    .fill(AppConfig.tertiaryFillBg)
                     .frame(width: 64, height: 64)
                     .shimmering(active: true)
 
@@ -786,7 +758,7 @@ struct AdminUsersView: View {
             HStack(spacing: 12) {
                 Image(systemName: allSelected ? "checkmark.circle.fill" : "circle")
                     .foregroundStyle(allSelected ? AppConfig.darkText : AppConfig.subtleGray)
-                    .font(.system(size: 20))
+                    .font(.title3)
                 Text(allSelected ? L10n.deselectAll : L10n.selectAllCount(pendingUsers.count))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AppConfig.darkText)
@@ -825,7 +797,7 @@ struct AdminUsersView: View {
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "person.crop.circle.badge.checkmark")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(AppConfig.subtleGray)
                             .frame(width: 20)
                         Text(L10n.activateAs)
@@ -836,7 +808,7 @@ struct AdminUsersView: View {
                             .font(.subheadline)
                             .foregroundStyle(AppConfig.subtleGray)
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(AppConfig.subtleGray.opacity(0.65))
                     }
                     .padding(.horizontal, 12)
@@ -932,7 +904,7 @@ struct AdminUsersView: View {
                             .lineLimit(1)
                         if isMe {
                             Text(L10n.you)
-                                .font(.system(size: 9, weight: .semibold)).tracking(1)
+                                .font(.caption2.weight(.semibold)).tracking(1)
                                 .foregroundStyle(AppConfig.darkText)
                                 .padding(.horizontal, 6).padding(.vertical, 3)
                                 .background(AppConfig.surfaceHigh)
@@ -1000,7 +972,7 @@ struct AdminUsersView: View {
             RoundedRectangle(cornerRadius: AppConfig.radius16)
                 .stroke(isSelected ? AppConfig.accent.opacity(0.3) : Color.clear, lineWidth: 1.5)
         )
-        .shadow(color: .black.opacity(0.03), radius: 7, y: 2)
+        .cardShadow()
     }
 
     private func detailButton(for user: AppUser) -> some View {
@@ -1009,7 +981,7 @@ struct AdminUsersView: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "info.circle")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                 Text("Detail")
                     .font(.subheadline.weight(.medium))
             }
@@ -1047,11 +1019,11 @@ struct AdminUsersView: View {
                     ZStack {
                         if recentlyActivatedUID == user.uid {
                             Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 18, weight: .semibold))
+                                .font(.title3.weight(.semibold))
                                 .foregroundStyle(AppConfig.darkText)
                         } else {
                             Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 18, weight: .semibold))
+                                .font(.title3.weight(.semibold))
                                 .foregroundStyle(AppConfig.darkText)
                         }
                     }
@@ -1068,7 +1040,7 @@ struct AdminUsersView: View {
                     showQuickRejectAlert = true
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.title3.weight(.semibold))
                         .foregroundStyle(AppConfig.spotOccupied)
                         .frame(width: 44, height: 44)
                         .background(AppConfig.spotOccupied.opacity(0.12))
@@ -1095,7 +1067,7 @@ struct AdminUsersView: View {
                 } label: {
                     HStack(spacing: 5) {
                         Text(L10n.reviewRequest).font(.subheadline).fontWeight(.semibold)
-                        Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
+                        Image(systemName: "chevron.right").font(.caption.weight(.semibold))
                     }
                     .foregroundStyle(AppConfig.darkText)
                     .padding(.horizontal, 14).padding(.vertical, 10)
@@ -1160,7 +1132,7 @@ struct AdminUsersView: View {
                 }
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "ellipsis.circle").font(.system(size: 14, weight: .semibold))
+                    Image(systemName: "ellipsis.circle").font(.subheadline.weight(.semibold))
                     Text(L10n.manage).font(.subheadline).fontWeight(.medium)
                 }
                 .foregroundStyle(AppConfig.darkText)
@@ -1197,7 +1169,7 @@ struct AdminUsersView: View {
                 } label: { Label(L10n.deleteUser, systemImage: "trash.fill") }
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "ellipsis.circle").font(.system(size: 14, weight: .semibold))
+                    Image(systemName: "ellipsis.circle").font(.subheadline.weight(.semibold))
                     Text(L10n.restore).font(.subheadline).fontWeight(.semibold)
                 }
                 .foregroundStyle(AppConfig.darkText)
@@ -1228,7 +1200,7 @@ struct AdminUsersView: View {
     private func warningSectionHeader(_ text: String) -> some View {
         Text(text)
             .textCase(nil)
-            .font(.system(size: 17, weight: .semibold))
+            .font(.body.weight(.semibold))
             .foregroundStyle(AppConfig.subtleGray)
     }
 
@@ -1281,12 +1253,8 @@ struct AdminUsersView: View {
                         VStack(spacing: 16) {
                             if hasSpecificMiniature {
                                 ZStack {
-                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
                                         .fill(AppConfig.surfaceLow)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                                .stroke(AppConfig.separatorSoft, lineWidth: 1)
-                                        )
                                     VehicleMiniatureView(
                                         carType: liveUser.carType,
                                         colorHex: liveUser.carColor,
@@ -1324,7 +1292,7 @@ struct AdminUsersView: View {
 
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Vehicle")
-                                .font(.system(size: 19, weight: .semibold))
+                                .font(.title3.weight(.semibold))
                                 .foregroundStyle(AppConfig.subtleGray)
 
                             if hasVehicle {
@@ -1345,7 +1313,7 @@ struct AdminUsersView: View {
 
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Account")
-                                .font(.system(size: 19, weight: .semibold))
+                                .font(.title3.weight(.semibold))
                                 .foregroundStyle(AppConfig.subtleGray)
                             keyValueRow(label: "Created", value: liveUser.createdAt.formatted(date: .abbreviated, time: .omitted))
                             Divider().overlay(AppConfig.separatorSoft)
@@ -1359,7 +1327,7 @@ struct AdminUsersView: View {
 
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Actions")
-                                .font(.system(size: 19, weight: .semibold))
+                                .font(.title3.weight(.semibold))
                                 .foregroundStyle(AppConfig.subtleGray)
 
                             if liveUser.status == .pending {
@@ -1520,7 +1488,7 @@ struct AdminUsersView: View {
         Button(action: action) {
             HStack(alignment: .center, spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.footnote.weight(.semibold))
                     .frame(width: 28, height: 28)
                     .background(isDestructive ? AppConfig.spotOccupied.opacity(0.1) : AppConfig.surfaceLow)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -1553,7 +1521,7 @@ struct AdminUsersView: View {
     private func detailMenuRow(title: String, icon: String, value: String) -> some View {
         HStack(alignment: .center, spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.footnote.weight(.semibold))
                 .frame(width: 28, height: 28)
                 .background(AppConfig.surfaceLow)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -1592,11 +1560,11 @@ struct AdminUsersView: View {
                     }
                     .frame(maxWidth: .infinity).padding(20)
                     .background(AppConfig.cardBg)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
 
                     VStack(alignment: .leading, spacing: 12) {
                         Text(L10n.assignRole)
-                            .font(.caption).fontWeight(.semibold).tracking(1.0)
+                            .font(.caption).fontWeight(.semibold)
                             .foregroundStyle(AppConfig.subtleGray)
                         VStack(spacing: 8) {
                             ForEach(UserRole.allCases, id: \.rawValue) { role in
@@ -1619,7 +1587,7 @@ struct AdminUsersView: View {
                                         }
                                     }
                                     .padding(14)
-                                    .background(selectedRole == role ? Color(uiColor: .secondarySystemGroupedBackground) : AppConfig.cardBg)
+                                    .background(selectedRole == role ? AppConfig.groupedCardBg : AppConfig.cardBg)
                                     .clipShape(RoundedRectangle(cornerRadius: 16))
                                     .overlay(RoundedRectangle(cornerRadius: 16)
                                         .stroke(selectedRole == role ? Color(uiColor: .separator) : AppConfig.separatorSoft, lineWidth: 1))
@@ -1643,14 +1611,14 @@ struct AdminUsersView: View {
                         .foregroundStyle(.black)
                         .frame(maxWidth: .infinity).padding(.vertical, 16)
                         .background(AppConfig.accent)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
 
                     // Reject section
                     VStack(alignment: .leading, spacing: 10) {
                         Text(L10n.rejectionReason)
-                            .font(.caption).fontWeight(.semibold).tracking(1.2)
+                            .font(.caption).fontWeight(.semibold)
                             .foregroundStyle(AppConfig.subtleGray)
 
                         ZStack(alignment: .topLeading) {
@@ -1798,7 +1766,7 @@ struct AdminUsersView: View {
     private func avatarColor(for user: AppUser) -> Color {
         switch user.role {
         case .admin:      return AppConfig.accent
-        case .privileged: return Color.blue
+        case .privileged: return AppConfig.infoTint
         case .user:       return AppConfig.subtleGray
         }
     }
@@ -1830,7 +1798,7 @@ struct AdminUsersView: View {
     private func statusBadge(_ status: UserStatus) -> some View {
         let (color, icon): (Color, String) = {
             switch status {
-            case .pending:   return (.orange, "clock.fill")
+            case .pending:   return (AppConfig.warning, "clock.fill")
             case .active:    return (AppConfig.activeGreen, "checkmark.circle.fill")
             case .suspended: return (AppConfig.spotOccupied, "minus.circle.fill")
             }
@@ -1875,7 +1843,7 @@ struct AdminUsersView: View {
 
     @ViewBuilder
     private func strikeBadge(_ user: AppUser) -> some View {
-        let color: Color = user.isSuspended ? AppConfig.spotOccupied : (user.strikes >= 2 ? .orange : .yellow)
+        let color: Color = user.isSuspended ? AppConfig.spotOccupied : (user.strikes >= 2 ? AppConfig.warning : .yellow)
         Button {
             strikeReason = ""
             userToStrike = user
@@ -1917,7 +1885,7 @@ struct AdminUsersView: View {
                         warningSummaryPill(for: user)
                     }
                     .padding(.vertical, 4)
-                }
+                }.listRowBackground(AppConfig.groupedCardBg)
 
                 if user.isSuspended, let liftDate = user.suspensionLiftDate {
                     Section {
@@ -1961,7 +1929,7 @@ struct AdminUsersView: View {
                                     } label: {
                                         Label("Delete", systemImage: "trash")
                                     }
-                                    .tint(.red)
+                                    .tint(AppConfig.danger)
                                 }
                         }
                     } header: {
@@ -2009,7 +1977,7 @@ struct AdminUsersView: View {
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(willSuspend ? AppConfig.spotOccupied : Color.orange)
+                            .background(willSuspend ? AppConfig.spotOccupied : AppConfig.warning)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(ScaleButtonStyle())
@@ -2039,12 +2007,12 @@ struct AdminUsersView: View {
     private func warningHistoryRow(_ entry: StrikeEntry) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Text("\(entry.strikeNumber)")
-                .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(entry.suspensionTriggered ? AppConfig.spotOccupied : .orange)
+                .font(.system(.footnote, design: .rounded, weight: .black))
+                .foregroundStyle(entry.suspensionTriggered ? AppConfig.spotOccupied : AppConfig.warning)
                 .frame(width: 28, height: 28)
                 .background(entry.suspensionTriggered
                     ? AppConfig.spotOccupied.opacity(0.15)
-                    : Color.orange.opacity(0.12))
+                    : AppConfig.warning.opacity(0.12))
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 3) {
@@ -2066,13 +2034,13 @@ struct AdminUsersView: View {
             Spacer()
             Image(systemName: "trash")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.red.opacity(0.85))
+                .foregroundStyle(AppConfig.danger.opacity(0.85))
         }
         .padding(.vertical, 4)
     }
 
     private func warningSummaryPill(for user: AppUser) -> some View {
-        let color: Color = user.isSuspended ? .red : (user.strikes >= 2 ? .orange : .secondary)
+        let color: Color = user.isSuspended ? AppConfig.danger : (user.strikes >= 2 ? AppConfig.warning : .secondary)
         return HStack(spacing: 6) {
             Image(systemName: user.isSuspended ? "lock.fill" : "exclamationmark.triangle.fill")
                 .font(.caption.weight(.semibold))
@@ -2082,7 +2050,7 @@ struct AdminUsersView: View {
         .foregroundStyle(color)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
+        .background(AppConfig.groupedCardBg)
         .clipShape(Capsule())
     }
 
@@ -2119,7 +2087,7 @@ struct AdminUsersView: View {
                     // Car make + model
                     VStack(alignment: .leading, spacing: 8) {
                         Text(L10n.carModel)
-                            .font(.caption).fontWeight(.semibold).tracking(1.2)
+                            .font(.caption).fontWeight(.semibold)
                             .foregroundStyle(AppConfig.subtleGray)
                         VStack(spacing: 8) {
                             Menu {
@@ -2173,7 +2141,7 @@ struct AdminUsersView: View {
                     // Registration plate
                     VStack(alignment: .leading, spacing: 8) {
                         Text(L10n.registrationPlate)
-                            .font(.caption).fontWeight(.semibold).tracking(1.2)
+                            .font(.caption).fontWeight(.semibold)
                             .foregroundStyle(AppConfig.subtleGray)
                         TextField("1A2 3456", text: $editPlate)
                             .textInputAutocapitalization(.characters)
@@ -2185,8 +2153,8 @@ struct AdminUsersView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("VEHICLE ICON")
-                            .font(.caption).fontWeight(.semibold).tracking(1.2)
+                        Text("Vehicle icon")
+                            .font(.caption).fontWeight(.semibold)
                             .foregroundStyle(AppConfig.subtleGray)
                         Button {
                             Haptics.selection()
@@ -2225,7 +2193,7 @@ struct AdminUsersView: View {
                                         .overlay(Circle().stroke(isSelected ? AppConfig.darkText : AppConfig.outlineVariant.opacity(0.5), lineWidth: isSelected ? 3 : 1))
                                         .overlay {
                                             if isSelected {
-                                                Image(systemName: "checkmark").font(.system(size: 10, weight: .semibold))
+                                                Image(systemName: "checkmark").font(.caption2.weight(.semibold))
                                                     .foregroundStyle(color.hex == "#FFFFFF" || color.hex == "#C0C0C0" || color.hex == "#F9A825" ? Color.black : Color.white)
                                             }
                                         }
@@ -2238,7 +2206,7 @@ struct AdminUsersView: View {
                     } label: {
                         HStack(spacing: 14) {
                             Image(systemName: "paintpalette")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(AppConfig.subtleGray)
                                 .frame(width: 24)
                             Text(L10n.carColor)
@@ -2327,7 +2295,7 @@ struct AdminUsersView: View {
     ) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray)
                 .frame(width: 24)
             Text(title)
@@ -2344,7 +2312,7 @@ struct AdminUsersView: View {
                     .lineLimit(1)
             }
             Image(systemName: "chevron.up.chevron.down")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
         }
         .padding(.horizontal, 16)
@@ -2361,7 +2329,7 @@ struct AdminUsersView: View {
     ) -> some View {
         HStack(spacing: 14) {
             Image(systemName: "sparkles")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray)
                 .frame(width: 24)
             Text(title)
@@ -2373,7 +2341,7 @@ struct AdminUsersView: View {
                 .foregroundStyle(isPlaceholder ? AppConfig.subtleGray : AppConfig.darkText)
                 .lineLimit(1)
             Image(systemName: "chevron.up.chevron.down")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
         }
         .padding(.horizontal, 16)
@@ -2410,96 +2378,7 @@ struct AdminUsersView: View {
     }
 }
 
-private struct CompanyBadgeView: View {
-    let badge: CompanyBadge
-    var compact: Bool = false
-    @Environment(\.colorScheme) private var colorScheme
 
-    var body: some View {
-        HStack(spacing: compact ? 6 : 8) {
-            ZStack {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: compact ? 18 : 22, weight: .black))
-                    .foregroundStyle(brandGradient)
-                    .overlay(
-                        Image(systemName: "checkmark")
-                            .font(.system(size: compact ? 7 : 9, weight: .black))
-                            .foregroundStyle(.white)
-                    )
-                Circle()
-                    .fill(brandAccent.opacity(0.95))
-                    .frame(width: compact ? 7 : 8, height: compact ? 7 : 8)
-                    .overlay(
-                        Circle()
-                            .stroke(.white.opacity(0.95), lineWidth: 1)
-                    )
-                    .offset(x: compact ? 6 : 8, y: compact ? 6 : 8)
-            }
-
-            Text(brandName)
-                .font(.system(size: compact ? 11 : 12, weight: .bold, design: .rounded))
-                .foregroundStyle(textColor)
-                .lineLimit(1)
-        }
-    }
-
-    private var brandName: String {
-        switch badge {
-        case .omega: return "Omega"
-        case .essilorLuxottica: return "EssilorLuxottica"
-        case .grandVision: return "Grand Vision"
-        case .none: return L10n.noneLabel
-        }
-    }
-
-    private var brandSymbol: String {
-        switch badge {
-        case .omega: return "water.waves"
-        case .essilorLuxottica: return "sparkles"
-        case .grandVision: return "eye.fill"
-        case .none: return "questionmark"
-        }
-    }
-
-    private var textColor: Color {
-        switch badge {
-        case .omega: return Color(red: 0.08, green: 0.22, blue: 0.55)
-        case .essilorLuxottica:
-            return colorScheme == .dark ? .white : .black
-        case .grandVision:
-            return colorScheme == .dark ? .white : Color(red: 0.44, green: 0.07, blue: 0.12)
-        case .none: return AppConfig.subtleGray
-        }
-    }
-
-    private var brandAccent: Color {
-        switch badge {
-        case .omega: return Color(red: 0.10, green: 0.36, blue: 0.86)
-        case .essilorLuxottica: return .black
-        case .grandVision: return Color(red: 0.90, green: 0.17, blue: 0.24)
-        case .none: return AppConfig.subtleGray
-        }
-    }
-
-    private var brandGradient: LinearGradient {
-        switch badge {
-        case .omega:
-            return LinearGradient(colors: [
-                Color(red: 0.26, green: 0.50, blue: 0.95),
-                Color(red: 0.11, green: 0.30, blue: 0.76)
-            ], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .essilorLuxottica:
-            return LinearGradient(colors: [.black, Color(white: 0.25)], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .grandVision:
-            return LinearGradient(colors: [
-                Color(red: 0.90, green: 0.17, blue: 0.24),
-                Color(red: 0.20, green: 0.34, blue: 0.84)
-            ], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .none:
-            return LinearGradient(colors: [Color.gray.opacity(0.5), Color.gray.opacity(0.35)], startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
-    }
-}
 
 #Preview {
     AdminUsersView()

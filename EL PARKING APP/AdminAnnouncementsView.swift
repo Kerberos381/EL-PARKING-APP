@@ -97,9 +97,10 @@ struct AdminAnnouncementsView: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .scrollEdgeEffectStyle(.soft, for: .top)
         .refreshable {
-            Haptics.selection()
             await announcementsManager.refresh()
+            Haptics.refreshCompleted()
         }
     }
 
@@ -119,7 +120,7 @@ struct AdminAnnouncementsView: View {
                 HStack(spacing: 5) {
                     if item.isPinned {
                         Image(systemName: "pin.circle")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                     }
                     Text(item.title)
@@ -141,7 +142,7 @@ struct AdminAnnouncementsView: View {
                     if let exp = item.expiresAt {
                         HStack(spacing: 3) {
                             Image(systemName: item.isExpired ? "clock.badge.xmark" : item.isExpiringSoon ? "exclamationmark.triangle.fill" : "timer")
-                                .font(.system(size: 9, weight: .bold))
+                                .font(.caption2.weight(.bold))
                             if item.isExpired {
                                 Text(L10n.expired)
                                     .font(.caption2)
@@ -153,7 +154,7 @@ struct AdminAnnouncementsView: View {
                                     .font(.caption2)
                             }
                         }
-                        .foregroundStyle(item.isExpired ? AppConfig.spotOccupied : item.isExpiringSoon ? .red : .orange)
+                        .foregroundStyle(item.isExpired ? AppConfig.spotOccupied : item.isExpiringSoon ? AppConfig.danger : AppConfig.warning)
 
                         if item.isExpiringSoon || item.isExpired {
                             Button {
@@ -221,7 +222,7 @@ struct AdminAnnouncementsView: View {
 
     private func statusControlIcon(symbol: String, tint: Color) -> some View {
         Image(systemName: symbol)
-            .font(.system(size: 16, weight: .semibold))
+            .font(.body.weight(.semibold))
             .foregroundStyle(tint)
             .frame(width: 32, height: 32)
             .background(AppConfig.surfaceLow)
@@ -235,7 +236,7 @@ struct AdminAnnouncementsView: View {
     private func listSectionHeader(_ text: String) -> some View {
         Text(text)
             .textCase(nil)
-            .font(.system(size: 17, weight: .semibold))
+            .font(.body.weight(.semibold))
             .foregroundStyle(AppConfig.subtleGray)
     }
 
@@ -268,6 +269,7 @@ struct AdminAnnouncementsView: View {
             } header: {
                 listSectionHeader(L10n.activeSectionHeader(0))
             }
+            .listRowBackground(AppConfig.groupedCardBg)
         }
         .scrollContentBackground(.hidden)
     }
@@ -275,7 +277,7 @@ struct AdminAnnouncementsView: View {
     private var skeletonRow: some View {
         HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(uiColor: .tertiarySystemFill))
+                .fill(AppConfig.tertiaryFillBg)
                 .frame(width: 44, height: 44)
                 .shimmering(active: true)
 
@@ -406,7 +408,7 @@ struct ComposeAnnouncementSheet: View {
                                                         )
                                                         .frame(width: 52, height: 52)
                                                     Text("Auto")
-                                                        .font(.system(size: 9, weight: .bold))
+                                                        .font(.caption2.weight(.bold))
                                                         .foregroundStyle(.white.opacity(0.7))
                                                 } else {
                                                     RoundedRectangle(cornerRadius: 14)
@@ -421,7 +423,7 @@ struct ComposeAnnouncementSheet: View {
                                             .overlay(alignment: .bottomTrailing) {
                                                 if isSelected {
                                                     Image(systemName: "checkmark.circle.fill")
-                                                        .font(.system(size: 16))
+                                                        .font(.body)
                                                         .foregroundStyle(.white)
                                                         .background(Circle().fill(AppConfig.darkText).frame(width: 15, height: 15))
                                                         .offset(x: 3, y: 3)
@@ -465,7 +467,7 @@ struct ComposeAnnouncementSheet: View {
                                         .font(.subheadline)
                                         .foregroundStyle(AppConfig.subtleGray)
                                     Image(systemName: "chevron.right")
-                                        .font(.system(size: 12, weight: .semibold))
+                                        .font(.caption.weight(.semibold))
                                         .foregroundStyle(AppConfig.subtleGray.opacity(0.65))
                                 }
                                 .padding(14)
@@ -506,7 +508,7 @@ struct ComposeAnnouncementSheet: View {
                                                     }
                                                 } label: {
                                                     Image(systemName: "xmark.circle.fill")
-                                                        .font(.system(size: 20))
+                                                        .font(.title3)
                                                         .foregroundStyle(.white, .black.opacity(0.5))
                                                 }
                                                 .offset(x: 6, y: -6)
@@ -530,7 +532,7 @@ struct ComposeAnnouncementSheet: View {
                                                     withAnimation { existingImageURL = nil; existingImageBase64 = nil }
                                                 } label: {
                                                     Image(systemName: "xmark.circle.fill")
-                                                        .font(.system(size: 20))
+                                                        .font(.title3)
                                                         .foregroundStyle(.white, .black.opacity(0.5))
                                                 }
                                                 .offset(x: 6, y: -6)
@@ -548,7 +550,7 @@ struct ComposeAnnouncementSheet: View {
                                                     withAnimation { existingImageURL = nil; existingImageBase64 = nil }
                                                 } label: {
                                                     Image(systemName: "xmark.circle.fill")
-                                                        .font(.system(size: 20))
+                                                        .font(.title3)
                                                         .foregroundStyle(.white, .black.opacity(0.5))
                                                 }
                                                 .offset(x: 6, y: -6)
@@ -598,7 +600,7 @@ struct ComposeAnnouncementSheet: View {
                             } label: {
                                 HStack(spacing: 10) {
                                     Image(systemName: "photo.badge.plus")
-                                        .font(.system(size: 14, weight: .semibold))
+                                        .font(.subheadline.weight(.semibold))
                                         .foregroundStyle(AppConfig.subtleGray)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("Use custom photo")
@@ -611,7 +613,7 @@ struct ComposeAnnouncementSheet: View {
                                     Spacer()
                                     if selectedImageData != nil || existingImageURL != nil || existingImageBase64 != nil {
                                         Image(systemName: "checkmark.circle.fill")
-                                            .font(.system(size: 14))
+                                            .font(.subheadline)
                                             .foregroundStyle(AppConfig.darkText)
                                     }
                                 }
@@ -686,9 +688,9 @@ struct ComposeAnnouncementSheet: View {
                             VStack(spacing: 0) {
                             toggleRow(icon: "checkmark.circle.fill",  label: L10n.activeLabel, subtitle: L10n.visibleToAllOnHome, color: AppConfig.activeGreen, value: $isActive)
                             Divider().padding(.leading, 58)
-                            toggleRow(icon: "pin.circle",  label: L10n.pinned,      subtitle: L10n.alwaysShownAtTop,  color: .orange,              value: $isPinned)
+                            toggleRow(icon: "pin.circle",  label: L10n.pinned,      subtitle: L10n.alwaysShownAtTop,  color: AppConfig.warning,              value: $isPinned)
                             Divider().padding(.leading, 58)
-                            toggleRow(icon: "timer",     label: L10n.setExpiry,   subtitle: L10n.autoHideAfterDate, color: .orange,               value: $hasExpiry)
+                            toggleRow(icon: "timer",     label: L10n.setExpiry,   subtitle: L10n.autoHideAfterDate, color: AppConfig.warning,               value: $hasExpiry)
 
                             // Inline date picker — only shown when expiry is on
                             if hasExpiry {
@@ -696,11 +698,11 @@ struct ComposeAnnouncementSheet: View {
                                 HStack(spacing: 14) {
                                     ZStack {
                                         RoundedRectangle(cornerRadius: 8)
-                                            .fill(Color.orange.opacity(0.12))
+                                            .fill(AppConfig.warning.opacity(0.12))
                                             .frame(width: 34, height: 34)
                                         Image(systemName: "calendar.badge.clock")
-                                            .font(.system(size: 13, weight: .semibold))
-                                            .foregroundStyle(.orange)
+                                            .font(.footnote.weight(.semibold))
+                                            .foregroundStyle(AppConfig.warning)
                                     }
                                     DatePicker(
                                         L10n.expiresOn,
@@ -709,7 +711,7 @@ struct ComposeAnnouncementSheet: View {
                                         displayedComponents: .date
                                     )
                                     .labelsHidden()
-                                    .tint(.orange)
+                                    .tint(AppConfig.warning)
                                     Spacer()
                                 }
                                 .padding(.horizontal, 16)
@@ -893,7 +895,7 @@ struct ComposeAnnouncementSheet: View {
                         .fill(AppConfig.surfaceHigh)
                         .frame(width: 44, height: 44)
                     Image(systemName: field.wrappedValue.type.icon)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
                 .contentShape(Rectangle())
@@ -932,7 +934,7 @@ struct ComposeAnnouncementSheet: View {
                 withAnimation { onDelete() }
             } label: {
                 Image(systemName: "minus.circle")
-                    .font(.system(size: 20))
+                    .font(.title3)
                     .foregroundStyle(AppConfig.spotOccupied.opacity(0.7))
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -949,14 +951,14 @@ struct ComposeAnnouncementSheet: View {
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 19, weight: .semibold))
+            .font(.title3.weight(.semibold))
             .foregroundStyle(AppConfig.subtleGray)
     }
 
     private func listSectionHeader(_ text: String) -> some View {
         Text(text)
             .textCase(nil)
-            .font(.system(size: 17, weight: .semibold))
+            .font(.body.weight(.semibold))
             .foregroundStyle(AppConfig.subtleGray)
     }
 
@@ -965,11 +967,7 @@ struct ComposeAnnouncementSheet: View {
         VStack(alignment: .leading, spacing: 10) { content() }
             .padding(16)
             .background(AppConfig.cardBg)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(AppConfig.separatorSoft, lineWidth: 1)
-            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     private var announcementPreviewCard: some View {
@@ -978,20 +976,20 @@ struct ComposeAnnouncementSheet: View {
                 Text(emoji)
                     .font(.title3)
                 Text(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? L10n.announcementTitlePlaceholder : title)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(AppConfig.darkText)
                     .lineLimit(2)
                 Spacer()
                 if isPinned {
                     Image(systemName: "pin.circle")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
             }
 
             if !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text(message)
-                    .font(.system(size: 13, weight: .regular))
+                    .font(.footnote.weight(.regular))
                     .foregroundStyle(AppConfig.subtleGray)
                     .lineLimit(3)
             }
@@ -1006,7 +1004,7 @@ struct ComposeAnnouncementSheet: View {
                         .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
                     Text(expiryDate, style: .date)
                         .font(.caption2)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(AppConfig.warning)
                 }
             }
         }
@@ -1022,7 +1020,7 @@ struct ComposeAnnouncementSheet: View {
                     .fill(color.opacity(0.15))
                     .frame(width: 34, height: 34)
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(color)
             }
             VStack(alignment: .leading, spacing: 2) {

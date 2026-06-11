@@ -14,6 +14,9 @@ struct SettingsView: View {
     @EnvironmentObject var authManager:   AuthManager
     @ObservedObject private var langManager = LanguageManager.shared
     @AppStorage("appTheme") private var themeRaw: Int = 0
+    @AppStorage("appPalette") private var paletteRaw: Int = 0
+    @AppStorage("homeStyle") private var homeStyleRaw: String = "roomy"
+    @State private var phoneField: String = ""
     @AppStorage("dailyReminderEnabled")   private var reminderEnabled      = false
     @AppStorage("reminderMinutesBefore")  private var reminderMinutesBefore = 60
     @AppStorage("biometricLockEnabled")   private var biometricEnabled      = false
@@ -187,9 +190,11 @@ struct SettingsView: View {
                     legacySettingsLayout
                 }
             }
+            .scrollEdgeEffectStyle(.soft, for: .top)
             .navigationTitle(L10n.settings)
             .navigationBarTitleDisplayMode(.large)
             .onAppear {
+                phoneField = authManager.currentUser?.phone ?? ""
                 lastSavedPlate   = bookingManager.registrationPlate
                 lastSavedCar     = bookingManager.carDescription
                 lastSavedColor   = bookingManager.carColor
@@ -224,6 +229,28 @@ struct SettingsView: View {
             } message: {
                 Text(L10n.clearConfirmMsg)
             }
+            // Hosted at body level so it presents from BOTH the native and
+            // legacy layouts (the native layout has no other host for it).
+            .alert(L10n.deleteAccount, isPresented: $showDeleteAccount) {
+                TextField(L10n.deleteConfirmPlaceholder, text: $deleteConfirmText)
+                    .textInputAutocapitalization(.characters)
+                Button(L10n.deletePermanently, role: .destructive) {
+                    guard deleteConfirmText.uppercased() == "DELETE" else { return }
+                    Haptics.destructive()
+                    Task {
+                        let success = await authManager.deleteAccount()
+                        if success {
+                            bookingManager.clearUser()
+                        } else if let message = authManager.errorMessage {
+                            ToastManager.shared.show(message, style: .error)
+                        }
+                        deleteConfirmText = ""
+                    }
+                }
+                Button(L10n.cancel, role: .cancel) { deleteConfirmText = "" }
+            } message: {
+                Text(L10n.deleteAccountMsg)
+            }
             .sheet(isPresented: $showCustomPicker) {
                 customPickerSheet
             }
@@ -255,7 +282,7 @@ struct SettingsView: View {
 
     private var legacySettingsLayout: some View {
         ZStack {
-            Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
+            AppConfig.groupedPageBg.ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: SettingsSpace.xl) {
@@ -285,7 +312,7 @@ struct SettingsView: View {
                 profileCard
                     .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                     .listRowBackground(Color.clear)
-            }
+            }.listRowBackground(AppConfig.groupedCardBg)
 
             Section("Appearance") {
                 Menu {
@@ -305,7 +332,58 @@ struct SettingsView: View {
                     nativeValueRow(L10n.appearance, value: theme.label, enabled: true)
                 }
                 .tint(AppConfig.darkText)
-            }
+
+                Menu {
+                    ForEach(AppConfig.AppPalette.allCases, id: \.rawValue) { option in
+                        Button {
+                            Haptics.selection()
+                            paletteRaw = option.rawValue
+                        } label: {
+                            HStack {
+                                Label(option.label, systemImage: option.icon)
+                                if paletteRaw == option.rawValue {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    nativeValueRow(
+                        L10n.colorPalette,
+                        value: (AppConfig.AppPalette(rawValue: paletteRaw) ?? .standard).label,
+                        enabled: true
+                    )
+                }
+                .tint(AppConfig.darkText)
+
+                Menu {
+                    Button {
+                        Haptics.selection()
+                        homeStyleRaw = "roomy"
+                    } label: {
+                        HStack {
+                            Label(L10n.homeRoomy, systemImage: "rectangle.grid.1x2")
+                            if homeStyleRaw == "roomy" { Image(systemName: "checkmark") }
+                        }
+                    }
+                    Button {
+                        Haptics.selection()
+                        homeStyleRaw = "compact"
+                    } label: {
+                        HStack {
+                            Label(L10n.homeCompact, systemImage: "square.grid.2x2")
+                            if homeStyleRaw == "compact" { Image(systemName: "checkmark") }
+                        }
+                    }
+                } label: {
+                    nativeValueRow(
+                        L10n.homeLayout,
+                        value: homeStyleRaw == "compact" ? L10n.homeCompact : L10n.homeRoomy,
+                        enabled: true
+                    )
+                }
+                .tint(AppConfig.darkText)
+            }.listRowBackground(AppConfig.groupedCardBg)
 
             Section("Language") {
                 Menu {
@@ -325,7 +403,7 @@ struct SettingsView: View {
                     nativeValueRow(L10n.language, value: "\(langManager.language.flag) \(langManager.language.displayName)", enabled: true)
                 }
                 .tint(AppConfig.darkText)
-            }
+            }.listRowBackground(AppConfig.groupedCardBg)
 
             Section("Vehicle") {
                 Button {
@@ -376,7 +454,7 @@ struct SettingsView: View {
                 } label: {
                     LabeledContent(L10n.regPlate, value: bookingManager.registrationPlate.isEmpty ? L10n.regPlatePlaceholder : bookingManager.registrationPlate)
                 }
-            }
+            }.listRowBackground(AppConfig.groupedCardBg)
 
             if isShortcutsOwner {
                 Section("Shortcuts") {
@@ -452,7 +530,7 @@ struct SettingsView: View {
                         LabeledContent("Remind Me", value: nativeReminderIntervalDisplay)
                     }
                 }
-            }
+            }.listRowBackground(AppConfig.groupedCardBg)
 
             Section("Security") {
                 if biometricsAvailable {
@@ -469,39 +547,70 @@ struct SettingsView: View {
                         }
                     }
                 }
-            }
+            }.listRowBackground(AppConfig.groupedCardBg)
 
             Section("Account") {
                 LabeledContent(L10n.name, value: bookingManager.currentUserName)
                 LabeledContent(L10n.email, value: bookingManager.currentUserEmail)
 
+                NavigationLink {
+                    TextEditDetailView(
+                        title: L10n.phoneNumber,
+                        text: $phoneField,
+                        keyboardType: .phonePad
+                    )
+                } label: {
+                    LabeledContent(
+                        L10n.phoneOptional,
+                        value: phoneField.isEmpty ? "—" : phoneField
+                    )
+                }
+                .onChange(of: phoneField) { _, newValue in
+                    Task {
+                        await authManager.updateProfile(
+                            displayName: bookingManager.currentUserName,
+                            plate: bookingManager.registrationPlate,
+                            carDescription: bookingManager.carDescription,
+                            carColor: bookingManager.carColor,
+                            carType: bookingManager.carType,
+                            vehicleMiniaturePresetID: bookingManager.vehicleMiniaturePresetID,
+                            preferredVocative: bookingManager.preferredVocative,
+                            phone: newValue
+                        )
+                    }
+                }
+
+                if bookingManager.isAdmin {
                 Menu {
-                    ForEach(CompanyBadge.allCases, id: \.rawValue) { badge in
-                        Button {
-                            selectedCompanyBadge = badge
-                            Task {
-                                await authManager.updateProfile(
-                                    displayName: bookingManager.currentUserName,
-                                    plate: bookingManager.registrationPlate,
-                                    carDescription: bookingManager.carDescription,
-                                    carColor: bookingManager.carColor,
-                                    carType: bookingManager.carType,
-                                    vehicleMiniaturePresetID: bookingManager.vehicleMiniaturePresetID,
-                                    preferredVocative: bookingManager.preferredVocative,
-                                    companyBadge: selectedCompanyBadge
-                                )
-                            }
-                        } label: {
-                            HStack {
-                                Text(companyBadgeLabel(badge))
-                                if selectedCompanyBadge == badge { Image(systemName: "checkmark") }
+                        ForEach(CompanyBadge.allCases, id: \.rawValue) { badge in
+                            Button {
+                                selectedCompanyBadge = badge
+                                Task {
+                                    await authManager.updateProfile(
+                                        displayName: bookingManager.currentUserName,
+                                        plate: bookingManager.registrationPlate,
+                                        carDescription: bookingManager.carDescription,
+                                        carColor: bookingManager.carColor,
+                                        carType: bookingManager.carType,
+                                        vehicleMiniaturePresetID: bookingManager.vehicleMiniaturePresetID,
+                                        preferredVocative: bookingManager.preferredVocative,
+                                        companyBadge: selectedCompanyBadge
+                                    )
+                                }
+                            } label: {
+                                HStack {
+                                    Text(companyBadgeLabel(badge))
+                                    if selectedCompanyBadge == badge { Image(systemName: "checkmark") }
+                                }
                             }
                         }
+                    } label: {
+                        nativeValueRow(L10n.companyBadge, value: companyBadgeLabel(selectedCompanyBadge), enabled: true)
                     }
-                } label: {
-                    nativeValueRow(L10n.companyBadge, value: companyBadgeLabel(selectedCompanyBadge), enabled: true)
+                    .tint(AppConfig.darkText)
+                } else {
+                    LabeledContent(L10n.companyBadge, value: companyBadgeLabel(selectedCompanyBadge))
                 }
-                .tint(AppConfig.darkText)
 
                 NavigationLink {
                     TextEditDetailView(
@@ -519,25 +628,25 @@ struct SettingsView: View {
                     nativeValueRow(L10n.changePassword, value: "", enabled: true)
                 }
                 .buttonStyle(.plain)
-            }
+            }.listRowBackground(AppConfig.groupedCardBg)
 
             Section(L10n.bookingRules) {
                 LabeledContent(L10n.personalAdvance, value: "\(AppConfig.selfBookingMaxAdvanceDays) days")
                 LabeledContent(L10n.forOthersAdvance, value: "\(AppConfig.othersBookingMaxAdvanceDays) days")
                 LabeledContent(L10n.maxPerDay, value: "\(AppConfig.selfBookingMaxPerDay)")
-            }
+            }.listRowBackground(AppConfig.groupedCardBg)
 
             Section(L10n.statistics) {
                 let myCount = bookingManager.getBookingsForUser(bookingManager.currentUserEmail).count
                 LabeledContent(L10n.myBookingsCount, value: "\(myCount)")
                 LabeledContent(L10n.totalBookings, value: "\(bookingManager.bookings.count)")
-            }
+            }.listRowBackground(AppConfig.groupedCardBg)
 
             Section(L10n.data) {
                 Button(role: .destructive) { showingClearAlert = true } label: {
                     Text(L10n.clearAllBookings)
                 }
-            }
+            }.listRowBackground(AppConfig.groupedCardBg)
 
             Section("Session") {
                 Button {
@@ -550,23 +659,36 @@ struct SettingsView: View {
                 Button(role: .destructive) { showDeleteAccount = true } label: {
                     Text(L10n.deleteAccount)
                 }
-            }
+            }.listRowBackground(AppConfig.groupedCardBg)
+
+            Section {
+                Link(destination: AppConfig.privacyPolicyURL) {
+                    HStack {
+                        Text(L10n.privacyPolicy)
+                            .foregroundStyle(AppConfig.darkText)
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppConfig.subtleGray)
+                    }
+                }
+            }.listRowBackground(AppConfig.groupedCardBg)
 
             Section {
                 VStack(spacing: 4) {
                     Text("EL PARKING")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")")
+                    Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0") · \(L10n.releasedLabel) \(AppConfig.releaseDate)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
-            }
+            }.listRowBackground(AppConfig.groupedCardBg)
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
-        .background(Color(uiColor: .systemGroupedBackground))
+        .background(AppConfig.groupedPageBg)
         .onAppear {
             nativeReminderInterval = nativeIntervalFromMinutes(reminderMinutesBefore)
         }
@@ -681,13 +803,9 @@ struct SettingsView: View {
 
         }
         .frame(maxWidth: .infinity)
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(AppConfig.separatorSoft.opacity(0.35), lineWidth: 0.5)
-        )
-        .shadow(color: .black.opacity(0.018), radius: 4, y: 1)
+        .background(AppConfig.groupedCardBg)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .cardShadow()
         .padding(.top, 8)
     }
 
@@ -833,12 +951,12 @@ struct SettingsView: View {
     // MARK: - Notifications Section
 
     private var notificationsSection: some View {
-        settingsSection(title: L10n.notifications, icon: "bell.badge.fill", iconTint: .red) {
+        settingsSection(title: L10n.notifications, icon: "bell.badge.fill", iconTint: AppConfig.danger) {
             VStack(spacing: 0) {
                 HStack(spacing: 14) {
                     settingsIconTile(
                         icon: reminderEnabled ? "bell.badge.fill" : "bell.slash.fill",
-                        tint: .red,
+                        tint: AppConfig.danger,
                         size: 24,
                         iconSize: 11
                     )
@@ -981,7 +1099,7 @@ struct SettingsView: View {
                                             ))
                                         if isSelected {
                                             Image(systemName: "checkmark")
-                                                .font(.system(size: 9, weight: .bold))
+                                                .font(.caption2.weight(.bold))
                                                 .foregroundStyle(
                                                     color.hex == "#FFFFFF" || color.hex == "#F9A825" ? Color.black : Color.white
                                                 )
@@ -995,7 +1113,7 @@ struct SettingsView: View {
                     } label: {
                         HStack(spacing: 14) {
                             Image(systemName: "paintpalette")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(AppConfig.subtleGray)
                                 .frame(width: 24)
                             Text(L10n.carColor)
@@ -1029,7 +1147,7 @@ struct SettingsView: View {
     // MARK: - Shortcuts & Favorite Section
 
     private var shortcutsSection: some View {
-        settingsSection(title: "Shortcuts & Favorite", icon: "wand.and.stars", iconTint: .orange) {
+        settingsSection(title: "Shortcuts & Favorite", icon: "wand.and.stars", iconTint: AppConfig.warning) {
             VStack(spacing: 14) {
                 // Explanation
                 HStack(spacing: 10) {
@@ -1049,10 +1167,9 @@ struct SettingsView: View {
 
                 // Favorite spot picker
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("FAVORITE SPOT")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1.1)
-                        .foregroundStyle(AppConfig.subtleGray)
+                    Text("Favorite spot")
+                        .font(.caption2.weight(.bold))
+                                                .foregroundStyle(AppConfig.subtleGray)
 
                     Menu {
                         Button("None") { favoriteSpotID = "" }
@@ -1084,10 +1201,9 @@ struct SettingsView: View {
                 // Time window pickers
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("FROM")
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(1.1)
-                            .foregroundStyle(AppConfig.subtleGray)
+                        Text("From")
+                            .font(.caption2.weight(.bold))
+                                                        .foregroundStyle(AppConfig.subtleGray)
 
                         Menu {
                             ForEach(AppConfig.availableTimeSlots, id: \.self) { slot in
@@ -1115,9 +1231,8 @@ struct SettingsView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("TO")
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(1.1)
+                        Text("To")
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(AppConfig.subtleGray)
 
                         Menu {
@@ -1202,7 +1317,7 @@ struct SettingsView: View {
                     settingsActionRow(
                         title: "\(L10n.companyBadge): \(companyBadgeLabel(selectedCompanyBadge))",
                         icon: "checkmark.seal.fill",
-                        tint: .orange,
+                        tint: AppConfig.warning,
                         textTint: AppConfig.darkText
                     )
                 }
@@ -1385,8 +1500,8 @@ struct SettingsView: View {
                         .foregroundStyle(AppConfig.darkText)
                         .padding(18)
                         .background(AppConfig.cardBg)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .shadow(color: .black.opacity(0.06), radius: 14, y: 4)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .cardShadow()
                     }
                     .buttonStyle(ScaleButtonStyle())
 
@@ -1403,31 +1518,13 @@ struct SettingsView: View {
                         .foregroundStyle(AppConfig.spotOccupied.opacity(0.7))
                         .padding(18)
                         .background(AppConfig.cardBg)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .shadow(color: .black.opacity(0.06), radius: 14, y: 4)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .cardShadow()
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
                 .padding(.horizontal)
             }
-        }
-        .alert(L10n.deleteAccount, isPresented: $showDeleteAccount) {
-            TextField(L10n.deleteConfirmPlaceholder, text: $deleteConfirmText)
-                .textInputAutocapitalization(.characters)
-            Button(L10n.deletePermanently, role: .destructive) {
-                guard deleteConfirmText.uppercased() == "DELETE" else { return }
-                Haptics.destructive()
-                Task {
-                    let success = await authManager.deleteAccount()
-                    if success {
-                        bookingManager.clearUser()
-                    }
-                    deleteConfirmText = ""
-                }
-            }
-            Button(L10n.cancel, role: .cancel) { deleteConfirmText = "" }
-        } message: {
-            Text(L10n.deleteAccountMsg)
         }
     }
 
@@ -1474,9 +1571,8 @@ struct SettingsView: View {
         _ = icon
         _ = iconTint
         return VStack(alignment: .leading, spacing: 7) {
-            Text(title.uppercased())
+            Text(title)
                 .font(.caption.weight(.semibold))
-                .tracking(1.0)
                 .foregroundStyle(AppConfig.subtleGray)
                 .padding(.horizontal, 8)
 
@@ -1486,12 +1582,8 @@ struct SettingsView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(uiColor: .secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(AppConfig.separatorSoft.opacity(0.35), lineWidth: 0.5)
-            )
+            .background(AppConfig.groupedCardBg)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal)
@@ -1566,7 +1658,7 @@ struct SettingsView: View {
                     .lineLimit(1)
             }
             Image(systemName: "chevron.up.chevron.down")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
         }
         .padding(.horizontal, 16)
@@ -1595,7 +1687,7 @@ struct SettingsView: View {
                 .foregroundStyle(isPlaceholder ? AppConfig.subtleGray : AppConfig.darkText)
                 .lineLimit(1)
             Image(systemName: "chevron.up.chevron.down")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
         }
         .padding(.horizontal, 16)
@@ -1729,7 +1821,7 @@ private struct ChangePasswordSheet: View {
                         }
                         .background(AppConfig.cardBg)
                         .clipShape(RoundedRectangle(cornerRadius: 24))
-                        .shadow(color: .black.opacity(0.06), radius: 14, y: 4)
+                        .cardShadow()
                         .padding(.horizontal)
 
                         // Error
@@ -1851,7 +1943,7 @@ private struct ChangePasswordSheet: View {
             Button { show.wrappedValue.toggle() } label: {
                 Image(systemName: show.wrappedValue ? "eye.slash" : "eye")
                     .foregroundStyle(AppConfig.subtleGray)
-                    .font(.system(size: 14))
+                    .font(.subheadline)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
@@ -1916,8 +2008,11 @@ private struct ReminderIntervalPickerView: View {
                 }
                 .buttonStyle(.plain)
             }
+            .listRowBackground(AppConfig.groupedCardBg)
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(AppConfig.groupedPageBg.ignoresSafeArea())
         .tint(AppConfig.darkText)
         .navigationTitle("Remind Me")
         .navigationBarTitleDisplayMode(.inline)
@@ -1928,14 +2023,16 @@ private struct TextEditDetailView: View {
     let title: String
     @Binding var text: String
     var capitalization: TextInputAutocapitalization = .never
+    var keyboardType: UIKeyboardType = .default
 
     @State private var inputBuffer: String = ""
     @Environment(\.dismiss) private var dismiss
 
-    init(title: String, text: Binding<String>, capitalization: TextInputAutocapitalization = .never) {
+    init(title: String, text: Binding<String>, capitalization: TextInputAutocapitalization = .never, keyboardType: UIKeyboardType = .default) {
         self.title = title
         self._text = text
         self.capitalization = capitalization
+        self.keyboardType = keyboardType
         self._inputBuffer = State(initialValue: text.wrappedValue)
     }
 
@@ -1945,6 +2042,7 @@ private struct TextEditDetailView: View {
                 TextField("Enter \(title.lowercased())", text: $inputBuffer)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(capitalization)
+                    .keyboardType(keyboardType)
                     .submitLabel(.done)
                     .onSubmit { saveAndExit() }
             }

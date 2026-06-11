@@ -11,6 +11,7 @@
 		754B25202F954A26007569EF /* SkeletonShimmer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 754B251F2F954A26007569EF /* SkeletonShimmer.swift */; };
 		757BEE7C2F7556AA00AA1F6F /* ParkingWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 757BEE702F7556AA00AA1F6F /* ParkingWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		757BEE8B2F7556AA00AA1F6F /* NotificationContent.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 757BEE802F7556AA00AA1F6F /* NotificationContent.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		75AC0001AC0001AC0001AC01 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = 75AC0002AC0002AC0002AC02 /* FirebaseAppCheck */; };
 		75DE50362F97A1E700D1F7E6 /* BookFavoriteSpotIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75DE50352F97A1E600D1F7E6 /* BookFavoriteSpotIntent.swift */; };
 		75DF17562FA0A99E00D605A7 /* GlassStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75DF17552FA0A99E00D605A7 /* GlassStyles.swift */; };
 		75E0E2D42F76DEBB0028B3F6 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 75E0E2D32F76DEBB0028B3F6 /* FirebaseAuth */; };
@@ -123,6 +124,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				75E0E2D42F76DEBB0028B3F6 /* FirebaseAuth in Frameworks */,
+				75AC0001AC0001AC0001AC01 /* FirebaseAppCheck in Frameworks */,
 				75E0E2D72F76DEBB0028B3F6 /* FirebaseCore in Frameworks */,
 				75E0E2D62F76DEBB0028B3F6 /* FirebaseFirestore in Frameworks */,
 				75E0E2DA2F76DEBB0028B3F6 /* FirebaseMessaging in Frameworks */,
@@ -220,6 +222,7 @@
 			name = "EL PARKING APP";
 			packageProductDependencies = (
 				75E0E2D32F76DEBB0028B3F6 /* FirebaseAuth */,
+				75AC0002AC0002AC0002AC02 /* FirebaseAppCheck */,
 				75E0E2D82F76DEBB0028B3F6 /* FirebaseCore */,
 				75E0E2D52F76DEBB0028B3F6 /* FirebaseFirestore */,
 				75E0E2DB2F76DEBB0028B3F6 /* FirebaseMessaging */,
@@ -637,7 +640,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -681,7 +684,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -706,7 +709,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/EL PARKING APP.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/EL PARKING APP";
 			};
 			name = Debug;
@@ -732,7 +735,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/EL PARKING APP.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/EL PARKING APP";
 			};
 			name = Release;
@@ -756,7 +759,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_TARGET_NAME = "EL PARKING APP";
 			};
 			name = Debug;
@@ -780,7 +783,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_TARGET_NAME = "EL PARKING APP";
 			};
 			name = Release;
@@ -812,7 +815,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -843,7 +846,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -873,7 +876,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -902,7 +905,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -981,6 +984,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 75E0E2D22F76DEBB0028B3F6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseStorage;
+		};
+		75AC0002AC0002AC0002AC02 /* FirebaseAppCheck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 75E0E2D22F76DEBB0028B3F6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAppCheck;
 		};
 		75E0E2D32F76DEBB0028B3F6 /* FirebaseAuth */ = {
 			isa = XCSwiftPackageProductDependency;

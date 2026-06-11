@@ -144,11 +144,14 @@ service cloud.firestore {
 
     function validBookingCreate(bookingId) {
       return validBookingDocument(bookingId)
-        && bookingDateAllowedForActor();
+        && bookingDateAllowedForActor()
+        && companySpotPolicyAllows();
     }
 
     function validBookingUpdate(bookingId) {
       return validBookingDocument(bookingId)
+        && (request.resource.data.spot == resource.data.spot
+            || companySpotPolicyAllows())
         && (bookingDateAllowedForActor()
             || request.resource.data.bookingDate == resource.data.bookingDate)
         && request.resource.data.id == resource.data.id
@@ -161,6 +164,43 @@ service cloud.firestore {
       return resource.data.email == myEmail()
         || resource.data.createdBy == myEmail()
         || isAdmin();
+    }
+
+    // ── Company spot policy (effective 22 June 2026) ─────────────────────────
+    // Spots 74–76 are reserved for GrandVision users, and GrandVision users
+    // may ONLY book those spots. Exception: same-day bookings made after
+    // 08:00 Prague local time are open to everyone on any free spot.
+    // Admins are exempt (but the apps label 74–76 as GrandVision spots).
+
+    function companyPolicyActive() {
+      return request.time >= timestamp.date(2026, 6, 22);
+    }
+
+    function isGrandVisionSpot() {
+      return request.resource.data.spot in ['Parking 74', 'Parking 75', 'Parking 76'];
+    }
+
+    function myCompany() {
+      return userData().get('companyBadge', 'none');
+    }
+
+    // 08:00 CEST = 06:00 UTC (in CET this evaluates to 07:00 local — acceptable,
+    // mirrors the isAfter18LocalTime approximation above).
+    function isAfter8LocalTime() {
+      return (request.time.toMillis() % 86400000) >= (6 * 3600 * 1000);
+    }
+
+    function sameDayReleaseApplies() {
+      return bookingDateIsToday() && isAfter8LocalTime();
+    }
+
+    function companySpotPolicyAllows() {
+      return !companyPolicyActive()
+        || isAdmin()
+        || sameDayReleaseApplies()
+        || (isGrandVisionSpot()
+              ? myCompany() == 'grandVision'
+              : myCompany() != 'grandVision');
     }
 
     function validSpotLockDocument() {
@@ -180,7 +220,9 @@ service cloud.firestore {
         (request.auth.uid == uid
           && request.resource.data.role    == 'user'
           && request.resource.data.status  == 'pending'
-          && request.resource.data.get('inviteAccepted', false) == false)
+          && request.resource.data.get('inviteAccepted', false) == false
+          // companyBadge gates GrandVision spot access — never self-assignable
+          && request.resource.data.get('companyBadge', 'none') != 'grandVision')
 
         // Admin creates an account for another user (typical path)
         || isAdmin()
@@ -197,7 +239,10 @@ service cloud.firestore {
           && request.resource.data.get('needsFinishRegistration', false) == true
           && request.resource.data.status        == 'active'
           && request.resource.data.get('inviteAccepted', false) == true
-          && request.resource.data.email         == request.auth.token.email)
+          && request.resource.data.email         == request.auth.token.email
+          // The admin plants this marker (own auth context) BEFORE creating
+          // the account — outsiders can mint Auth users but not this doc.
+          && exists(/databases/$(database)/documents/invites/$(request.resource.data.email)))
       );
 
       // ── Read ────────────────────────────────────────────────────────────────
@@ -216,13 +261,13 @@ service cloud.firestore {
           && request.resource.data.get('needsFinishRegistration', false) == false
           && request.resource.data.get('inviteAccepted', false)          == true
           && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['role', 'status', 'email', 'uid', 'createdAt',
+              .hasAny(['role', 'status', 'email', 'uid', 'createdAt', 'companyBadge',
                        'strikes', 'suspendedAt', 'suspensionCount', 'strikeHistory']))
 
         // Normal self-edit: cannot change role, status, email, or strike/suspension fields
         || (request.auth.uid == uid
           && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['role', 'status', 'email',
+              .hasAny(['role', 'status', 'email', 'companyBadge',
                        'strikes', 'suspendedAt', 'suspensionCount', 'strikeHistory',
                        'inviteAccepted']))
 
@@ -236,7 +281,7 @@ service cloud.firestore {
           && request.resource.data.get('inviteAccepted', true) == resource.data.get('inviteAccepted', true)
           && request.resource.data.strikes == 0
           && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['role', 'email', 'uid', 'createdAt',
+              .hasAny(['role', 'email', 'uid', 'createdAt', 'companyBadge',
                        'strikeHistory', 'suspensionCount', 'suspendedAt', 'inviteAccepted']))
 
         // Strike decay: user can self-reduce strike count once 30+ days have passed
@@ -250,7 +295,7 @@ service cloud.firestore {
           && request.resource.data.strikes >= 0
           && request.resource.data.get('inviteAccepted', true) == resource.data.get('inviteAccepted', true)
           && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['role', 'status', 'email', 'uid', 'createdAt',
+              .hasAny(['role', 'status', 'email', 'uid', 'createdAt', 'companyBadge',
                        'strikeHistory', 'suspensionCount', 'suspendedAt', 'inviteAccepted']))
 
         // Admin can update any field
@@ -340,6 +385,16 @@ service cloud.firestore {
                     && resource.data.delivered == false
                     && request.resource.data.diff(resource.data).affectedKeys()
                         .hasOnly(['delivered']);
+    }
+
+    // ── /invites/{email} ──────────────────────────────────────────────────────
+    // Admin-planted markers that authorize the provisioning fallback above.
+    // exists() checks in rules don't require client read access.
+
+    match /invites/{email} {
+      allow create, delete: if isAdmin();
+      allow read:           if isAdmin();
+      allow update:         if false;
     }
 
     // ── /appConfig/{configId} ─────────────────────────────────────────────────

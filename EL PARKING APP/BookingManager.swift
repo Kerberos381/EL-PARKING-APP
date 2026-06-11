@@ -58,6 +58,7 @@ class BookingManager: ObservableObject {
     @Published var currentUserName:  String = ""
     @Published var currentUserUID:   String = ""
     @Published var currentUserRole:  UserRole = .user
+    @Published var currentUserCompany: CompanyBadge = .none
     @Published var registrationPlate: String = ""
     @Published var carDescription:    String = ""
     @Published var carColor:           String = ""
@@ -95,8 +96,10 @@ class BookingManager: ObservableObject {
         color:    String = "",
         carType:  String = "",
         vehicleMiniaturePresetID: String = "",
-        preferredVocative: String = ""
+        preferredVocative: String = "",
+        companyBadge: CompanyBadge = .none
     ) {
+        currentUserCompany = companyBadge
         currentUserEmail  = email
         currentUserName   = name.isEmpty ? email : name
         currentUserUID    = uid
@@ -582,6 +585,12 @@ class BookingManager: ObservableObject {
         guard daysDiff >= 0 else { throw BookingError.invalidDateRange }
         guard timeFrom < timeTo else { throw BookingError.invalidDuration }
         guard !AppConfig.blockedSpotIDs.contains(spotID) else { throw BookingError.spotBlocked }
+        guard AppConfig.companyMayBook(spotID: spotID,
+                                       company: currentUserCompany,
+                                       isAdmin: isAdmin,
+                                       bookingDate: startDate) else {
+            throw BookingError.spotReservedForCompany
+        }
 
         // All bookings in a multi-day range share a groupID so the share card can display the full range
         let rangeGroupID: UUID? = daysDiff > 0 ? UUID() : nil
@@ -1137,10 +1146,15 @@ class BookingManager: ObservableObject {
     }
 
     func availableSpotsCount(on date: Date) -> Int {
-        let total   = parkingSpots.count
-        let booked  = Set(getBookingsForDate(date).map { normalizedSpotKey($0.spot) }).count
-        let blocked = AppConfig.blockedSpotIDs.count
-        return max(0, total - booked - blocked)
+        let visible = parkingSpots.filter {
+            !AppConfig.blockedSpotIDs.contains($0.id)
+                && AppConfig.spotVisible(spotID: $0.id,
+                                         company: currentUserCompany,
+                                         isAdmin: isAdmin,
+                                         bookingDate: date)
+        }
+        let bookedKeys = Set(getBookingsForDate(date).map { normalizedSpotKey($0.spot) })
+        return visible.filter { !bookedKeys.contains(normalizedSpotKey($0.label)) }.count
     }
 
     // MARK: - Post-Change Helpers
@@ -1602,6 +1616,7 @@ enum BookingError: LocalizedError {
     case unauthorized
     case maxPerDayReached
     case maxDelegatedPerDayReached
+    case spotReservedForCompany
 
     var errorDescription: String? {
         switch self {
@@ -1617,6 +1632,8 @@ enum BookingError: LocalizedError {
             return "You can only book 1 spot per day. Contact \(AppConfig.adminContactEmail) for additional spots."
         case .maxDelegatedPerDayReached:
             return L10n.maxDelegatedPerDayError
+        case .spotReservedForCompany:
+            return L10n.spotReservedForCompanyError
         }
     }
 }

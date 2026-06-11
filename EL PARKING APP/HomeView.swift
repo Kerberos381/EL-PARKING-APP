@@ -16,11 +16,6 @@ struct HomeView: View {
         case infoHub
     }
 
-    private enum HomeFeedTab: String, CaseIterable {
-        case pinned = "Pinned"
-        case updates = "Updates"
-    }
-
     private enum HomeFeedFilter: String, CaseIterable {
         case all = "All"
         case unread = "Unread"
@@ -29,6 +24,7 @@ struct HomeView: View {
     }
 
     @EnvironmentObject var bookingManager:       BookingManager
+    @EnvironmentObject var authManager:          AuthManager
     @EnvironmentObject var announcementsManager: AnnouncementsManager
     @EnvironmentObject var deepLinkManager:      DeepLinkManager
     @EnvironmentObject var infoManager:          InfoManager
@@ -47,13 +43,13 @@ struct HomeView: View {
     @State private var expandedAnnouncementIDs: Set<String> = []
     @State private var selectedAnnouncement: Announcement?
     @State private var selectedInfoItem: InfoItem?
-    @State private var selectedHomeFeedTab: HomeFeedTab = .pinned
     @State private var selectedHomeFeedFilter: HomeFeedFilter = .all
-    @State private var showWidgetGuideSheet = false
     @State private var lastAnnouncementsRefreshAt = Date()
-    @State private var widgetTeaserDragOffset: CGFloat = 0
     @AppStorage("readAnnouncementIDs") private var readAnnouncementIDsRaw = ""
-    @AppStorage("homeWidgetTeaserDismissed") private var homeWidgetTeaserDismissed = false
+    @AppStorage("homeStyle") private var homeStyleRaw: String = "roomy"
+    @AppStorage("favouriteSpotIDs") private var favouriteSpotIDsStr: String = ""
+    @State private var favoriteSpotForBooking: ParkingSpot?
+    @State private var tilesVisible = false
     private let screenMode: ScreenMode
 
     init(screenMode: ScreenMode = .home) {
@@ -90,7 +86,9 @@ struct HomeView: View {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 28) {
                             if screenMode == .home {
-                                // Greeting + theme toggle
+                                // News lives in the Info tab for everyone now;
+                                // home is bookings + vehicle only.
+                                // The big greeting is a design staple — same in both layouts.
                                 HStack(alignment: .top) {
                                     Text(L10n.helloGreeting(
                                         bookingManager.currentFirstName,
@@ -109,35 +107,26 @@ struct HomeView: View {
                                 }
                                 .padding(.horizontal)
 
-                                // Hero Booking Card
                                 heroSection
                                     .id("home_hero")
                                     .offset(y: heroVisible ? 0 : 28)
                                     .opacity(heroVisible ? 1 : 0)
 
-                                // Compact quick actions + availability bar
-                                VStack(spacing: 8) {
+                                if homeStyleRaw == "compact" {
+                                    compactTileRow
+                                } else {
                                     HStack(spacing: 10) {
                                         myBookingsQuickButton
                                             .id("home_my_bookings")
-                                        if !(AppConfig.enableHomePremiumEmptyStates && !hasUpcomingOrActiveBooking) {
+                                        if hasUpcomingOrActiveBooking {
                                             bookSpotQuickButton
                                                 .id("home_book")
                                         }
                                     }
                                     .padding(.horizontal)
-
-                                    garageStatusBar
-                                        .id("home_garage")
                                 }
 
-                                // Widget teaser handoff
-                                if AppConfig.enableHomeWidgetTeaserCard && !homeWidgetTeaserDismissed {
-                                    widgetTeaserCard
-                                        .id("home_widget_teaser")
-                                }
-
-                                homeNewsAndInfoHub
+                                vehicleCard
 
                                 // Footer logo
                                 footerLogo
@@ -147,6 +136,7 @@ struct HomeView: View {
                         }
                         .padding(.bottom, 100)
                     }
+                    .scrollEdgeEffectStyle(.soft, for: .top)
                     .refreshable {
                         await refreshData()
                     }
@@ -158,6 +148,7 @@ struct HomeView: View {
                     withAnimation(.motionSheet.delay(0.1)) {
                         heroVisible = true
                     }
+                    tilesVisible = true
                 }
                 if !didPrefetchLikelyNextScreens {
                     didPrefetchLikelyNextScreens = true
@@ -166,6 +157,13 @@ struct HomeView: View {
             }
             .navigationDestination(isPresented: $navigateToMyBookings) {
                 MyBookingsView()
+            }
+            .fullScreenCover(item: $favoriteSpotForBooking) { spot in
+                BookingSheet(
+                    preselectedSpot: spot,
+                    preselectedDate: bestQuickBookDate(for: spot),
+                    isForOthers: false
+                )
             }
             .fullScreenCover(isPresented: $showingBookingSheet) {
                 BookingSheet(
@@ -201,9 +199,6 @@ struct HomeView: View {
             }
             .sheet(item: AppConfig.enableHomeInfoDetailSheet ? $selectedInfoItem : .constant(nil)) { item in
                 infoDetailSheet(item)
-            }
-            .sheet(isPresented: $showWidgetGuideSheet) {
-                widgetGuideSheet
             }
             .task(id: deepLinkTaskID) {
                 processPendingDeepLink()
@@ -316,64 +311,75 @@ struct HomeView: View {
         if let booking = displayedBooking, !booking.isPast {
             heroCard(booking)
         } else {
-            if AppConfig.enableHomePremiumEmptyStates {
-                premiumHomeEmptyState
-            } else {
-                AppEmptyStateCard(
-                    icon: "car.side.fill",
-                    title: L10n.noBooking,
-                    subtitle: L10n.bookFromBelow,
-                    actionTitle: L10n.bookASpot,
-                    actionIcon: "plus"
-                ) {
-                    showingBookingSheet = true
-                }
-                .padding(.horizontal)
-            }
+            invitingEmptyHero
         }
     }
 
-    private var premiumHomeEmptyState: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "parkingsign.circle")
-                .font(.system(size: 52, weight: .semibold))
-                .foregroundStyle(AppConfig.accentFg.opacity(0.75))
-                .padding(.top, 6)
+    /// Empty-state hero: the user's own car waiting in a dashed parking bay,
+    /// inviting the first booking of the day.
+    private var invitingEmptyHero: some View {
+        VStack(spacing: 0) {
+            Group {
+                if let user = authManager.currentUser,
+                   !user.carDescription.isEmpty || !user.vehicleMiniaturePresetID.isEmpty {
+                    VehicleMiniatureView(
+                        carType: user.carType,
+                        colorHex: user.carColor,
+                        description: user.carDescription,
+                        presetID: user.vehicleMiniaturePresetID.isEmpty
+                            ? nil : user.vehicleMiniaturePresetID
+                    )
+                    .frame(width: 180, height: 100)
+                } else {
+                    Image(systemName: "car.side.fill")
+                        .font(.system(size: 44))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .frame(width: 180, height: 100)
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
+                    .foregroundStyle(.white.opacity(0.18))
+            )
+            .padding(.top, 26)
+            .accessibilityHidden(true)
 
-            Text("No booking yet")
-                .font(.title3.weight(.bold))
-                .foregroundStyle(AppConfig.darkText)
-
-            Text("Reserve your first parking spot for today in one tap.")
-                .font(.subheadline)
-                .foregroundStyle(AppConfig.subtleGray)
+            Text(L10n.emptyHeroTitle)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 12)
+                .padding(.top, 18)
+                .padding(.horizontal, 20)
+
+            Text(L10n.spotsAvailable(freeSpotsToday))
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.55))
+                .padding(.top, 4)
 
             Button {
                 Haptics.selection()
                 showingBookingSheet = true
             } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "car")
-                    Text(L10n.bookASpot)
-                }
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(AppConfig.onAccent)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 13)
-                .background(AppConfig.accent)
-                .clipShape(Capsule())
+                Text(L10n.bookASpot)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(AppConfig.onAccent)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(AppConfig.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(ScaleButtonStyle())
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+            .padding(.bottom, 20)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 22)
-        .padding(.horizontal, 14)
-        .background(AppConfig.cardBg)
+        .background(AppConfig.obsidian)
         .clipShape(RoundedRectangle(cornerRadius: 24))
-        .shadow(color: .black.opacity(0.06), radius: 16, y: 4)
+        .cardShadow()
         .padding(.horizontal)
     }
 
@@ -394,7 +400,6 @@ struct HomeView: View {
 
                 Text(isActive ? L10n.activeNow : L10n.upcoming)
                     .font(.caption.bold())
-                    .tracking(2)
                     .foregroundStyle(AppConfig.accentFg)
 
                 Spacer()
@@ -411,9 +416,14 @@ struct HomeView: View {
             HStack(alignment: .center, spacing: 20) {
                 Text(booking.spotNumber)
                     .font(.system(size: 72, weight: .black, design: .rounded).monospacedDigit())
-                    .foregroundStyle(AppConfig.accentFg)
+                    // Calm: soft translucent white reads better on the forest card.
+                    .foregroundStyle(AppConfig.isCalmPalette
+                        ? AnyShapeStyle(Color.white.opacity(0.88))
+                        : AnyShapeStyle(AppConfig.accentFg))
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
+                    .contentTransition(.numericText())
+                    .animation(.motionStandard, value: booking.spotNumber)
 
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 8) {
@@ -454,7 +464,8 @@ struct HomeView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 18)
 
-            // Glass pill action buttons
+            // Glass pill action buttons — real Liquid Glass over the obsidian card
+            GlassEffectContainer {
             HStack(spacing: 12) {
                 if let url = URL(string: AppConfig.googleMapsURL) {
                     Link(destination: url) {
@@ -466,8 +477,7 @@ struct HomeView: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 44)
-                        .background(.white.opacity(0.12))
-                        .clipShape(Capsule())
+                        .glassEffect(.frosted.interactive(), in: Capsule())
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
@@ -484,8 +494,7 @@ struct HomeView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
-                    .background(.white.opacity(0.12))
-                    .clipShape(Capsule())
+                    .glassEffect(.frosted.interactive(), in: Capsule())
                 }
                 .buttonStyle(PlainButtonStyle())
 
@@ -502,8 +511,7 @@ struct HomeView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
-                    .background(AppConfig.spotOccupied.opacity(0.30))
-                    .clipShape(Capsule())
+                    .glassEffect(.regular.tint(AppConfig.spotOccupied.opacity(0.35)).interactive(), in: Capsule())
                 }
                 .buttonStyle(PlainButtonStyle())
                 .confirmationDialog(L10n.cancelBooking, isPresented: $showCancelAlert, titleVisibility: .visible) {
@@ -517,49 +525,234 @@ struct HomeView: View {
                     }
                 }
             }
+            }
             .padding(.horizontal, 20)
             .padding(.bottom, 18)
         }
         .background(AppConfig.obsidian)
         .clipShape(RoundedRectangle(cornerRadius: 24))
-        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+        .cardShadow()
+        .squishyCard()
         .padding(.horizontal)
     }
 
-    // MARK: - Garage Status Bar
-
-    private var garageStatusBar: some View {
+    private var freeSpotsToday: Int {
         let today = Calendar.current.startOfDay(for: Date())
-        let total = max(1, bookingManager.parkingSpots.count - AppConfig.blockedSpotIDs.count)
-        let free  = bookingManager.availableSpotsCount(on: today)
-        let ratio = min(1.0, max(0.0, Double(free) / Double(total)))
-        let barColor: Color = ratio > 0.5 ? AppConfig.activeGreen : (ratio > 0.2 ? .orange : AppConfig.spotOccupied)
+        return bookingManager.availableSpotsCount(on: today)
+    }
 
-        return VStack(spacing: 6) {
-            HStack(alignment: .center) {
-                Text("Spots available today")
-                    .font(.caption2)
-                    .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
-                Spacer()
-                Text("\(free)/\(total)")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(barColor)
-                    .contentTransition(.numericText())
-                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: free)
+
+    // MARK: - Compact Home (pill style)
+
+    private var firstFavoriteSpot: ParkingSpot? {
+        let ids = favouriteSpotIDsStr.split(separator: ",").map(String.init).filter { !$0.isEmpty }
+        guard let first = ids.first else { return nil }
+        return bookingManager.parkingSpots.first { $0.id == first }
+    }
+
+    /// Most recently booked spot by the current user (favorite fallback).
+    private var lastBookedSpot: ParkingSpot? {
+        let mine = bookingManager.bookings
+            .filter { $0.email == bookingManager.currentUserEmail }
+            .sorted { $0.date > $1.date }
+        guard let last = mine.first else { return nil }
+        return bookingManager.parkingSpots.first {
+            bookingManager.normalizedSpotKey($0.label) == bookingManager.normalizedSpotKey(last.spot)
+        }
+    }
+
+    private var quickSpotTarget: (spot: ParkingSpot, isFavorite: Bool)? {
+        if let fav = firstFavoriteSpot { return (fav, true) }
+        if let last = lastBookedSpot { return (last, false) }
+        return nil
+    }
+
+    /// Prefer the first sensible date where the quick-booked spot is free:
+    /// the sheet's default date, else the following day. Falls back to the
+    /// default (the banner then shows the unavailable state inline).
+    private func bestQuickBookDate(for spot: ParkingSpot) -> Date {
+        let base = Date.smartDefaultDate()
+        let candidates = [base, Calendar.current.date(byAdding: .day, value: 1, to: base) ?? base]
+        for date in candidates {
+            if bookingManager.isSpotAvailable(spotLabel: spot.label, on: date) {
+                return date
             }
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(AppConfig.subtleGray.opacity(0.10))
-                    Capsule()
-                        .fill(barColor)
-                        .frame(width: max(6, geo.size.width * ratio))
-                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: ratio)
+        }
+        return base
+    }
+
+    private func isSpotFreeToday(_ spot: ParkingSpot) -> Bool {
+        let todays = bookingManager.getBookingsForDate(Date())
+        let key = bookingManager.normalizedSpotKey(spot.label)
+        return !todays.contains { bookingManager.normalizedSpotKey($0.spot) == key }
+    }
+
+    private var compactTileRow: some View {
+        HStack(spacing: 10) {
+            // Big accent tile — Book a Spot (n free)
+            Button {
+                Haptics.selection()
+                showingBookingSheet = true
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L10n.bookASpot)
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(AppConfig.onAccent)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    Text(L10n.freeCount(freeSpotsToday))
+                        .font(.subheadline)
+                        .foregroundStyle(AppConfig.onAccent.opacity(0.85))
+                        .contentTransition(.numericText())
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        circleArrow(on: .white, tint: AppConfig.obsidian)
+                    }
                 }
+                .padding(14)
+                .frame(maxWidth: .infinity, minHeight: 132, alignment: .leading)
+                .background(AppConfig.accent)
+                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
             }
-            .frame(height: 6)
+            .buttonStyle(BouncyTileStyle())
+            .modifier(cascadeIn(0))
+
+            VStack(spacing: 10) {
+                smallTile(title: L10n.myBookings) {
+                    navigateToMyBookings = true
+                }
+                .modifier(cascadeIn(1))
+                smallTile(
+                    title: quickSpotTarget.map {
+                        "\($0.isFavorite ? L10n.favoriteShort : L10n.lastShort) \($0.spot.id)"
+                    } ?? L10n.favoriteShort
+                ) {
+                    if let target = quickSpotTarget {
+                        if !isSpotFreeToday(target.spot) {
+                            ToastManager.shared.show(
+                                L10n.spotTakenToday(target.spot.id), style: .warning
+                            )
+                        }
+                        favoriteSpotForBooking = target.spot
+                    } else {
+                        showingBookingSheet = true
+                    }
+                }
+                .modifier(cascadeIn(2))
+            }
         }
         .padding(.horizontal)
+    }
+
+    private func smallTile(title: String, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.selection()
+            action()
+        } label: {
+            HStack {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppConfig.darkText)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppConfig.subtleGray)
+            }
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 61, alignment: .leading)
+            .background(AppConfig.cardBg)
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        }
+        .buttonStyle(BouncyTileStyle())
+    }
+
+    /// Staggered entrance for home tiles — rise + fade with a small spring.
+    private func cascadeIn(_ index: Int) -> some ViewModifier {
+        CascadeIn(visible: tilesVisible, index: index)
+    }
+
+    private func circleArrow(on background: Color, tint: Color) -> some View {
+        Image(systemName: "arrow.up.right")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(tint)
+            .frame(width: 30, height: 30)
+            .background(background)
+            .clipShape(Circle())
+    }
+
+    // MARK: - Your Vehicle card
+
+    private var hasVehicleOnFile: Bool {
+        guard let user = authManager.currentUser else { return false }
+        return !user.carDescription.isEmpty || !user.vehicleMiniaturePresetID.isEmpty
+    }
+
+    private var vehicleCard: some View {
+        Button {
+            Haptics.selection()
+            NotificationCenter.default.post(name: .navigateToSettingsTab, object: nil)
+        } label: {
+            HStack(spacing: 14) {
+                Group {
+                    if hasVehicleOnFile, let user = authManager.currentUser {
+                        VehicleMiniatureView(
+                            carType: user.carType,
+                            colorHex: user.carColor,
+                            description: user.carDescription,
+                            presetID: user.vehicleMiniaturePresetID.isEmpty
+                                ? nil : user.vehicleMiniaturePresetID,
+                            useFastRendering: true
+                        )
+                    } else {
+                        Image(systemName: "car.side.fill")
+                            .font(.title)
+                            .foregroundStyle(.white.opacity(0.55))
+                    }
+                }
+                .frame(width: 184, height: 110)
+                // Parallax: the car drifts gently against scroll for depth.
+                .visualEffect { content, proxy in
+                    let y = proxy.frame(in: .scrollView).minY
+                    return content.offset(y: max(-8, min(8, -y * 0.05)))
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(hasVehicleOnFile ? L10n.yourVehicle : L10n.addYourVehicle)
+                        .font(.footnote)
+                        .foregroundStyle(.white.opacity(0.55))
+                    if hasVehicleOnFile, let user = authManager.currentUser {
+                        Text(user.carDescription.isEmpty ? user.carType : user.carDescription)
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.8)
+                        if !user.registrationPlate.isEmpty {
+                            Text(user.registrationPlate)
+                                .font(.system(.caption, design: .monospaced, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.6))
+                        }
+                    }
+                }
+
+                Spacer()
+
+                circleArrow(on: .white.opacity(0.18), tint: .white)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 28)
+            .frame(maxWidth: .infinity)
+            .background(AppConfig.obsidian)
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .cardShadow()
+        }
+        .buttonStyle(.plain)
+        .squishyCard()
+        .modifier(cascadeIn(3))
+        .padding(.horizontal)
+        .accessibilityLabel(L10n.yourVehicle)
     }
 
     // MARK: - Home Quick Actions
@@ -571,7 +764,7 @@ struct HomeView: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "calendar.badge.clock")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AppConfig.accentFg)
                 Text(L10n.myBookings)
                     .font(.subheadline.weight(.semibold))
@@ -598,11 +791,12 @@ struct HomeView: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "car")
-                    .font(.system(size: 14, weight: .semibold))
-                Text(L10n.bookASpot)
+                    .font(.subheadline.weight(.semibold))
+                Text(L10n.bookWithCount(freeSpotsToday))
                     .font(.subheadline.weight(.bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.9)
+                    .contentTransition(.numericText())
             }
             .foregroundStyle(AppConfig.onAccent)
             .frame(maxWidth: .infinity)
@@ -636,138 +830,46 @@ struct HomeView: View {
         announcementsManager.activeAnnouncements.sorted { $0.createdAt > $1.createdAt }
     }
 
-    private var filteredPinnedAnnouncements: [Announcement] {
-        let base = pinnedAnnouncements
-        switch selectedHomeFeedFilter {
-        case .all, .announcements:
-            return base
-        case .unread:
-            return base.filter { !isAnnouncementRead($0) }
-        case .info:
-            return []
-        }
-    }
 
-    private var filteredUpdatesAnnouncements: [Announcement] {
-        let base = nonPinnedAnnouncements
-        switch selectedHomeFeedFilter {
-        case .all, .announcements:
-            return base
-        case .unread:
-            return base.filter { !isAnnouncementRead($0) }
-        case .info:
-            return []
-        }
-    }
 
-    private var filteredUpdatesInfoItems: [InfoItem] {
-        let base = sortedInfoItems
-        switch selectedHomeFeedFilter {
-        case .all, .info:
-            return base
-        case .unread, .announcements:
-            return []
-        }
-    }
 
     private var homeNewsAndInfoHub: some View {
         if !bookingManager.isAdmin {
             return AnyView(nonAdminPinnedHomeSection)
         }
 
-        let hasPinned = !pinnedAnnouncements.isEmpty
-        let hasUpdates = !nonPinnedAnnouncements.isEmpty || !infoManager.items.isEmpty
+        let hasAnything = !pinnedAnnouncements.isEmpty
+            || !nonPinnedAnnouncements.isEmpty
+            || !sortedInfoItems.isEmpty
 
+        // Single merged feed: pinned first, then updates, then info cards.
         return AnyView(VStack(spacing: 14) {
-            HStack(spacing: 0) {
-                ForEach(HomeFeedTab.allCases, id: \.self) { tab in
-                    Button {
-                        Haptics.selection()
-                        withAnimation(.quick) { selectedHomeFeedTab = tab }
-                    } label: {
-                        Text(tab.rawValue)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(selectedHomeFeedTab == tab ? AppConfig.darkText : AppConfig.subtleGray)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(selectedHomeFeedTab == tab ? AppConfig.cardBg : Color.clear)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled((tab == .pinned && !hasPinned) || (tab == .updates && !hasUpdates))
-                    .opacity((tab == .pinned && !hasPinned) || (tab == .updates && !hasUpdates) ? 0.45 : 1)
-                }
+            if !pinnedAnnouncements.isEmpty {
+                announcementsGroupedView(items: pinnedAnnouncements)
+                    .id("home_announcements_pinned")
             }
-            .padding(4)
-            .background(AppConfig.surfaceLow)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .padding(.horizontal)
 
-            if selectedHomeFeedTab == .pinned {
-                if !filteredPinnedAnnouncements.isEmpty {
-                    announcementsGroupedView(items: filteredPinnedAnnouncements)
-                        .id("home_announcements_pinned")
-                } else {
-                    AppEmptyStateCard(
-                        icon: "pin",
-                        title: "Pinned Updates",
-                        subtitle: "No pinned news right now"
-                    )
-                    .padding(.horizontal)
-                }
-            } else {
-                if !filteredUpdatesAnnouncements.isEmpty {
-                    announcementsGroupedView(items: filteredUpdatesAnnouncements)
-                        .id("home_announcements_updates")
-                }
+            if !nonPinnedAnnouncements.isEmpty {
+                announcementsGroupedView(items: nonPinnedAnnouncements)
+                    .id("home_announcements_updates")
+            }
 
-                if !filteredUpdatesInfoItems.isEmpty {
-                    infoSectionAppleStyle(items: filteredUpdatesInfoItems)
-                        .id("home_info_updates")
-                }
+            if !sortedInfoItems.isEmpty {
+                infoSectionAppleStyle(items: sortedInfoItems)
+                    .id("home_info_updates")
+            }
 
-                if filteredUpdatesAnnouncements.isEmpty && filteredUpdatesInfoItems.isEmpty {
-                    announcementsEmptyState
-                }
+            if !hasAnything {
+                announcementsEmptyState
             }
-        }
-        .onAppear {
-            selectedHomeFeedFilter = .all
-            if selectedHomeFeedTab == .pinned && !hasPinned && hasUpdates {
-                selectedHomeFeedTab = .updates
-            } else if selectedHomeFeedTab == .updates && !hasUpdates && hasPinned {
-                selectedHomeFeedTab = .pinned
-            }
-        }
-        .onChange(of: announcementsManager.activeAnnouncements.count) { _, _ in
-            selectedHomeFeedFilter = .all
-            if selectedHomeFeedTab == .pinned && !hasPinned && hasUpdates {
-                selectedHomeFeedTab = .updates
-            } else if selectedHomeFeedTab == .updates && !hasUpdates && hasPinned {
-                selectedHomeFeedTab = .pinned
-            }
-        }
-        .onChange(of: infoManager.items.count) { _, _ in
-            selectedHomeFeedFilter = .all
-            if selectedHomeFeedTab == .pinned && !hasPinned && hasUpdates {
-                selectedHomeFeedTab = .updates
-            } else if selectedHomeFeedTab == .updates && !hasUpdates && hasPinned {
-                selectedHomeFeedTab = .pinned
-            }
-        }
-        .onChange(of: selectedHomeFeedTab) { _, _ in
-            selectedHomeFeedFilter = .all
-        }
-        )
+        })
     }
 
     private var nonAdminPinnedHomeSection: some View {
         VStack(spacing: 12) {
             HStack(spacing: 7) {
                 Image(systemName: "pin.fill")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AppConfig.subtleGray)
                 Text("Pinned")
                     .font(.subheadline.weight(.semibold))
@@ -802,11 +904,7 @@ struct HomeView: View {
             }
             .padding(.horizontal)
 
-            if bookingManager.isAdmin {
-                homeNewsAndInfoHub
-            } else {
-                nonAdminInfoHubFeed
-            }
+            nonAdminInfoHubFeed
         }
     }
 
@@ -898,7 +996,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 7) {
                     Image(systemName: "bell.badge")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AppConfig.subtleGray)
                     Text(L10n.announcements)
                         .font(.subheadline.weight(.semibold))
@@ -922,8 +1020,7 @@ struct HomeView: View {
                     }
                 }
                 .background(AppConfig.cardBg)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-                .overlay(RoundedRectangle(cornerRadius: 18).stroke(AppConfig.separatorSoft, lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
             }
             .padding(.horizontal)
         }
@@ -1006,7 +1103,7 @@ struct HomeView: View {
                 // Section header
                 HStack(spacing: 7) {
                     Image(systemName: "bell.badge")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AppConfig.subtleGray)
                     Text(L10n.announcements)
                         .font(.subheadline.weight(.semibold))
@@ -1045,8 +1142,7 @@ struct HomeView: View {
                         }
                     }
                     .background(AppConfig.cardBg)
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
-                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(AppConfig.separatorSoft, lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
             }
             .padding(.horizontal)
@@ -1139,7 +1235,7 @@ struct HomeView: View {
             RoundedRectangle(cornerRadius: 22)
                 .stroke(item.isPinned ? AppConfig.separatorStrong : AppConfig.separatorSoft, lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.05), radius: 12, y: 3)
+        .cardShadow()
         .opacity(isRead ? 0.72 : 1.0)
         .animation(.standard, value: isRead)
     }
@@ -1269,6 +1365,7 @@ struct HomeView: View {
                 ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
                     let isFirst = idx == 0
                     todayCard(item, isHero: isFirst)
+                        .feedCardScrollTransition()
                         .contentShape(Rectangle())
                         .onTapGesture {
                             markAnnouncementRead(item)
@@ -1394,7 +1491,7 @@ struct HomeView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .shadow(color: .black.opacity(0.15), radius: 16, y: 6)
+                .cardShadow()
                 .padding(.horizontal)
 
             } else {
@@ -1438,7 +1535,7 @@ struct HomeView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         if isNew && !isRead {
                             Text("NEW")
-                                .font(.system(size: 9, weight: .heavy))
+                                .font(.caption2.weight(.heavy))
                                 .tracking(1)
                                 .foregroundStyle(AppConfig.accentFg)
                         }
@@ -1470,12 +1567,8 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity)
                 .padding(14)
                 .background(AppConfig.cardBg)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(AppConfig.separatorSoft, lineWidth: 0.5)
-                )
-                .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .cardShadow()
                 .padding(.horizontal)
             }
         }
@@ -1495,21 +1588,29 @@ struct HomeView: View {
             let base = Color(hex: hex)
             return LinearGradient(colors: [base, base.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing)
         }
+        let calm = AppConfig.isCalmPalette
         let colors: [Color] = switch item.emoji {
         case "🔧", "⚙️", "🛠️":
-            [Color(red: 0.2, green: 0.2, blue: 0.3), Color(red: 0.35, green: 0.35, blue: 0.5)]
+            calm ? [Color(red: 0.24, green: 0.24, blue: 0.22), Color(red: 0.36, green: 0.35, blue: 0.32)]
+                 : [Color(red: 0.2, green: 0.2, blue: 0.3), Color(red: 0.35, green: 0.35, blue: 0.5)]
         case "⚠️", "🚨", "❗":
-            [Color(red: 0.85, green: 0.3, blue: 0.2), Color(red: 0.95, green: 0.5, blue: 0.3)]
+            calm ? [Color(red: 0.62, green: 0.36, blue: 0.26), Color(red: 0.75, green: 0.47, blue: 0.34)]
+                 : [Color(red: 0.85, green: 0.3, blue: 0.2), Color(red: 0.95, green: 0.5, blue: 0.3)]
         case "🎉", "🥳", "✨", "🎊":
-            [Color(red: 0.55, green: 0.2, blue: 0.8), Color(red: 0.75, green: 0.35, blue: 0.95)]
+            calm ? [Color(red: 0.42, green: 0.33, blue: 0.45), Color(red: 0.55, green: 0.44, blue: 0.58)]
+                 : [Color(red: 0.55, green: 0.2, blue: 0.8), Color(red: 0.75, green: 0.35, blue: 0.95)]
         case "📋", "📌", "📝":
-            [Color(red: 0.15, green: 0.4, blue: 0.7), Color(red: 0.25, green: 0.55, blue: 0.85)]
+            calm ? [Color(red: 0.29, green: 0.37, blue: 0.43), Color(red: 0.40, green: 0.50, blue: 0.58)]
+                 : [Color(red: 0.15, green: 0.4, blue: 0.7), Color(red: 0.25, green: 0.55, blue: 0.85)]
         case "🅿️", "🚗", "🚙":
-            [Color(red: 0.1, green: 0.5, blue: 0.4), Color(red: 0.2, green: 0.65, blue: 0.55)]
+            calm ? [Color(red: 0.22, green: 0.33, blue: 0.28), Color(red: 0.32, green: 0.45, blue: 0.39)]
+                 : [Color(red: 0.1, green: 0.5, blue: 0.4), Color(red: 0.2, green: 0.65, blue: 0.55)]
         case "💡", "🔔":
-            [Color(red: 0.9, green: 0.65, blue: 0.1), Color(red: 0.95, green: 0.75, blue: 0.3)]
+            calm ? [Color(red: 0.66, green: 0.52, blue: 0.29), Color(red: 0.76, green: 0.62, blue: 0.39)]
+                 : [Color(red: 0.9, green: 0.65, blue: 0.1), Color(red: 0.95, green: 0.75, blue: 0.3)]
         default:
-            [Color(red: 0.15, green: 0.15, blue: 0.25), Color(red: 0.3, green: 0.3, blue: 0.45)]
+            calm ? [Color(red: 0.22, green: 0.23, blue: 0.21), Color(red: 0.33, green: 0.34, blue: 0.31)]
+                 : [Color(red: 0.15, green: 0.15, blue: 0.25), Color(red: 0.3, green: 0.3, blue: 0.45)]
         }
         return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
     }
@@ -1552,91 +1653,6 @@ struct HomeView: View {
         let b = Double(value & 0xFF) / 255.0
         let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
         return luminance > 0.60
-    }
-
-    private var widgetTeaserCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                HStack(spacing: 8) {
-                    Image(systemName: "rectangle.3.group")
-                        .foregroundStyle(AppConfig.accentFg)
-                    Text("Add Widget")
-                        .font(.headline)
-                        .foregroundStyle(AppConfig.darkText)
-                }
-                Spacer()
-            }
-
-            Text("Pin EL Parking on Home or Lock Screen for quick spot and time glance.")
-                .font(.subheadline)
-                .foregroundStyle(AppConfig.subtleGray)
-
-            Button {
-                Haptics.selection()
-                showWidgetGuideSheet = true
-            } label: {
-                Text("How to add")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppConfig.darkText)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(AppConfig.surfaceLow)
-                    .clipShape(Capsule())
-            }
-            .buttonStyle(ScaleButtonStyle())
-
-            Text("Swipe left or right to dismiss")
-                .font(.caption2)
-                .foregroundStyle(AppConfig.subtleGray.opacity(0.8))
-        }
-        .padding(16)
-        .background(AppConfig.cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .shadow(color: .black.opacity(0.025), radius: 6, y: 2)
-        .offset(x: widgetTeaserDragOffset)
-        .opacity(max(0.2, 1 - abs(widgetTeaserDragOffset) / 260))
-        .gesture(
-            DragGesture(minimumDistance: 8)
-                .onChanged { value in
-                    widgetTeaserDragOffset = value.translation.width
-                }
-                .onEnded { value in
-                    let shouldDismiss = abs(value.translation.width) > 90 || abs(value.predictedEndTranslation.width) > 140
-                    if shouldDismiss {
-                        Haptics.selection()
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            widgetTeaserDragOffset = value.translation.width > 0 ? 420 : -420
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                            homeWidgetTeaserDismissed = true
-                            widgetTeaserDragOffset = 0
-                        }
-                    } else {
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
-                            widgetTeaserDragOffset = 0
-                        }
-                    }
-                }
-        )
-        .padding(.horizontal)
-    }
-
-    private var widgetGuideSheet: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Add EL Parking Widget")
-                    .font(.title3.bold())
-                Text("1. Press and hold Home Screen or Lock Screen.\n2. Tap + in the top corner.\n3. Search for EL Parking.\n4. Pick your preferred size and add.")
-                    .font(.body)
-                    .foregroundStyle(AppConfig.subtleGray)
-                Spacer()
-            }
-            .padding()
-            .navigationTitle("Widget Guide")
-            .navigationBarTitleDisplayMode(.inline)
-        }
-        .presentationDetents([.medium])
-        .presentationDragIndicator(.visible)
     }
 
     private func announcementDetailSheet(_ item: Announcement) -> some View {
@@ -1796,7 +1812,6 @@ struct HomeView: View {
                                 }
                                 .background(AppConfig.cardBg)
                                 .clipShape(RoundedRectangle(cornerRadius: 16))
-                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppConfig.separatorSoft, lineWidth: 1))
                             }
 
                             Spacer(minLength: 24)
@@ -1812,7 +1827,7 @@ struct HomeView: View {
                     selectedAnnouncement = nil
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .heavy))
+                        .font(.body.weight(.heavy))
                         .foregroundStyle(Color(white: 0.6))
                         .frame(width: 42, height: 42)
                         .background(Color(white: 0.19))
@@ -1843,6 +1858,7 @@ struct HomeView: View {
 
             ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
                 infoTodayStyleCard(item, isHero: idx == 0)
+                    .feedCardScrollTransition()
             }
         }
     }
@@ -1930,11 +1946,7 @@ struct HomeView: View {
                     )
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .stroke(AppConfig.separatorSoft.opacity(0.45), lineWidth: 0.8)
-                )
-                .shadow(color: .black.opacity(0.12), radius: 14, y: 5)
+                .cardShadow()
                 .padding(.horizontal)
             } else {
                 HStack(spacing: 14) {
@@ -2001,12 +2013,8 @@ struct HomeView: View {
                 }
                 .padding(14)
                 .background(AppConfig.cardBg)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(AppConfig.separatorSoft, lineWidth: 0.5)
-                )
-                .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .cardShadow()
                 .padding(.horizontal)
             }
         }
@@ -2019,7 +2027,15 @@ struct HomeView: View {
     }
 
     private func infoCardGradient(for item: InfoItem) -> LinearGradient {
-        let palette: [[Color]] = [
+        let palette: [[Color]] = AppConfig.isCalmPalette
+        ? [
+            [Color(red: 0.27, green: 0.34, blue: 0.41), Color(red: 0.37, green: 0.46, blue: 0.54)],
+            [Color(red: 0.24, green: 0.36, blue: 0.31), Color(red: 0.33, green: 0.47, blue: 0.41)],
+            [Color(red: 0.40, green: 0.33, blue: 0.43), Color(red: 0.51, green: 0.43, blue: 0.54)],
+            [Color(red: 0.55, green: 0.37, blue: 0.28), Color(red: 0.67, green: 0.47, blue: 0.37)],
+            [Color(red: 0.25, green: 0.25, blue: 0.23), Color(red: 0.36, green: 0.36, blue: 0.33)]
+        ]
+        : [
             [Color(red: 0.18, green: 0.25, blue: 0.45), Color(red: 0.25, green: 0.42, blue: 0.68)],
             [Color(red: 0.17, green: 0.42, blue: 0.36), Color(red: 0.25, green: 0.62, blue: 0.5)],
             [Color(red: 0.48, green: 0.24, blue: 0.62), Color(red: 0.65, green: 0.35, blue: 0.82)],
@@ -2037,7 +2053,7 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 7) {
                 Image(systemName: "info.circle")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AppConfig.subtleGray)
                 Text(L10n.info)
                     .font(.subheadline.weight(.semibold))
@@ -2072,7 +2088,7 @@ struct HomeView: View {
                         .fill(AppConfig.accent.opacity(0.10))
                         .frame(width: 40, height: 40)
                     Image(systemName: item.icon)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(AppConfig.accentFg)
                 }
                 Spacer()
@@ -2098,11 +2114,7 @@ struct HomeView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(AppConfig.cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(AppConfig.separatorSoft, lineWidth: 1)
-        )
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .contentShape(Rectangle())
         .onTapGesture {
             guard AppConfig.enableHomeInfoDetailSheet else { return }
@@ -2203,7 +2215,7 @@ struct HomeView: View {
                                         .fill(AppConfig.surfaceLow)
                                         .frame(width: 44, height: 44)
                                     Image(systemName: item.icon)
-                                        .font(.system(size: 18, weight: .semibold))
+                                        .font(.title3.weight(.semibold))
                                         .foregroundStyle(AppConfig.accentFg)
                                 }
 
@@ -2249,7 +2261,6 @@ struct HomeView: View {
                                 }
                                 .background(AppConfig.cardBg)
                                 .clipShape(RoundedRectangle(cornerRadius: 16))
-                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppConfig.separatorSoft, lineWidth: 1))
                             }
 
                             if !item.details.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -2278,7 +2289,7 @@ struct HomeView: View {
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 14)
                                     .background(AppConfig.accent)
-                                    .clipShape(Capsule())
+                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                                 }
                                 .buttonStyle(ScaleButtonStyle())
                             }
@@ -2296,7 +2307,7 @@ struct HomeView: View {
                     selectedInfoItem = nil
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .heavy))
+                        .font(.body.weight(.heavy))
                         .foregroundStyle(Color(white: 0.6))
                         .frame(width: 42, height: 42)
                         .background(Color(white: 0.19))
@@ -2329,7 +2340,7 @@ struct HomeView: View {
                     .fill(AppConfig.accent.opacity(0.10))
                     .frame(width: 36, height: 36)
                 Image(systemName: field.type.icon)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AppConfig.accentFg)
             }
 
@@ -2390,17 +2401,17 @@ struct HomeView: View {
     // MARK: - Footer Logo
 
     private var footerLogo: some View {
-        VStack(spacing: 8) {
-            Text(AppConfig.companyName)
-                .font(.system(size: 14, weight: .bold, design: .default))
-                .tracking(2)
-                .foregroundStyle(AppConfig.subtleGray.opacity(0.5))
+        VStack(spacing: 4) {
+            Text("EL Parking")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(AppConfig.subtleGray.opacity(0.45))
 
-            Text("EL Parking v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")")
+            Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0") · \(AppConfig.companyName)")
                 .font(.caption2)
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.3))
         }
-        .padding(.vertical, 16)
+        .padding(.top, 28)
+        .padding(.bottom, 12)
         .frame(maxWidth: .infinity)
     }
 }
@@ -2450,9 +2461,15 @@ struct PulsingDot: View {
 struct ScaleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
-            .opacity(configuration.isPressed ? 0.92 : 1.0)
-            .animation(.quick, value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.965 : 1.0)
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            // Press-down must feel instant; only the release springs back.
+            .animation(
+                configuration.isPressed
+                    ? .snappy(duration: 0.15, extraBounce: 0.0)
+                    : .snappy(duration: 0.32, extraBounce: 0.12),
+                value: configuration.isPressed
+            )
     }
 }
 
@@ -2475,7 +2492,29 @@ private struct TextReadabilityUnderlay: ViewModifier {
 #Preview {
     HomeView()
         .environmentObject(BookingManager())
+        .environmentObject(AuthManager())
         .environmentObject(AnnouncementsManager())
         .environmentObject(DeepLinkManager())
         .environmentObject(InfoManager())
+}
+
+
+// MARK: - Cascade Entrance
+
+private struct CascadeIn: ViewModifier {
+    let visible: Bool
+    let index: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(visible ? 1 : 0)
+            .offset(y: visible || reduceMotion ? 0 : 14)
+            .animation(
+                reduceMotion
+                    ? .easeOut(duration: 0.2)
+                    : .spring(duration: 0.45, bounce: 0.24).delay(0.15 + Double(index) * 0.04),
+                value: visible
+            )
+    }
 }

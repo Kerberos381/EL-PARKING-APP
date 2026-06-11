@@ -79,7 +79,7 @@ struct SpotDetailSheet: View {
                     .padding(20)
                     .background(AppConfig.cardBg)
                     .clipShape(RoundedRectangle(cornerRadius: 24))
-                    .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
+                    .cardShadow()
 
                     // ── Share button ─────────────────────────────────────────
                     Button {
@@ -88,7 +88,7 @@ struct SpotDetailSheet: View {
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.subheadline.weight(.semibold))
                             Text(L10n.share)
                                 .font(.caption.weight(.semibold))
                                 .lineLimit(1)
@@ -100,9 +100,9 @@ struct SpotDetailSheet: View {
                         .padding(.vertical, 14)
                         .contentShape(Rectangle())
                         .background(AppConfig.cardBg)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(AppConfig.outlineVariant, lineWidth: 1))
-                        .shadow(color: .black.opacity(0.03), radius: 6, y: 2)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppConfig.outlineVariant, lineWidth: 1))
+                        .cardShadow()
                     }
                     .buttonStyle(ScaleButtonStyle())
 
@@ -204,7 +204,7 @@ struct SpotDetailSheet: View {
                     .fill(color.opacity(0.15))
                     .frame(width: 36, height: 36)
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(color)
             }
             Text(text)
@@ -216,8 +216,8 @@ struct SpotDetailSheet: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 13)
         .background(color.opacity(0.07))
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(color.opacity(0.18), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(color.opacity(0.18), lineWidth: 1))
     }
 
     private var bannerContent: (icon: String, text: String, color: Color) {
@@ -226,7 +226,7 @@ struct SpotDetailSheet: View {
         } else if !isMine && iCreated {
             return ("person.fill.badge.plus", L10n.youBookedFor(booking.user), .blue)
         } else if isMine && !iCreated {
-            return ("gift", L10n.bookedForYouBy(creatorDisplayName), .orange)
+            return ("gift", L10n.bookedForYouBy(creatorDisplayName), AppConfig.warning)
         } else {
             return ("person.2.fill", L10n.personBookedFor(creator: creatorDisplayName, bookedFor: booking.user), AppConfig.subtleGray)
         }
@@ -274,7 +274,7 @@ struct SpotDetailSheet: View {
         .padding(20)
         .background(AppConfig.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: 24))
-        .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
+        .cardShadow()
     }
 
     // MARK: - Actions Card
@@ -326,8 +326,8 @@ struct SpotDetailSheet: View {
             .frame(minHeight: 52)
             .contentShape(Rectangle())
             .background(AppConfig.cardBg)
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .overlay(RoundedRectangle(cornerRadius: 20).stroke(color.opacity(0.2), lineWidth: 1.5))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(color.opacity(0.2), lineWidth: 1.5))
         }
         .buttonStyle(ScaleButtonStyle())
     }

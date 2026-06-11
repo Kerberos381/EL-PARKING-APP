@@ -25,6 +25,14 @@ enum ToastStyle {
     }
 
     var color: Color {
+        if AppConfig.isCalmPalette {
+            switch self {
+            case .success: return Color(red: 0.42, green: 0.58, blue: 0.47)   // sage
+            case .error:   return Color(red: 0.75, green: 0.44, blue: 0.31)   // clay
+            case .warning: return Color(red: 0.79, green: 0.61, blue: 0.31)   // ochre
+            case .info:    return Color(red: 0.40, green: 0.50, blue: 0.58)   // fog
+            }
+        }
         switch self {
         case .success: return Color(red: 0.2,  green: 0.78, blue: 0.35)
         case .error:   return Color(red: 0.85, green: 0.2,  blue: 0.2)
@@ -169,22 +177,25 @@ struct ToastOverlay: View {
 
             Spacer()
 
-            // Toast stack (bottom)
-            VStack(spacing: 8) {
-                // Undo banner (appears above regular toasts)
-                if let msg = manager.undoMessage {
-                    undoBanner(message: msg, countdown: manager.undoCountdown)
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .bottom).combined(with: .opacity),
-                            removal:   .move(edge: .bottom).combined(with: .opacity)
-                        ))
-                }
-                ForEach(manager.toasts) { toast in
-                    toastCard(toast)
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .bottom).combined(with: .opacity),
-                            removal:   .move(edge: .top).combined(with: .opacity)
-                        ))
+            // Toast stack (bottom) — glass shapes share one container so
+            // adjacent toasts blend correctly while animating in/out.
+            GlassEffectContainer {
+                VStack(spacing: 8) {
+                    // Undo banner (appears above regular toasts)
+                    if let msg = manager.undoMessage {
+                        undoBanner(message: msg, countdown: manager.undoCountdown)
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .bottom).combined(with: .opacity),
+                                removal:   .move(edge: .bottom).combined(with: .opacity)
+                            ))
+                    }
+                    ForEach(manager.toasts) { toast in
+                        toastCard(toast)
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .bottom).combined(with: .opacity),
+                                removal:   .move(edge: .top).combined(with: .opacity)
+                            ))
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -210,9 +221,9 @@ struct ToastOverlay: View {
     private var offlineBanner: some View {
         HStack(spacing: 10) {
             Image(systemName: "wifi.slash")
-                .font(.system(size: 13, weight: .bold))
+                .font(.footnote.weight(.bold))
             Text("No internet connection")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.footnote.weight(.semibold))
             Spacer()
         }
         .foregroundStyle(.white)
@@ -227,15 +238,16 @@ struct ToastOverlay: View {
     private var backOnlinePill: some View {
         HStack(spacing: 8) {
             Image(systemName: "wifi")
-                .font(.system(size: 12, weight: .bold))
+                .font(.caption.weight(.bold))
+                .foregroundStyle(AppConfig.activeGreen)
             Text("Back online")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.primary)
         }
-        .foregroundStyle(.white)
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
-        .background(Color(red: 0.18, green: 0.65, blue: 0.35))
-        .frame(maxWidth: .infinity)
+        .glassEffect(.regular.tint(AppConfig.activeGreen.opacity(0.25)), in: Capsule())
+        .padding(.top, 60)
     }
 
     // MARK: - Undo Banner
@@ -245,12 +257,12 @@ struct ToastOverlay: View {
             // Top row: icon + message + countdown ring
             HStack(spacing: 10) {
                 Image(systemName: "arrow.uturn.backward.circle.fill")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                     .foregroundStyle(AppConfig.activeGreen)
 
                 Text(message)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -259,7 +271,7 @@ struct ToastOverlay: View {
                 // Countdown ring
                 ZStack {
                     Circle()
-                        .stroke(Color.white.opacity(0.18), lineWidth: 2.5)
+                        .stroke(Color.primary.opacity(0.15), lineWidth: 2.5)
                         .frame(width: 30, height: 30)
                     Circle()
                         .trim(from: 0, to: CGFloat(countdown) / 5)
@@ -268,8 +280,8 @@ struct ToastOverlay: View {
                         .rotationEffect(.degrees(-90))
                         .animation(.linear(duration: 1), value: countdown)
                     Text("\(countdown)")
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.white)
+                        .font(.system(.caption, design: .monospaced, weight: .bold))
+                        .foregroundStyle(.primary)
                 }
             }
 
@@ -279,11 +291,11 @@ struct ToastOverlay: View {
                     manager.dismissUndo()
                 } label: {
                     Text("Done")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.75))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 44)
-                        .background(Color.white.opacity(0.1))
+                        .background(Color.primary.opacity(0.08))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -293,9 +305,9 @@ struct ToastOverlay: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.uturn.backward")
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.subheadline.weight(.bold))
                         Text("Undo")
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.subheadline.weight(.bold))
                     }
                     .foregroundStyle(Color(red: 19/255, green: 31/255, blue: 0/255))
                     .frame(maxWidth: .infinity)
@@ -308,14 +320,9 @@ struct ToastOverlay: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color(red: 0.10, green: 0.11, blue: 0.13))
-                .shadow(color: .black.opacity(0.55), radius: 24, y: 8)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(AppConfig.activeGreen.opacity(0.3), lineWidth: 1)
+        .glassEffect(
+            .regular.tint(AppConfig.activeGreen.opacity(0.18)),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
     }
 
@@ -335,7 +342,7 @@ private struct ToastCardView: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: toast.style.icon)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(toast.style.color)
                 .scaleEffect(iconScale)
                 .onAppear {
@@ -348,8 +355,8 @@ private struct ToastCardView: View {
                 }
 
             Text(toast.message)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.primary)
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -357,21 +364,16 @@ private struct ToastCardView: View {
 
             Button { manager.dismiss(toast) } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
             }
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(red: 0.14, green: 0.15, blue: 0.17))
-                .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(toast.style.color.opacity(0.25), lineWidth: 1)
+        .glassEffect(
+            .regular.tint(toast.style.color.opacity(0.18)),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
     }
 }

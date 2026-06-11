@@ -8,39 +8,95 @@ import FirebaseCore
 import FirebaseAuth
 import FirebaseFirestore
 import FirebaseMessaging
+import FirebaseAppCheck
 import UIKit
 import UserNotifications
+import WidgetKit
+
+/// App Check: proves requests come from genuine app binaries.
+/// DEBUG uses the debug provider (register its token in Firebase Console
+/// for simulators); release uses App Attest with DeviceCheck fallback.
+private final class ELAppCheckProviderFactory: NSObject, AppCheckProviderFactory {
+    func createProvider(with app: FirebaseApp) -> AppCheckProvider? {
+        #if DEBUG
+        return AppCheckDebugProvider(app: app)
+        #else
+        if #available(iOS 14.0, *) {
+            return AppAttestProvider(app: app)
+        }
+        return DeviceCheckProvider(app: app)
+        #endif
+    }
+}
 
 private enum FirebaseBootstrap {
     static func configureIfNeeded() {
         guard FirebaseApp.app() == nil else { return }
+        AppCheck.setAppCheckProviderFactory(ELAppCheckProviderFactory())
         FirebaseApp.configure()
     }
 }
 
 // MARK: - AppDelegate (configures Firebase before any StateObjects are created)
 
+/// Shared store for a quick action that arrived before the UI was ready
+/// (cold launch). Written by the scene delegate, consumed once in onAppear.
+enum QuickActionStore {
+    static var pendingType: String?
+}
+
+/// Scene-based apps receive Home Screen quick actions through the window
+/// scene delegate — the app delegate callbacks are never invoked. SwiftUI
+/// installs its own scene delegate by default, so we substitute this one
+/// via configurationForConnecting below.
+final class QuickActionSceneDelegate: NSObject, UIWindowSceneDelegate {
+    func scene(
+        _ scene: UIScene,
+        willConnectTo session: UISceneSession,
+        options connectionOptions: UIScene.ConnectionOptions
+    ) {
+        // Cold launch from a quick action.
+        if let shortcutItem = connectionOptions.shortcutItem {
+            QuickActionStore.pendingType = shortcutItem.type
+        }
+    }
+
+    func windowScene(
+        _ windowScene: UIWindowScene,
+        performActionFor shortcutItem: UIApplicationShortcutItem,
+        completionHandler: @escaping (Bool) -> Void
+    ) {
+        // App was running (foreground or background).
+        NotificationCenter.default.post(
+            name: .appQuickActionTriggered,
+            object: shortcutItem.type
+        )
+        completionHandler(true)
+    }
+}
+
 class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate {
-    private(set) var pendingQuickActionType: String?
 
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         FirebaseBootstrap.configureIfNeeded()
+        PushNotificationManager.registerBackgroundTask()
         application.shortcutItems = AppQuickAction.shortcutItems
         Messaging.messaging().delegate = self
         registerForRemoteNotificationsIfAuthorized(application)
-
-        // iOS 26 deprecates LaunchOptionsKey.shortcutItem in favor of scene connection options.
-        // Keep backward-compatible cold-launch support by reading the raw launch option key.
-        let shortcutLaunchKey = UIApplication.LaunchOptionsKey(rawValue: "UIApplicationLaunchOptionsShortcutItemKey")
-        if let shortcutItem = launchOptions?[shortcutLaunchKey] as? UIApplicationShortcutItem {
-            pendingQuickActionType = shortcutItem.type
-            // Returning false prevents a duplicate callback to performAction.
-            return false
-        }
         return true
+    }
+
+    func application(
+        _ application: UIApplication,
+        configurationForConnecting connectingSceneSession: UISceneSession,
+        options: UIScene.ConnectionOptions
+    ) -> UISceneConfiguration {
+        let config = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        config.delegateClass = QuickActionSceneDelegate.self
+        return config
     }
 
     func application(
@@ -57,21 +113,9 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate {
         print("APNs registration failed: \(error.localizedDescription)")
     }
 
-    func application(
-        _ application: UIApplication,
-        performActionFor shortcutItem: UIApplicationShortcutItem,
-        completionHandler: @escaping (Bool) -> Void
-    ) {
-        NotificationCenter.default.post(
-            name: .appQuickActionTriggered,
-            object: shortcutItem.type
-        )
-        completionHandler(true)
-    }
-
     func consumePendingQuickActionType() -> String? {
-        defer { pendingQuickActionType = nil }
-        return pendingQuickActionType
+        defer { QuickActionStore.pendingType = nil }
+        return QuickActionStore.pendingType
     }
 
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
@@ -138,15 +182,15 @@ private enum AppQuickAction {
         var items: [UIApplicationShortcutItem] = [
             UIApplicationShortcutItem(
                 type: bookType,
-                localizedTitle: "Book a Spot",
-                localizedSubtitle: "Open booking sheet",
+                localizedTitle: L10n.bookASpot,
+                localizedSubtitle: L10n.qaOpenBookingSheet,
                 icon: UIApplicationShortcutIcon(systemImageName: "plus.circle"),
                 userInfo: nil
             ),
             UIApplicationShortcutItem(
                 type: myBookingsType,
-                localizedTitle: "My Bookings",
-                localizedSubtitle: "See upcoming bookings",
+                localizedTitle: L10n.myBookings,
+                localizedSubtitle: L10n.qaSeeUpcoming,
                 icon: UIApplicationShortcutIcon(systemImageName: "bookmark"),
                 userInfo: nil
             )
@@ -156,8 +200,8 @@ private enum AppQuickAction {
             items.append(
                 UIApplicationShortcutItem(
                     type: cancelType,
-                    localizedTitle: "Cancel Booking",
-                    localizedSubtitle: "Open bookings to cancel",
+                    localizedTitle: L10n.cancelBooking,
+                    localizedSubtitle: L10n.qaOpenToCancel,
                     icon: UIApplicationShortcutIcon(systemImageName: "xmark.circle"),
                     userInfo: nil
                 )
@@ -169,8 +213,8 @@ private enum AppQuickAction {
             items.append(
                 UIApplicationShortcutItem(
                     type: adminType,
-                    localizedTitle: "Admin Dashboard",
-                    localizedSubtitle: "Open admin controls",
+                    localizedTitle: L10n.qaAdminDashboard,
+                    localizedSubtitle: L10n.qaAdminControls,
                     icon: UIApplicationShortcutIcon(systemImageName: "shield.lefthalf.filled"),
                     userInfo: nil
                 )
@@ -179,8 +223,8 @@ private enum AppQuickAction {
             items.append(
                 UIApplicationShortcutItem(
                     type: navigateType,
-                    localizedTitle: "Navigate to Parking",
-                    localizedSubtitle: "Open directions",
+                    localizedTitle: L10n.qaNavigateToParking,
+                    localizedSubtitle: L10n.qaOpenDirections,
                     icon: UIApplicationShortcutIcon(systemImageName: "location.fill.viewfinder"),
                     userInfo: nil
                 )
@@ -189,8 +233,8 @@ private enum AppQuickAction {
             items.append(
                 UIApplicationShortcutItem(
                     type: bookNextType,
-                    localizedTitle: "Book Next Available",
-                    localizedSubtitle: "Start quick booking",
+                    localizedTitle: L10n.qaBookNext,
+                    localizedSubtitle: L10n.qaQuickBooking,
                     icon: UIApplicationShortcutIcon(systemImageName: "calendar.badge.plus"),
                     userInfo: nil
                 )
@@ -245,6 +289,7 @@ struct ParkKingApp: App {
     @StateObject private var pushManager: PushNotificationManager
     @StateObject private var deepLinkManager: DeepLinkManager
     @AppStorage("appTheme") private var themeRaw: Int = 0
+    @AppStorage("appPalette") private var paletteRaw: Int = 0
     private let proximityReminderManager = ProximityReminderManager.shared
 
     /// Booking to open in edit sheet via notification/deep link
@@ -277,8 +322,17 @@ struct ParkKingApp: App {
                 .environmentObject(infoManager)
                 .environmentObject(deepLinkManager)
                 .environmentObject(LanguageManager.shared)
+                // Palette colors are read from UserDefaults inside AppConfig;
+                // changing the id rebuilds the tree so the new palette applies.
+                .id("palette-\(paletteRaw)")
+                .onChange(of: paletteRaw) { _, newValue in
+                    // Mirror into the app group so widgets follow the palette.
+                    UserDefaults.appGroup.set(newValue, forKey: "appPalette")
+                    WidgetCenter.shared.reloadAllTimelines()
+                }
                 .preferredColorScheme(colorScheme)
                 .onAppear {
+                    UserDefaults.appGroup.set(paletteRaw, forKey: "appPalette")
                     NotificationHandler.shared.registerCategories()
                     bookingManager.scheduleDailyReminders()
                     if authManager.currentUser?.isActive == true {
@@ -297,9 +351,18 @@ struct ParkKingApp: App {
                     }
                 }
                 .onChange(of: scenePhase) { _, phase in
+                    if phase == .background {
+                        // Free killed-app delivery: drain the inbox on the
+                        // system's next opportunistic background wake.
+                        PushNotificationManager.scheduleBackgroundSync()
+                    }
                     guard phase == .active,
                           authManager.currentUser?.isActive == true else { return }
                     appDelegate.syncMessagingTokenToCurrentUser()
+                    // Foreground catch-up: drain any inbox items the live
+                    // listener may have missed while suspended (near-instant
+                    // the moment the user returns to the app).
+                    Task { await PushNotificationManager.backgroundSyncOnce() }
                 }
                 // Bridge: when auth changes, configure BookingManager + push notifications for the user
                 .onChange(of: authManager.currentUser) { _, user in
@@ -314,7 +377,8 @@ struct ParkKingApp: App {
                             color:   user.carColor,
                             carType: user.carType,
                             vehicleMiniaturePresetID: user.vehicleMiniaturePresetID,
-                            preferredVocative: user.preferredVocative
+                            preferredVocative: user.preferredVocative,
+                            companyBadge: user.companyBadge
                         )
                         pushManager.startListening(for: user.uid)
                         appDelegate.syncMessagingTokenToCurrentUser()
@@ -366,6 +430,8 @@ struct ParkKingApp: App {
                             editingBooking:  booking
                         )
                         .environmentObject(bookingManager)
+                        .environmentObject(authManager)
+                        .environmentObject(deepLinkManager)
                     }
                 }
                 .alert(L10n.cancelBooking, isPresented: $showNotificationCancelAlert) {
@@ -387,6 +453,8 @@ struct ParkKingApp: App {
 
 extension Notification.Name {
     static let appQuickActionTriggered = Notification.Name("appQuickActionTriggered")
+    /// Posted by home cards (e.g. Your Vehicle) to hop to the Settings tab.
+    static let navigateToSettingsTab = Notification.Name("navigateToSettingsTab")
 }
 
 private extension ParkKingApp {

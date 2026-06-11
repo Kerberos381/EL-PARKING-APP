@@ -103,7 +103,7 @@ struct LoginView: View {
                 .tracking(0.2)
 
             Text("EssilorLuxottica")
-                .font(.system(size: 12, weight: .medium))
+                .font(.caption.weight(.medium))
                 .tracking(1.6)
                 .foregroundStyle(secondaryTextColor)
         }
@@ -141,7 +141,7 @@ struct LoginView: View {
 
                     VStack(spacing: 6) {
                         Text(L10n.biometricWelcome(""))
-                            .font(.system(size: 20, weight: .bold))
+                            .font(.title3.weight(.bold))
                             .foregroundStyle(.white)
 
                         if let email = keychain.savedEmail {
@@ -163,17 +163,17 @@ struct LoginView: View {
             if let error = authManager.errorMessage {
                 HStack(spacing: 8) {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(Color(red: 1, green: 0.35, blue: 0.35))
+                        .foregroundStyle(AppConfig.danger)
                     Text(error)
                         .font(.subheadline)
-                        .foregroundStyle(Color(red: 1, green: 0.35, blue: 0.35))
+                        .foregroundStyle(AppConfig.danger)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.red.opacity(0.1))
+                .background(AppConfig.danger.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.red.opacity(0.2), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppConfig.danger.opacity(0.2), lineWidth: 1))
                 .transition(.opacity)
             }
 
@@ -181,9 +181,8 @@ struct LoginView: View {
             VStack(spacing: 16) {
                 HStack(spacing: 12) {
                     Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1)
-                    Text("OR")
-                        .font(.system(size: 11, weight: .bold))
-                        .tracking(1.5)
+                    Text("or")
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(.white.opacity(0.25))
                     Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1)
                 }
@@ -212,12 +211,7 @@ struct LoginView: View {
             }
         }
         .padding(32)
-        .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Color.clear)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.08), lineWidth: 1))
-        )
+        .glassEffect(.frosted, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .padding(.horizontal, 20)
     }
 
@@ -236,7 +230,7 @@ struct LoginView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.footnote.weight(.semibold))
                         Text(L10n.back)
                     }
                     .font(.subheadline)
@@ -294,34 +288,34 @@ struct LoginView: View {
             if let error = authManager.errorMessage {
                 HStack(spacing: 8) {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(Color(red: 1, green: 0.35, blue: 0.35))
+                        .foregroundStyle(AppConfig.danger)
                     Text(error)
                         .font(.subheadline)
-                        .foregroundStyle(Color(red: 1, green: 0.35, blue: 0.35))
+                        .foregroundStyle(AppConfig.danger)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.red.opacity(0.1))
+                .background(AppConfig.danger.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.red.opacity(0.2), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppConfig.danger.opacity(0.2), lineWidth: 1))
             }
 
             Button {
                 Task { await authManager.login(email: email, password: password) }
             } label: {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .fill(isFormValid ? AppConfig.accent : AppConfig.accent.opacity(0.4))
                     if authManager.isLoading {
                         ProgressView().tint(.black).scaleEffect(0.9)
                     } else {
                         Text(L10n.signIn)
-                            .font(.system(size: 21, weight: .bold, design: .rounded))
+                            .font(.body.weight(.semibold))
                             .foregroundStyle(.black)
                     }
                 }
-                .frame(height: 60)
+                .frame(height: 50)
             }
             .buttonStyle(ScaleButtonStyle())
             .disabled(authManager.isLoading || !isFormValid)
@@ -393,10 +387,10 @@ struct LoginView: View {
         .frame(height: 58)
         .contentShape(RoundedRectangle(cornerRadius: 14))
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(fieldColor)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .stroke(borderColor, lineWidth: 1)
                 )
         )
@@ -426,7 +420,7 @@ struct LoginView: View {
             Button { showPassword.toggle() } label: {
                 Image(systemName: showPassword ? "eye.slash" : "eye")
                     .foregroundStyle(secondaryTextColor)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
@@ -436,10 +430,10 @@ struct LoginView: View {
         .frame(height: 58)
         .contentShape(RoundedRectangle(cornerRadius: 14))
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(fieldColor)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .stroke(borderColor, lineWidth: 1)
                 )
         )

@@ -113,6 +113,7 @@ struct AppUser: Identifiable, Codable, Equatable {
     var role: UserRole
     var status: UserStatus
     var registrationPlate: String
+    var phone: String = ""          // optional, for admin contact on cancel
     var carDescription: String
     var carColor: String          // hex string e.g. "#CC3333", empty = unset
     var carType:  String          // CarBodyType rawValue, empty = unset
@@ -168,6 +169,7 @@ struct AppUser: Identifiable, Codable, Equatable {
             "role":                     role.rawValue,
             "status":                   status.rawValue,
             "registrationPlate":        registrationPlate,
+            "phone":                    phone,
             "carDescription":           carDescription,
             "carColor":                 carColor,
             "carType":                  carType,
@@ -220,6 +222,7 @@ struct AppUser: Identifiable, Codable, Equatable {
             role:                    role,
             status:                  status,
             registrationPlate:       data["registrationPlate"] as? String ?? "",
+            phone:                   data["phone"] as? String ?? "",
             carDescription:          data["carDescription"]    as? String ?? "",
             carColor:                data["carColor"]          as? String ?? "",
             carType:                 data["carType"]           as? String ?? "",

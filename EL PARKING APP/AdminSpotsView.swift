@@ -39,9 +39,10 @@ struct AdminSpotsView: View {
                 .padding(.horizontal)
                 .padding(.bottom, bulkMode ? 110 : 40)
             }
+            .scrollEdgeEffectStyle(.soft, for: .top)
             .refreshable {
-                Haptics.selection()
                 await bookingManager.refreshData()
+                Haptics.refreshCompleted()
             }
 
             if bulkMode {
@@ -79,7 +80,7 @@ struct AdminSpotsView: View {
 
     private var overlineRow: some View {
         Text("EL PARK \u{00B7} ADMIN")
-            .font(.system(size: 12, weight: .semibold))
+            .font(.caption.weight(.semibold))
             .tracking(1.8)
             .textCase(.uppercase)
             .foregroundStyle(AppConfig.subtleGray.opacity(0.75))
@@ -93,7 +94,7 @@ struct AdminSpotsView: View {
         HStack(spacing: 14) {
             compactStat(value: "\(spots.count)", label: L10n.total, dot: AppConfig.subtleGray.opacity(0.75))
             compactStat(value: "\(blockedIDs.count)", label: L10n.blocked, dot: AppConfig.spotOccupied)
-            compactStat(value: "\(spots.filter { $0.isAccessible }.count)", label: L10n.accessible, dot: .blue)
+            compactStat(value: "\(spots.filter { $0.isAccessible }.count)", label: L10n.accessible, dot: AppConfig.infoTint)
         }
         .frame(maxWidth: .infinity, alignment: .center)
     }
@@ -104,10 +105,10 @@ struct AdminSpotsView: View {
                 .fill(dot)
                 .frame(width: 8, height: 8)
             Text(value)
-                .font(.system(size: 17, weight: .bold))
+                .font(.body.weight(.bold))
                 .foregroundStyle(AppConfig.darkText)
             Text(label)
-                .font(.system(size: 11, weight: .medium))
+                .font(.caption.weight(.medium))
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.9))
         }
     }
@@ -136,7 +137,7 @@ struct AdminSpotsView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color(uiColor: .tertiarySystemFill).opacity(0.35))
+                    .background(AppConfig.tertiaryFillBg.opacity(0.35))
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .shimmering(active: true)
                 }
@@ -146,7 +147,7 @@ struct AdminSpotsView: View {
             LazyVGrid(columns: cols, spacing: 10) {
                 ForEach(0..<18, id: \.self) { _ in
                     RoundedRectangle(cornerRadius: AppConfig.radius16, style: .continuous)
-                        .fill(Color(uiColor: .tertiarySystemFill))
+                        .fill(AppConfig.tertiaryFillBg)
                         .frame(height: 95)
                         .shimmering(active: true)
                 }
@@ -162,7 +163,7 @@ struct AdminSpotsView: View {
         let numberColor: Color = isBlocked ? AppConfig.spotOccupied : (isAccessible ? .blue : AppConfig.darkText)
         let cardFill: Color = isBlocked
             ? AppConfig.spotOccupied.opacity(0.04)
-            : (isAccessible ? Color.blue.opacity(0.09) : AppConfig.cardBg)
+            : (isAccessible ? AppConfig.infoTint.opacity(0.09) : AppConfig.cardBg)
 
         ZStack {
             RoundedRectangle(cornerRadius: AppConfig.radius16)
@@ -170,7 +171,7 @@ struct AdminSpotsView: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: AppConfig.radius16)
                         .strokeBorder(
-                            isSelected ? Color.blue : AppConfig.separatorSoft.opacity(0.65),
+                            isSelected ? AppConfig.infoTint : AppConfig.separatorSoft.opacity(0.65),
                             lineWidth: isSelected ? 2.5 : 0.8
                         )
                 )
@@ -263,10 +264,10 @@ struct AdminSpotsView: View {
     private var accessibleCornerBadge: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.blue)
+                .fill(AppConfig.infoTint)
                 .frame(width: 34, height: 34)
             Image(systemName: "figure.roll")
-                .font(.system(size: 13, weight: .bold))
+                .font(.footnote.weight(.bold))
                 .foregroundStyle(.white)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
@@ -276,14 +277,14 @@ struct AdminSpotsView: View {
     private func selectCircle(selected: Bool) -> some View {
         ZStack {
             Circle()
-                .fill(selected ? Color.blue : Color.white.opacity(0.95))
+                .fill(selected ? AppConfig.infoTint : Color.white.opacity(0.95))
                 .frame(width: 22, height: 22)
             Circle()
-                .stroke(selected ? Color.blue : Color.black.opacity(0.18), lineWidth: 1.5)
+                .stroke(selected ? AppConfig.infoTint : Color.black.opacity(0.18), lineWidth: 1.5)
                 .frame(width: 22, height: 22)
             if selected {
                 Image(systemName: "checkmark")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(.white)
             }
         }
@@ -298,10 +299,10 @@ struct AdminSpotsView: View {
         return HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(selectedIDs.count) selected")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
                 Text("Apply an action to all")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.caption2.weight(.medium))
                     .foregroundStyle(.white.opacity(0.75))
                     .lineLimit(1)
             }
@@ -320,9 +321,9 @@ struct AdminSpotsView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "lock.open")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.footnote.weight(.semibold))
                         Text("Unblock")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.footnote.weight(.semibold))
                             .lineLimit(1)
                     }
                     .frame(minWidth: 96, minHeight: 48)
@@ -343,9 +344,9 @@ struct AdminSpotsView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "figure.roll")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.footnote.weight(.semibold))
                         Text("Accessible")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.footnote.weight(.semibold))
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                     }
@@ -368,9 +369,9 @@ struct AdminSpotsView: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "nosign")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.footnote.weight(.semibold))
                     Text("Block")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.footnote.weight(.semibold))
                         .lineLimit(1)
                 }
                 .frame(minWidth: 88, minHeight: 48)
@@ -470,20 +471,20 @@ struct AdminSpotsView: View {
                         .fill(tint.opacity(0.12))
                         .frame(width: 32, height: 32)
                     Image(systemName: icon)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(tint)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AppConfig.darkText)
                     Text(subtitle)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.caption.weight(.medium))
                         .foregroundStyle(AppConfig.subtleGray)
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
             }
             .padding(.horizontal, 14)

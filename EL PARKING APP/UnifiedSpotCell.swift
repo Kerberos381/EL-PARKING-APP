@@ -26,6 +26,9 @@ struct UnifiedSpotCell: View {
     let spot: ParkingSpot
     let status: SpotCellStatus
     let mode: SpotCellMode
+    /// Ownership badges (company seals) shown when the spot belongs to a
+    /// different group than the viewer — see AppConfig.spotGroupBadges.
+    var spotGroupBadges: [CompanyBadge] = []
     var isFavourite: Bool = false
     var onFavouriteTap: (() -> Void)? = nil
     let onTap: () -> Void
@@ -87,16 +90,34 @@ struct UnifiedSpotCell: View {
             // Top row: status icon left, star favourite right
             HStack {
                 topIcon
+                if !spotGroupBadges.isEmpty {
+                    HStack(spacing: 4) {
+                        ForEach(spotGroupBadges, id: \.rawValue) { badge in
+                            CompanyBadgeView(
+                                badge: badge,
+                                compact: true,
+                                iconOnly: spotGroupBadges.count > 1
+                            )
+                        }
+                    }
+                    .accessibilityLabel(
+                        spotGroupBadges.map(\.displayName).joined(separator: ", ") + " spot"
+                    )
+                }
                 Spacer()
                 if let tap = onFavouriteTap {
                     Button(action: tap) {
                         Image(systemName: isFavourite ? "star.fill" : "star")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.footnote.weight(.semibold))
                             .foregroundStyle(isFavourite
                                 ? Color.yellow
                                 : (isMineOrSelected
                                     ? AppConfig.onAccent.opacity(0.45)
                                     : AppConfig.subtleGray.opacity(0.45)))
+                            .symbolEffect(.bounce, value: isFavourite)
+                            .background {
+                                StarBurstView(isActive: isFavourite)
+                            }
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
@@ -138,6 +159,18 @@ struct UnifiedSpotCell: View {
             VStack(spacing: 4) {
                 // Top icon (smaller)
                 topIconCompact
+
+                if !spotGroupBadges.isEmpty {
+                    HStack(spacing: 3) {
+                        ForEach(spotGroupBadges, id: \.rawValue) { badge in
+                            CompanyBadgeView(badge: badge, compact: true, iconOnly: true)
+                                .scaleEffect(0.8)
+                        }
+                    }
+                    .accessibilityLabel(
+                        spotGroupBadges.map(\.displayName).joined(separator: ", ") + " spot"
+                    )
+                }
 
                 // Spot number
                 Text(spot.id)
@@ -182,17 +215,17 @@ struct UnifiedSpotCell: View {
         switch status {
         case .selected:
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 11))
+                .font(.caption)
                 .foregroundStyle(AppConfig.onAccent)
         case .occupied:
             EmptyView().frame(height: 0)
         case .partial:
             Image(systemName: "clock")
-                .font(.system(size: 9))
+                .font(.caption2)
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.55))
         case .blocked:
             Image(systemName: "lock.fill")
-                .font(.system(size: 9))
+                .font(.caption2)
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.5))
         default:
             EmptyView().frame(height: 0)
@@ -206,12 +239,12 @@ struct UnifiedSpotCell: View {
         switch status {
         case .mine:
             Text("YOURS")
-                .font(.system(size: 10, weight: .bold))
+                .font(.caption2.weight(.bold))
                 .tracking(2)
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.9))
         case .selected:
             Text("SELECTED")
-                .font(.system(size: 10, weight: .bold))
+                .font(.caption2.weight(.bold))
                 .tracking(2)
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.9))
         case .occupied(let name, _):
@@ -227,12 +260,12 @@ struct UnifiedSpotCell: View {
         case .partial(let name, _, let ranges):
             VStack(spacing: 2) {
                 Text("PARTIAL")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.caption2.weight(.bold))
                     .tracking(1)
                     .foregroundStyle(AppConfig.subtleGray.opacity(0.75))
                 if let ranges, !ranges.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(ranges)
-                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced, weight: .medium))
                         .foregroundStyle(AppConfig.subtleGray.opacity(0.65))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -240,26 +273,26 @@ struct UnifiedSpotCell: View {
                 if let name, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     let split = splitSpotUserName(name)
                     Text(split.givenNames)
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(AppConfig.subtleGray.opacity(0.72))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     if let surname = split.surname {
                         Text(surname)
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.caption2.weight(.semibold))
                             .foregroundStyle(AppConfig.subtleGray.opacity(0.72))
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                     }
                 } else if ranges == nil || ranges?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
                     Text("Booked")
-                        .font(.system(size: 9, weight: .medium))
+                        .font(.caption2.weight(.medium))
                         .foregroundStyle(AppConfig.subtleGray.opacity(0.65))
                 }
             }
         case .blocked:
             Text("BLOCKED")
-                .font(.system(size: 10, weight: .bold))
+                .font(.caption2.weight(.bold))
                 .tracking(1)
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
         case .available:
@@ -348,7 +381,7 @@ struct UnifiedSpotCell: View {
             HStack {
                 Spacer()
                 Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.subheadline.weight(.bold))
                     .foregroundStyle(AppConfig.onAccent)
                     .frame(width: 32, height: 32)
                     .background(AppConfig.accent)
@@ -450,7 +483,7 @@ struct UnifiedSpotCell: View {
                 .stroke(AppConfig.separatorSoft, lineWidth: 1)
         } else if case .partial = status {
             RoundedRectangle(cornerRadius: 24)
-                .stroke(Color.orange.opacity(0.95), lineWidth: 2)
+                .stroke(AppConfig.warning.opacity(0.95), lineWidth: 2)
         } else if case .mine = status, mode == .full {
             RoundedRectangle(cornerRadius: 24)
                 .stroke(AppConfig.separatorSoft, lineWidth: 1)
@@ -472,6 +505,39 @@ private struct AspectModifier: ViewModifier {
             content.aspectRatio(3.0/4.0, contentMode: .fit)
         case .compact:
             content.frame(height: 80)
+        }
+    }
+}
+
+// MARK: - Star Burst
+
+/// One-shot radial burst of 6 dots fired when a spot is favorited.
+struct StarBurstView: View {
+    let isActive: Bool
+
+    @State private var burst = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<6, id: \.self) { index in
+                let angle = Double(index) / 6.0 * 2 * .pi
+                Circle()
+                    .fill(Color.yellow)
+                    .frame(width: 3.5, height: 3.5)
+                    .offset(
+                        x: burst ? cos(angle) * 16 : 0,
+                        y: burst ? sin(angle) * 16 : 0
+                    )
+                    .opacity(burst ? 0 : 0.9)
+            }
+        }
+        .allowsHitTesting(false)
+        .onChange(of: isActive) { _, nowFavourite in
+            guard nowFavourite, !reduceMotion else { return }
+            burst = false
+            withAnimation(.easeOut(duration: 0.45)) { burst = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { burst = false }
         }
     }
 }

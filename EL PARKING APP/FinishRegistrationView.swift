@@ -132,11 +132,10 @@ struct FinishRegistrationView: View {
                             VStack(alignment: .leading, spacing: 10) {
                                 HStack(spacing: 6) {
                                     Image(systemName: "car.side")
-                                        .font(.system(size: 12, weight: .semibold))
+                                        .font(.caption.weight(.semibold))
                                         .foregroundStyle(AppConfig.subtleGray)
-                                    Text("VEHICLE ICON")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .tracking(1.1)
+                                    Text("Vehicle icon")
+                                        .font(.caption2.weight(.bold))
                                         .foregroundStyle(AppConfig.subtleGray)
                                 }
 
@@ -168,7 +167,7 @@ struct FinishRegistrationView: View {
                             } label: {
                                 HStack(spacing: 14) {
                                     Image(systemName: "paintpalette")
-                                        .font(.system(size: 15, weight: .semibold))
+                                        .font(.subheadline.weight(.semibold))
                                         .foregroundStyle(AppConfig.subtleGray)
                                         .frame(width: 24)
                                     Text(L10n.carColor)
@@ -202,7 +201,7 @@ struct FinishRegistrationView: View {
                             if !newPassword.isEmpty && newPassword.count < 6 {
                                 Label(L10n.passwordTooShortHint, systemImage: "exclamationmark.circle")
                                     .font(.caption)
-                                    .foregroundStyle(.orange)
+                                    .foregroundStyle(AppConfig.warning)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .transition(.opacity.combined(with: .move(edge: .top)))
                             } else if !confirmPassword.isEmpty && newPassword != confirmPassword {
@@ -227,8 +226,8 @@ struct FinishRegistrationView: View {
                     // Error
                     if let err = errorMsg {
                         HStack(spacing: 8) {
-                            Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
-                            Text(err).font(.subheadline).foregroundStyle(.red)
+                            Image(systemName: "xmark.circle.fill").foregroundStyle(AppConfig.danger)
+                            Text(err).font(.subheadline).foregroundStyle(AppConfig.danger)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal)
@@ -243,7 +242,7 @@ struct FinishRegistrationView: View {
                                 ProgressView().tint(.black).scaleEffect(0.9)
                             } else {
                                 Text(L10n.completeRegistration)
-                                    .font(.system(size: 16, weight: .bold))
+                                    .font(.body.weight(.bold))
                                     .foregroundStyle(.black)
                             }
                         }
@@ -333,9 +332,9 @@ struct FinishRegistrationView: View {
                     } label: {
                         HStack(spacing: 5) {
                             Image(systemName: bodyType.icon)
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.caption.weight(.semibold))
                             Text(bodyType.label)
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.footnote.weight(.semibold))
                         }
                         .foregroundStyle(isSelected ? AppConfig.onAccent : AppConfig.subtleGray)
                         .padding(.horizontal, 13)
@@ -365,7 +364,7 @@ struct FinishRegistrationView: View {
     ) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray)
                 .frame(width: 24)
             Text(title)
@@ -382,7 +381,7 @@ struct FinishRegistrationView: View {
                     .lineLimit(1)
             }
             Image(systemName: "chevron.up.chevron.down")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
         }
         .padding(.horizontal, 16)
@@ -397,7 +396,7 @@ struct FinishRegistrationView: View {
     ) -> some View {
         HStack(spacing: 14) {
             Image(systemName: "sparkles")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray)
                 .frame(width: 24)
             Text(title)
@@ -409,7 +408,7 @@ struct FinishRegistrationView: View {
                 .foregroundStyle(isPlaceholder ? AppConfig.subtleGray : AppConfig.darkText)
                 .lineLimit(1)
             Image(systemName: "chevron.up.chevron.down")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
         }
         .padding(.horizontal, 16)
@@ -443,7 +442,7 @@ struct FinishRegistrationView: View {
                             )
                         if isSelected {
                             Image(systemName: "checkmark")
-                                .font(.system(size: 11, weight: .bold))
+                                .font(.caption.weight(.bold))
                                 .foregroundStyle(
                                     color.hex == "#FFFFFF" || color.hex == "#F9A825" ? Color.black : Color.white
                                 )
@@ -478,11 +477,10 @@ struct FinishRegistrationView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(AppConfig.subtleGray)
-                Text(title.uppercased())
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.5)
+                Text(title)
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(AppConfig.subtleGray)
             }
             .padding(.horizontal, 4)
@@ -492,8 +490,8 @@ struct FinishRegistrationView: View {
             }
             .padding(20)
             .background(AppConfig.cardBg)
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .shadow(color: .black.opacity(0.06), radius: 10, y: 3)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .cardShadow()
         }
         .padding(.horizontal)
     }
@@ -567,7 +565,7 @@ struct FinishRegistrationView: View {
             Button { showSecure.wrappedValue.toggle() } label: {
                 Image(systemName: showSecure.wrappedValue ? "eye.slash" : "eye")
                     .foregroundStyle(AppConfig.subtleGray)
-                    .font(.system(size: 15))
+                    .font(.subheadline)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }

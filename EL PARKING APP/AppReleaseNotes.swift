@@ -37,6 +37,52 @@ struct AppReleaseNotes {
     static var all: [AppRelease] {[
 
         AppRelease(
+            version: "4.0",
+            features: [
+                ReleaseFeature(
+                    icon: "leaf.fill",
+                    color: "accent",
+                    title: L10n.lang == .czech ? "Klidná barevná paleta" : "Calm Color Theme",
+                    description: L10n.lang == .czech
+                        ? "Tlumená severská paleta — méně křiklavých barev, méně vizuálního šumu, klidnější parkování. Přepněte v Nastavení → Vzhled."
+                        : "A muted, Nordic-inspired palette — softer colors, less visual noise, calmer parking. Switch anytime in Settings → Appearance."
+                ),
+                ReleaseFeature(
+                    icon: "sparkles",
+                    color: "accent",
+                    title: L10n.lang == .czech ? "Nový vzhled" : "Refreshed Design",
+                    description: L10n.lang == .czech
+                        ? "Liquid Glass povrchy, plynulejší animace, nová úvodní obrazovka a klidnější domovská stránka."
+                        : "Liquid Glass surfaces, smoother animations, a new splash screen, and a calmer home screen."
+                ),
+                ReleaseFeature(
+                    icon: "car.fill",
+                    color: "green",
+                    title: L10n.lang == .czech ? "Vaše auto zaparkuje" : "Your Car Parks In",
+                    description: L10n.lang == .czech
+                        ? "Po potvrzení rezervace vaše vlastní auto zajede na místo — s jemnou haptickou odezvou."
+                        : "After confirming a booking, your own car drives into the spot — with a satisfying haptic thunk."
+                ),
+                ReleaseFeature(
+                    icon: "square.grid.2x2.fill",
+                    color: "blue",
+                    title: L10n.lang == .czech ? "Rychlé akce" : "Quick Actions",
+                    description: L10n.lang == .czech
+                        ? "Podržte ikonu aplikace pro rezervaci, moje rezervace, navigaci nebo správu."
+                        : "Long-press the app icon to book, see bookings, navigate, or open admin."
+                ),
+                ReleaseFeature(
+                    icon: "checkmark.shield.fill",
+                    color: "green",
+                    title: L10n.lang == .czech ? "Bezpečnější smazání účtu" : "Safer Account Deletion",
+                    description: L10n.lang == .czech
+                        ? "Smazání účtu nyní vyžaduje potvrzení přes Face ID."
+                        : "Deleting your account now requires Face ID confirmation."
+                ),
+            ]
+        ),
+
+        AppRelease(
             version: "2.0",
             features: [
                 ReleaseFeature(

@@ -221,7 +221,7 @@ struct VehicleMiniaturePresetPickerSheet: View {
                                     Spacer()
                                     if selectedPresetID == option.preset.id {
                                         Image(systemName: "checkmark")
-                                        .font(.system(size: 12, weight: .semibold))
+                                        .font(.caption.weight(.semibold))
                                             .foregroundStyle(AppConfig.accentFg)
                                     }
                                 }
@@ -230,8 +230,11 @@ struct VehicleMiniaturePresetPickerSheet: View {
                             .buttonStyle(.plain)
                             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                         }
+                        .listRowBackground(AppConfig.groupedCardBg)
                     }
                     .listStyle(.insetGrouped)
+                    .scrollContentBackground(.hidden)
+                    .background(AppConfig.groupedPageBg.ignoresSafeArea())
                 }
             }
             .navigationTitle(title)

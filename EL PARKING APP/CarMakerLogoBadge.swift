@@ -102,7 +102,7 @@ struct CarMakerLogoBadge: View {
     var body: some View {
         if let logoAssetName, hasLogoAsset {
             RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-                .fill(Color(uiColor: .secondarySystemBackground))
+                .fill(AppConfig.surfaceLow)
                 .overlay(
                     Image(logoAssetName)
                         .resizable()

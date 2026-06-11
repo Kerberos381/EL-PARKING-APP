@@ -18,6 +18,7 @@ private class MailComposeDelegate: NSObject, MFMailComposeViewControllerDelegate
 
 struct BookingSheet: View {
     @EnvironmentObject var bookingManager: BookingManager
+    @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var deepLinkManager: DeepLinkManager
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -55,6 +56,7 @@ struct BookingSheet: View {
     @State private var cardOpacity: Double = 0
     @State private var bgOpacity: Double = 0
     @State private var actionsOpacity: Double = 0
+    @State private var carParked = false
     @State private var isDismissing = false
 
     private enum ConfirmVisualState: Equatable {
@@ -152,13 +154,9 @@ struct BookingSheet: View {
                             // 1. Date selection first
                             dateSection
 
-                            // 2. Time selection
-                            timeSection
-
-                            // 3. Spot selection (availability based on date + time)
-                            spotSection
-
-                            // Book for others toggle (privileged users)
+                            // Book for others toggle (privileged users) — placed
+                            // right after the date so it's decided FIRST: it
+                            // changes the allowed date range and spot pool.
                             if bookingManager.isPrivileged && !isEditing {
                                 bookForOthersSection
                             }
@@ -167,6 +165,12 @@ struct BookingSheet: View {
                             if isForOthersToggle {
                                 personSection
                             }
+
+                            // 2. Time selection
+                            timeSection
+
+                            // 3. Spot selection (availability based on date + time)
+                            spotSection
 
                             // Confirm button
                             confirmButton
@@ -280,8 +284,9 @@ struct BookingSheet: View {
 
     @ViewBuilder
     private var spotSection: some View {
-        // If preselected and still valid, show compact banner
-        if let spot = selectedSpot, hasPreselection && !showSpotPicker && isSelectedSpotValid {
+        // Preselected banner — stays visible even when the chosen date makes
+        // the spot unavailable, so a quick-booked spot is never silently lost.
+        if let spot = selectedSpot, hasPreselection && !showSpotPicker {
             HStack(spacing: 16) {
                 VStack(spacing: 3) {
                     Text(spot.id)
@@ -294,7 +299,9 @@ struct BookingSheet: View {
                     }
                 }
                 .frame(width: 72, height: 72)
-                .background(AppConfig.accent.opacity(0.2))
+                .background(isSelectedSpotValid
+                    ? AppConfig.accent.opacity(0.2)
+                    : AppConfig.warning.opacity(0.18))
                 .clipShape(RoundedRectangle(cornerRadius: 24))
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -302,9 +309,15 @@ struct BookingSheet: View {
                         .font(.title3)
                         .fontWeight(.bold)
                         .foregroundStyle(AppConfig.darkText)
-                    Text(L10n.availableOnSelectedDate)
-                        .font(.caption)
-                        .foregroundStyle(AppConfig.activeGreen)
+                    if isSelectedSpotValid {
+                        Text(L10n.availableOnSelectedDate)
+                            .font(.caption)
+                            .foregroundStyle(AppConfig.activeGreen)
+                    } else {
+                        Text(L10n.unavailableOnSelectedDate)
+                            .font(.caption)
+                            .foregroundStyle(AppConfig.warning)
+                    }
                 }
 
                 Spacer()
@@ -326,7 +339,7 @@ struct BookingSheet: View {
             .padding(18)
             .background(AppConfig.cardBg)
             .clipShape(RoundedRectangle(cornerRadius: 24))
-            .shadow(color: .black.opacity(0.06), radius: 14, y: 4)
+            .cardShadow()
             .padding(.horizontal)
         } else {
             // 3-column spot picker grid with availability header
@@ -407,7 +420,16 @@ struct BookingSheet: View {
                             if occupiedRanges != nil { return .partial(name: nil, plate: nil, ranges: occupiedRanges) }
                             return .available
                         }()
-                        UnifiedSpotCell(spot: spot, status: cellStatus, mode: .compact) {
+                        UnifiedSpotCell(
+                            spot: spot,
+                            status: cellStatus,
+                            mode: .compact,
+                            spotGroupBadges: AppConfig.spotGroupBadges(
+                                spotID: spot.id,
+                                viewerCompany: bookingManager.currentUserCompany,
+                                isAdmin: bookingManager.isAdmin
+                            )
+                        ) {
                             if available {
                                 withAnimation(.standard) {
                                     selectedSpot = spot
@@ -599,11 +621,11 @@ struct BookingSheet: View {
 
                 VStack(spacing: 3) {
                     Text(label)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.caption.weight(.semibold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
                     Text("\(Calendar.current.component(.day, from: date))")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(.system(.body, design: .rounded, weight: .bold))
                 }
                 .foregroundStyle(isSelected ? .white : AppConfig.subtleGray)
                 .frame(width: innerWidth, height: innerHeight)
@@ -831,7 +853,7 @@ struct BookingSheet: View {
                     .stroke(AppConfig.separatorSoft, lineWidth: 1.5)
                 : nil
             )
-            .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
+            .cardShadow()
             .animation(.standard, value: isForOthersToggle)
         }
         .buttonStyle(ScaleButtonStyle())
@@ -898,7 +920,7 @@ struct BookingSheet: View {
             Task { await submitBooking() }
         } label: {
             ZStack {
-                Capsule()
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(confirmButtonBackground(noSpot: noSpot))
                     .overlay {
                         if confirmVisualState == .loading && !reduceMotion {
@@ -909,7 +931,7 @@ struct BookingSheet: View {
                 ZStack {
                     HStack(spacing: 8) {
                         Image(systemName: confirmButtonIcon(noSpot: noSpot))
-                            .font(.system(size: 17, weight: .bold))
+                            .font(.body.weight(.bold))
                         Text(confirmTitle(for: .idle, noSpot: noSpot))
                             .font(.body)
                             .fontWeight(.bold)
@@ -926,7 +948,7 @@ struct BookingSheet: View {
 
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.title3.weight(.bold))
                         Text(confirmTitle(for: .success, noSpot: noSpot))
                             .font(.body)
                             .fontWeight(.bold)
@@ -937,7 +959,7 @@ struct BookingSheet: View {
 
                     HStack(spacing: 8) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.title3.weight(.bold))
                         Text(confirmTitle(for: .failure, noSpot: noSpot))
                             .font(.body)
                             .fontWeight(.bold)
@@ -950,7 +972,7 @@ struct BookingSheet: View {
                 .padding(.horizontal, 24)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 54)
+            .frame(height: 50)
         }
         .buttonStyle(SystemMicroButtonStyle())
         .disabled(!canSubmit)
@@ -1039,7 +1061,7 @@ struct BookingSheet: View {
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
                         .fill(AppConfig.surfaceHigh)
                     Image(systemName: icon)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(AppConfig.subtleGray)
                 }
@@ -1053,7 +1075,7 @@ struct BookingSheet: View {
         .padding(18)
         .background(AppConfig.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: 24))
-        .shadow(color: .black.opacity(0.06), radius: 14, y: 4)
+        .cardShadow()
         .padding(.horizontal)
     }
 
@@ -1064,7 +1086,7 @@ struct BookingSheet: View {
         .padding(18)
         .background(AppConfig.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: 24))
-        .shadow(color: .black.opacity(0.06), radius: 14, y: 4)
+        .cardShadow()
         .padding(.horizontal)
     }
 
@@ -1074,7 +1096,7 @@ struct BookingSheet: View {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(AppConfig.surfaceHigh)
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(AppConfig.subtleGray)
             }
@@ -1091,7 +1113,13 @@ struct BookingSheet: View {
     }
 
     private var bookableSpots: [ParkingSpot] {
-        bookingManager.parkingSpots.filter { !AppConfig.blockedSpotIDs.contains($0.id) }
+        bookingManager.parkingSpots.filter {
+            !AppConfig.blockedSpotIDs.contains($0.id)
+                && AppConfig.spotVisible(spotID: $0.id,
+                                         company: bookingManager.currentUserCompany,
+                                         isAdmin: bookingManager.isAdmin,
+                                         bookingDate: bookingDate)
+        }
     }
 
     private var isValid: Bool {
@@ -1172,8 +1200,8 @@ struct BookingSheet: View {
             await ensureMinimumLoadingTime(since: submitStartedAt)
             withAnimation(motionStandard) { confirmVisualState = .success }
             try? await Task.sleep(for: .milliseconds(reduceMotion ? 220 : 420))
+            // Success haptic fires from the overlay choreography, timed to the car settling.
             withAnimation(.emphasis) { showSuccess = true }
-            Haptics.notify(.success)
 
             // Stay on success overlay — user must tap "Got it!" to dismiss.
         } catch {
@@ -1234,10 +1262,9 @@ struct BookingSheet: View {
                                 .font(.body).fontWeight(.semibold)
                                 .foregroundStyle(AppConfig.onAccent)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
+                                .frame(height: 50)
                                 .background(AppConfig.accent)
-                                .clipShape(Capsule())
-                                .shadow(color: AppConfig.accent.opacity(0.35), radius: 12, y: 4)
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                         .buttonStyle(ScaleButtonStyle())
 
@@ -1246,9 +1273,9 @@ struct BookingSheet: View {
                                 .font(.body).fontWeight(.semibold)
                                 .foregroundStyle(AppConfig.darkText)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
+                                .frame(height: 50)
                                 .background(AppConfig.surfaceHigh)
-                                .clipShape(Capsule())
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                         .buttonStyle(ScaleButtonStyle())
                     }
@@ -1258,9 +1285,9 @@ struct BookingSheet: View {
                             .font(.body.bold())
                             .foregroundStyle(isForOthersToggle && !isEditing ? AppConfig.darkText : AppConfig.onAccent)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
+                            .frame(height: 50)
                             .background(isForOthersToggle && !isEditing ? AppConfig.surfaceHigh : AppConfig.accent)
-                            .clipShape(Capsule())
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
@@ -1278,6 +1305,7 @@ struct BookingSheet: View {
             cardOpacity = 0
             bgOpacity = 0
             actionsOpacity = 0
+            carParked = false
 
             // 1. Background fades in
             withAnimation(motionFade) { bgOpacity = 1 }
@@ -1293,8 +1321,34 @@ struct BookingSheet: View {
             withAnimation((reduceMotion ? Animation.linear(duration: 0.01) : .easeOut(duration: 0.14)).delay(reduceMotion ? 0 : 0.12)) {
                 actionsOpacity = 1
             }
+
+            // 4. The car drives into the spot; haptic thunk as it settles.
+            if parkedVehicleUser != nil {
+                if reduceMotion {
+                    withAnimation(.easeOut(duration: 0.25).delay(0.15)) { carParked = true }
+                    Haptics.notify(.success)
+                } else {
+                    withAnimation(.spring(duration: 0.9, bounce: 0.12).delay(0.40)) { carParked = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.05) {
+                        Haptics.parked()
+                    }
+                }
+            } else {
+                Haptics.notify(.success)
+            }
         }
         .transition(.opacity)
+    }
+
+    /// The booker's own vehicle, shown driving into the confirmed spot.
+    /// Hidden for delegated bookings, admin range bookings, and users with no
+    /// vehicle visual on file.
+    private var parkedVehicleUser: AppUser? {
+        guard !isForOthersToggle, !isAdminRangeMode,
+              let user = authManager.currentUser,
+              !user.vehicleMiniaturePresetID.isEmpty || !user.carDescription.isEmpty
+        else { return nil }
+        return user
     }
 
     /// The parking ticket card shown in the success overlay.
@@ -1312,7 +1366,7 @@ struct BookingSheet: View {
                 }
                 Spacer()
                 Text("EL PARKING")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.caption2.weight(.bold))
                     .tracking(2)
                     .foregroundStyle(AppConfig.subtleGray)
             }
@@ -1331,6 +1385,25 @@ struct BookingSheet: View {
                         .lineLimit(1)
                 }
 
+                // The user's own car drives into the spot
+                if let vehicleUser = parkedVehicleUser {
+                    VehicleMiniatureView(
+                        carType: vehicleUser.carType,
+                        colorHex: vehicleUser.carColor,
+                        description: vehicleUser.carDescription,
+                        presetID: vehicleUser.vehicleMiniaturePresetID.isEmpty
+                            ? nil : vehicleUser.vehicleMiniaturePresetID,
+                        useFastRendering: true
+                    )
+                    .frame(width: 150, height: 84)
+                    // Rasterize so the slide animates as one cheap texture.
+                    .drawingGroup()
+                    // Starts beyond the card's right edge (clipped away), then drives in leftward.
+                    .offset(x: carParked || reduceMotion ? 0 : 360)
+                    .opacity(reduceMotion ? (carParked ? 1 : 0) : 1)
+                    .accessibilityHidden(true)
+                }
+
                 // Ticket perforation line
                 HStack(spacing: 5) {
                     ForEach(0..<22, id: \.self) { _ in
@@ -1344,7 +1417,7 @@ struct BookingSheet: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("DATE")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.caption2.weight(.bold))
                             .tracking(1.5)
                             .foregroundStyle(AppConfig.subtleGray)
                         if isAdminRangeMode,
@@ -1363,11 +1436,11 @@ struct BookingSheet: View {
 
                     VStack(alignment: .trailing, spacing: 3) {
                         Text("TIME")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.caption2.weight(.bold))
                             .tracking(1.5)
                             .foregroundStyle(AppConfig.subtleGray)
                         Text("\(timeFrom) – \(timeTo)")
-                            .font(.system(size: 14, weight: .bold, design: .monospaced))
+                            .font(.system(.subheadline, design: .monospaced, weight: .bold))
                             .foregroundStyle(AppConfig.darkText)
                     }
                 }
@@ -1375,8 +1448,8 @@ struct BookingSheet: View {
             .padding(24)
             .background(AppConfig.cardBg)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 28))
-        .shadow(color: .black.opacity(0.32), radius: 48, y: 24)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .modalShadow()
         .padding(.horizontal, 24)
     }
 
@@ -1529,69 +1602,21 @@ private struct BookingCardChrome: ViewModifier {
                 .padding(.horizontal, horizontalPadding)
                 .background(AppConfig.cardBg)
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                .shadow(color: .black.opacity(0.06), radius: 14, y: 4)
+                .cardShadow()
                 .padding(.horizontal)
         } else {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        content
-            .padding(verticalPadding)
-            .padding(.horizontal, horizontalPadding)
-            .background(
-                shape
-                    .fill(.ultraThinMaterial)
-                    .allowsHitTesting(false)
-            )
-            .overlay(
-                // Specular sheen pass for a premium glass surface.
-                shape
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.28),
-                                Color.white.opacity(0.08),
-                                Color.clear
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .center
-                        )
-                    )
-                    .allowsHitTesting(false)
-            )
-            .overlay(
-                // Outer bright rim.
-                shape
-                    .stroke(Color.white.opacity(0.42), lineWidth: 1.2)
-                    .allowsHitTesting(false)
-            )
-            .overlay(
-                // Inner optical edge.
-                RoundedRectangle(cornerRadius: max(0, cornerRadius - 1.2), style: .continuous)
-                    .stroke(Color.white.opacity(0.18), lineWidth: 0.8)
-                    .padding(1.2)
-                    .allowsHitTesting(false)
-            )
-            .overlay(
-                // Lower edge darkening to increase perceived thickness.
-                shape
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color.clear,
-                                Color.black.opacity(0.07)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 1.1
-                    )
-                    .allowsHitTesting(false)
-            )
-            .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
-            .shadow(color: .white.opacity(0.04), radius: 2, y: -1)
-            .padding(.horizontal)
+            // Real Liquid Glass — replaces the previous hand-painted
+            // material + sheen + rim imitation.
+            content
+                .padding(verticalPadding)
+                .padding(.horizontal, horizontalPadding)
+                .glassEffect(
+                    .frosted,
+                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                )
+                .padding(.horizontal)
         }
     }
-
 }
 
 private struct BookingMiniPillModifier: ViewModifier {
@@ -1693,7 +1718,7 @@ struct CancelSuccessOverlay: View {
                 }
                 Spacer()
                 Text("EL PARKING")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.caption2.weight(.bold))
                     .tracking(2)
                     .foregroundStyle(AppConfig.subtleGray)
             }
@@ -1727,7 +1752,7 @@ struct CancelSuccessOverlay: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("DATE")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.caption2.weight(.bold))
                             .tracking(1.5)
                             .foregroundStyle(AppConfig.subtleGray)
                         Text(date)
@@ -1738,11 +1763,11 @@ struct CancelSuccessOverlay: View {
                     Spacer()
                     VStack(alignment: .trailing, spacing: 3) {
                         Text("TIME")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.caption2.weight(.bold))
                             .tracking(1.5)
                             .foregroundStyle(AppConfig.subtleGray)
                         Text("\(timeFrom) – \(timeTo)")
-                            .font(.system(size: 14, weight: .bold, design: .monospaced))
+                            .font(.system(.subheadline, design: .monospaced, weight: .bold))
                             .foregroundStyle(AppConfig.darkText)
                             .strikethrough(true, color: AppConfig.subtleGray)
                     }
@@ -1751,8 +1776,8 @@ struct CancelSuccessOverlay: View {
             .padding(24)
             .background(AppConfig.cardBg)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 28))
-        .shadow(color: .black.opacity(0.32), radius: 48, y: 24)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .modalShadow()
         .padding(.horizontal, 24)
     }
 

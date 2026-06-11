@@ -15,6 +15,47 @@ struct AppEmptyStateCard: View {
     var action: (() -> Void)? = nil
 
     var body: some View {
+        if AppConfig.enableNativeEmptyStates {
+            nativeBody
+        } else {
+            legacyBody
+        }
+    }
+
+    // MARK: - Native (ContentUnavailableView)
+
+    private var nativeBody: some View {
+        ContentUnavailableView {
+            Label(title, systemImage: icon)
+        } description: {
+            if let footnote {
+                Text("\(subtitle)\n\(footnote)")
+            } else {
+                Text(subtitle)
+            }
+        } actions: {
+            if let actionTitle, let action {
+                Button {
+                    Haptics.action()
+                    action()
+                } label: {
+                    if let actionIcon {
+                        Label(actionTitle, systemImage: actionIcon)
+                    } else {
+                        Text(actionTitle)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(AppConfig.accent)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - Legacy card (kept for easy revert via AppConfig.enableNativeEmptyStates)
+
+    private var legacyBody: some View {
         VStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.title2.weight(.semibold))
@@ -65,10 +106,6 @@ struct AppEmptyStateCard: View {
         .padding(.horizontal, 18)
         .background(AppConfig.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
-        .overlay(
-            RoundedRectangle(cornerRadius: AppConfig.radius16)
-                .stroke(AppConfig.separatorSoft, lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.03), radius: 8, y: 2)
+        .cardShadow()
     }
 }

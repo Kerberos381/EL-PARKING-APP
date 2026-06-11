@@ -456,6 +456,7 @@ class AuthManager: ObservableObject {
         carType: String = "",
         vehicleMiniaturePresetID: String = "",
         preferredVocative: String = "",
+        phone: String? = nil,
         companyBadge: CompanyBadge? = nil
     ) async {
         guard let uid = currentUser?.uid else { return }
@@ -468,6 +469,7 @@ class AuthManager: ObservableObject {
                 "vehicleMiniaturePresetID": vehicleMiniaturePresetID,
                 "preferredVocative": trimmedVocative
             ]
+            if let phone { update["phone"] = phone.trimmingCharacters(in: .whitespacesAndNewlines) }
             if !carColor.isEmpty { update["carColor"] = carColor }
             if !carType.isEmpty  { update["carType"]  = carType  }
             if let companyBadge { update["companyBadge"] = companyBadge.rawValue }
@@ -588,6 +590,20 @@ class AuthManager: ObservableObject {
             let error = NSError(domain: "AuthManager", code: -1,
                                 userInfo: [NSLocalizedDescriptionKey: "Firebase Setup: Firebase is not configured."])
             errorMessage = error.localizedDescription
+            return .failure(error)
+        }
+
+        // Plant the invite marker under the ADMIN's auth context first —
+        // the security rules' provisioning fallback requires it, so freshly
+        // minted Auth accounts can't self-create active user docs.
+        do {
+            try await db.collection("invites").document(normalizedEmail).setData([
+                "email":     normalizedEmail,
+                "createdBy": currentUser?.uid ?? "",
+                "createdAt": FieldValue.serverTimestamp()
+            ])
+        } catch {
+            errorMessage = "Admin Setup: Could not authorize the new account (\(error.localizedDescription))"
             return .failure(error)
         }
 
@@ -1129,6 +1145,28 @@ class AuthManager: ObservableObject {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
+
+        // 0. Refresh the auth session BEFORE touching any data. Firebase
+        //    refuses account deletion on stale sessions (error 17014); doing
+        //    this first also prevents a half-deleted state where Firestore
+        //    data is gone but the Auth account survives.
+        if KeychainManager.shared.hasSavedCredentials {
+            guard let email = KeychainManager.shared.savedEmail,
+                  let password = await KeychainManager.shared.retrievePassword(
+                      reason: L10n.reauthToDeleteReason
+                  ) else {
+                // User cancelled Face ID or retrieval failed — abort safely.
+                errorMessage = L10n.reauthFailedMsg
+                return false
+            }
+            do {
+                let credential = EmailAuthProvider.credential(withEmail: email, password: password)
+                try await firebaseUser.reauthenticate(with: credential)
+            } catch {
+                errorMessage = friendlyError(error)
+                return false
+            }
+        }
 
         do {
             let uid = user.uid

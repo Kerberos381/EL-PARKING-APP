@@ -63,7 +63,7 @@ class LanguageManager: ObservableObject {
 struct L10n {
 
     static var lang: AppLanguage { LanguageManager.shared.language }
-    private static var isCzech: Bool { lang == .czech }
+    static var isCzech: Bool { lang == .czech }
 
     // ─────────────────────────────────────────────────────────────────────────
     // MARK: Navigation / Tab Bar
@@ -75,6 +75,17 @@ struct L10n {
     static var settings:   String { isCzech ? "Nastavení"  : "Settings" }
     static var search:     String { isCzech ? "Hledat"     : "Search" }
     static var dashboard:  String { isCzech ? "Přehled"    : "Dashboard" }
+
+    // Home Screen quick action subtitles
+    static var qaOpenBookingSheet:  String { isCzech ? "Otevřít rezervaci"        : "Open booking sheet" }
+    static var qaSeeUpcoming:       String { isCzech ? "Nadcházející rezervace"   : "See upcoming bookings" }
+    static var qaOpenToCancel:      String { isCzech ? "Zrušit v Moje rezervace"  : "Open bookings to cancel" }
+    static var qaAdminControls:     String { isCzech ? "Otevřít správu"           : "Open admin controls" }
+    static var qaOpenDirections:    String { isCzech ? "Otevřít navigaci"         : "Open directions" }
+    static var qaQuickBooking:      String { isCzech ? "Rychlá rezervace"         : "Start quick booking" }
+    static var qaNavigateToParking: String { isCzech ? "Navigovat na parkoviště"  : "Navigate to Parking" }
+    static var qaBookNext:          String { isCzech ? "Rezervovat nejbližší"     : "Book Next Available" }
+    static var qaAdminDashboard:    String { isCzech ? "Správa"                   : "Admin Dashboard" }
 
     // ─────────────────────────────────────────────────────────────────────────
     // MARK: Common Actions
@@ -108,8 +119,8 @@ struct L10n {
     static var bookFromBelow:  String { isCzech ? "Zarezervujte místo níže" : "Book a spot from below" }
     static var announcements:  String { isCzech ? "Oznámení"            : "Announcements" }
     static var info:           String { isCzech ? "Informace"           : "Info" }
-    static var activeNow:      String { isCzech ? "AKTIVNÍ"             : "ACTIVE NOW" }
-    static var upcoming:       String { isCzech ? "NADCHÁZEJÍCÍ"        : "UPCOMING" }
+    static var activeNow:      String { isCzech ? "Aktivní"             : "Active now" }
+    static var upcoming:       String { isCzech ? "Nadcházející"        : "Upcoming" }
     static var navigate:       String { isCzech ? "Navigovat"           : "Navigate" }
     static var bookedBy:       String { isCzech ? "Rezervováno:"        : "Booked by" }
 
@@ -120,6 +131,15 @@ struct L10n {
             return "Ahoj, \(finalName)"
         }
         return "Hello, \(name)"
+    }
+
+    /// Primary book CTA with live availability — "Book (12)".
+    static func bookWithCount(_ n: Int) -> String {
+        isCzech ? "Rezervovat (\(n))" : "Book (\(n))"
+    }
+
+    static var emptyHeroTitle: String {
+        isCzech ? "Zarezervujte si místo na dnešek" : "Reserve your spot for today"
     }
 
     static func spotsAvailable(_ count: Int) -> String {
@@ -137,7 +157,7 @@ struct L10n {
     // MARK: Parking Overview
     // ─────────────────────────────────────────────────────────────────────────
 
-    static var executiveMobility: String { isCzech ? "FIREMNÍ MOBILITA"  : "EXECUTIVE MOBILITY" }
+    static var executiveMobility: String { isCzech ? "Firemní mobilita"  : "Executive mobility" }
     static var parkingDot:        String { isCzech ? "Parkování."        : "Parking." }
     static var today:             String { isCzech ? "Dnes"              : "Today" }
     static var free:              String { isCzech ? "Volné"             : "Free" }
@@ -179,6 +199,9 @@ struct L10n {
     static var change:     String { isCzech ? "Změnit"         : "Change" }
     static var available:  String { isCzech ? "Dostupné"       : "Available" }
     static var availableOnSelectedDate: String { isCzech ? "Dostupné ve vybraný den" : "Available on selected date" }
+    static var unavailableOnSelectedDate: String {
+        isCzech ? "Pro vybrané datum není dostupné – změňte datum nebo místo" : "Not available on this date — change the date or spot"
+    }
     static var delegateBooking: String { isCzech ? "Delegovat rezervaci" : "Delegate Booking" }
     static var suggestedAlternatives: String { isCzech ? "Doporučené alternativy" : "Suggested alternatives" }
     static var sameTime: String { isCzech ? "Stejný čas" : "Same time" }
@@ -330,6 +353,20 @@ struct L10n {
     static var profile:          String { isCzech ? "Profil"            : "Profile" }
     static var language:         String { isCzech ? "Jazyk"             : "Language" }
     static var appearance:       String { isCzech ? "Vzhled"            : "Appearance" }
+    static var colorPalette:     String { isCzech ? "Barevná paleta"    : "Color palette" }
+    static var paletteDefault:   String { isCzech ? "Výchozí"           : "Default" }
+    static var paletteCalm:      String { isCzech ? "Klidná"            : "Calm" }
+    static var homeLayout:       String { isCzech ? "Domovská obrazovka" : "Home layout" }
+    static var homeRoomy:        String { isCzech ? "Výchozí"           : "Default" }
+    static var homeCompact:      String { isCzech ? "Kompaktní"         : "Compact" }
+    static var yourVehicle:      String { isCzech ? "Vaše vozidlo"      : "Your vehicle" }
+    static var addYourVehicle:   String { isCzech ? "Přidat vozidlo"    : "Add your vehicle" }
+    static var favoriteShort:    String { isCzech ? "Oblíbené"          : "Favorite" }
+    static var lastShort:        String { isCzech ? "Naposledy"         : "Last" }
+    static func freeCount(_ n: Int) -> String { isCzech ? "\(n) volných" : "\(n) free" }
+    static func spotTakenToday(_ id: String) -> String {
+        isCzech ? "Místo \(id) je dnes obsazené – vyberte jiné." : "Spot \(id) is already taken today — pick another."
+    }
     static var notifications:    String { isCzech ? "Oznámení"          : "Notifications" }
     static var vehicle:          String { isCzech ? "Vozidlo"           : "My Vehicle" }
     static var account:          String { isCzech ? "Účet"              : "Account" }
@@ -459,6 +496,14 @@ struct L10n {
     static var confirmPassword:  String { isCzech ? "Potvrdit heslo"      : "Confirm Password" }
     static var forgotPassword:   String { isCzech ? "Zapomenuté heslo?"   : "Forgot password?" }
     static var privacyPolicy:    String { isCzech ? "Zásady ochrany soukromí" : "Privacy Policy" }
+    static var reauthToDeleteReason: String {
+        isCzech ? "Potvrďte svou totožnost pro smazání účtu" : "Confirm your identity to delete your account"
+    }
+    static var reauthFailedMsg: String {
+        isCzech
+            ? "Totožnost se nepodařilo ověřit. Účet nebyl smazán."
+            : "Couldn't confirm your identity. Your account was not deleted."
+    }
     static var passwordsMismatch:String { isCzech ? "Hesla se neshodují"  : "Passwords do not match" }
     static var alreadyHaveAccount:String{ isCzech ? "Již máte účet?"      : "Already have an account?" }
     static var noAccountYet:     String { isCzech ? "Nemáte účet?"        : "Don't have an account?" }
@@ -542,6 +587,12 @@ struct L10n {
     // ─────────────────────────────────────────────────────────────────────────
 
     static var whatsNew: String { isCzech ? "Co je nového" : "What's New" }
+    static var versionLabel: String { isCzech ? "Verze" : "Version" }
+    static var releasedLabel: String { isCzech ? "Vydáno" : "Released" }
+
+    // Onboarding page titles (3-page Apple-style walkthrough)
+    static var onboardingPage2Title: String { isCzech ? "Zůstaňte v obraze" : "Stay in the Loop" }
+    static var onboardingPage3Title: String { isCzech ? "Dobré vědět" : "Good to Know" }
 
     // ─────────────────────────────────────────────────────────────────────────
     // MARK: Onboarding
@@ -628,6 +679,28 @@ struct L10n {
             ? "O každém varování i obnovení budete okamžitě upozorněni."
             : "You'll be notified immediately for each warning and when your account is restored."
     }
+    static var spotReservedForCompanyError: String {
+        isCzech
+            ? "Toto místo je vyhrazeno pro jinou skupinu. Všechna volná místa se otevírají pro všechny dnes od 8:00."
+            : "This spot is reserved for another group. All free spots open to everyone from 8:00 today."
+    }
+    static var grandVisionTag: String { "GV" }
+    static var onboardingSpotGroupsTitle: String { isCzech ? "Skupiny míst" : "Spot Groups" }
+    static var onboardingSpotGroupsDesc: String {
+        isCzech
+            ? "Místa 74–76 jsou vyhrazena pro GrandVision; GrandVision parkuje pouze tam. Ostatní místa patří Essilor a Omega. Každý den od 8:00 jsou všechna volná místa otevřena pro všechny — pouze pro daný den."
+            : "Spots 74–76 are reserved for GrandVision; GrandVision parks only there. All other spots belong to Essilor and Omega. Every day from 8:00, any free spot opens to everyone — for that day only."
+    }
+    static var onboardingPersonalizeTitle: String { isCzech ? "Přizpůsobte si\naplikaci" : "Make It\nYours" }
+    static var changeAnytimeHint: String {
+        isCzech ? "Kdykoli změníte v Nastavení → Vzhled." : "You can change this anytime in Settings → Appearance."
+    }
+    static var onboardingCalmTitle: String { isCzech ? "Klidná paleta" : "Calm Color Theme" }
+    static var onboardingCalmDesc: String {
+        isCzech
+            ? "Preferujete jemnější vzhled? Přepněte na tlumenou severskou paletu v Nastavení → Vzhled."
+            : "Prefer a softer look? Switch to the muted Nordic palette in Settings → Appearance."
+    }
     static var onboardingDoneTitle:       String { isCzech ? "Vše připraveno!"     : "You're All Set!" }
     static var onboardingDoneSub:         String { isCzech ? "Pojďme parkovat"     : "Let's get parking" }
     static var onboardingDoneDesc:        String {
@@ -641,6 +714,23 @@ struct L10n {
     // ─────────────────────────────────────────────────────────────────────────
 
     static var userManagement:  String { isCzech ? "Správa uživatelů"  : "User Management" }
+
+    // Admin dashboard sections & row subtitles
+    static var adminSectionOverview:    String { isCzech ? "Přehled"       : "Overview" }
+    static var adminSectionUsers:       String { isCzech ? "Uživatelé"     : "Users" }
+    static var adminSectionContent:     String { isCzech ? "Obsah"         : "Content" }
+    static var adminSectionAnalytics:   String { isCzech ? "Analytika"     : "Analytics" }
+    static var adminSectionMaintenance: String { isCzech ? "Údržba"        : "Maintenance" }
+    static var adminRowUsers:           String { isCzech ? "Uživatelé"     : "Users" }
+    static var adminRowNewUser:         String { isCzech ? "Nový uživatel" : "New User" }
+    static var adminRowCSVImport:       String { isCzech ? "Import CSV"    : "CSV Import" }
+    static var adminRowSpots:           String { isCzech ? "Místa"         : "Spots" }
+    static var adminRowPosts:           String { isCzech ? "Příspěvky"     : "Posts" }
+    static var adminRowCards:           String { isCzech ? "Karty"         : "Cards" }
+    static var adminRowTrends:          String { isCzech ? "Trendy"        : "Trends" }
+    static var adminRowCleanup:         String { isCzech ? "Čištění"       : "Cleanup" }
+    static var adminPurgeDeleting:      String { isCzech ? "Mažu…"         : "Deleting…" }
+
     static var all:             String { isCzech ? "Vše"               : "All" }
     static var pending:         String { isCzech ? "Čekající"          : "Pending" }
     static var activeFilter:    String { isCzech ? "Aktivní"           : "Active" }
@@ -788,6 +878,16 @@ struct L10n {
 
     // Admin: Cancel Booking
     static var adminCancelBooking: String { isCzech ? "Správce: Zrušit rezervaci" : "Admin: Cancel Booking" }
+    static var notifyUserTitle: String { isCzech ? "Upozornit uživatele?" : "Notify the user?" }
+    static func notifyUserMessage(_ name: String) -> String {
+        isCzech ? "Dejte vědět uživateli \(name), že jeho rezervace byla zrušena." : "Let \(name) know their booking was cancelled."
+    }
+    static var notifyViaMessage: String { isCzech ? "Zpráva (SMS)" : "Message (SMS)" }
+    static var notifyViaEmail:   String { isCzech ? "E-mail" : "Email" }
+    static var notifyLater:      String { isCzech ? "Teď ne" : "Not now" }
+    static var bookingCancelledSubject: String { isCzech ? "Zrušená rezervace parkování" : "Parking booking cancelled" }
+    static var phoneNumber:      String { isCzech ? "Telefon" : "Phone" }
+    static var phoneOptional:    String { isCzech ? "Telefon (volitelné)" : "Phone (optional)" }
     static var cancelAndNotify:    String { isCzech ? "Zrušit a odeslat oznámení" : "Cancel & Notify" }
     static var cancelBookingFailed: String { isCzech ? "Rezervaci se nepodařilo zrušit" : "Could Not Cancel Booking" }
     static var adminBookingProtectedTitle: String { isCzech ? "Rezervace správce je chráněna" : "Admin Booking Protected" }

@@ -79,7 +79,7 @@ struct ParkingMapView: View {
             ZStack {
                 // ── Background placeholder ─────────────────────────────────
                 // TODO: Replace with Image("parking_layout").resizable().scaledToFit()
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: 16)
                     .fill(AppConfig.surfaceLow)
                     .overlay(
                         VStack(spacing: 16) {
@@ -117,7 +117,7 @@ struct ParkingMapView: View {
                 .fill(pinColor(status))
                 .frame(width: 36, height: 36)
             Text(spot.id)
-                .font(.system(size: 10, weight: .bold))
+                .font(.caption2.weight(.bold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)

@@ -12,6 +12,7 @@ struct OverviewView: View {
     @EnvironmentObject var authManager:   AuthManager
     @ObservedObject private var lang = LanguageManager.shared
     @State private var selectedDate = Calendar.current.startOfDay(for: Date())
+    @Namespace private var datePillSelectionNS
     @State private var bookingToCancel: Booking?
     @State private var showCancelAlert = false
     @State private var spotBookingDetail: Booking?
@@ -21,6 +22,8 @@ struct OverviewView: View {
     @State private var showProtectedAdminAlert = false
     @State private var showCancelErrorAlert = false
     @State private var cancelErrorMessage = ""
+    @State private var notifyAfterCancel: Booking?
+    @State private var showNotifyPrompt = false
     @State private var activeFilter: SpotStatus? = nil
     /// Comma-separated favourite spot IDs persisted to UserDefaults
     @AppStorage("favouriteSpotIDs") private var favouriteSpotIDsStr: String = ""
@@ -97,10 +100,20 @@ struct OverviewView: View {
     }
 
     /// Spots filtered by active filter, with favourites sorted to top
+    /// Spots the current user may see for the selected date (company policy).
+    private var visibleSpots: [ParkingSpot] {
+        bookingManager.parkingSpots.filter {
+            AppConfig.spotVisible(spotID: $0.id,
+                                  company: bookingManager.currentUserCompany,
+                                  isAdmin: bookingManager.isAdmin,
+                                  bookingDate: selectedDate)
+        }
+    }
+
     private var filteredSpots: [ParkingSpot] {
         let base: [ParkingSpot]
         if let filter = activeFilter {
-            base = bookingManager.parkingSpots.filter { spot in
+            base = visibleSpots.filter { spot in
                 let status = spotStatusByID[spot.id] ?? .available
                 if filter == .occupied {
                     return status == .occupied || status == .mine || status == .partial
@@ -108,7 +121,7 @@ struct OverviewView: View {
                 return status == filter
             }
         } else {
-            base = bookingManager.parkingSpots
+            base = visibleSpots
         }
         // Favourites float to the top; original order preserved within each group
         let favs = favouriteSpotIDs
@@ -179,6 +192,32 @@ struct OverviewView: View {
                     Text(L10n.cancelOwnBookingAlert(user: booking.user, spot: booking.spotNumber, date: booking.naturalDate))
                 }
             }
+            .confirmationDialog(
+                L10n.notifyUserTitle,
+                isPresented: $showNotifyPrompt,
+                titleVisibility: .visible,
+                presenting: notifyAfterCancel
+            ) { booking in
+                let phone = cancelledUserPhone(booking)
+                let body = CancelNotify.body(
+                    spot: booking.spotNumber, date: booking.naturalDate, reason: ""
+                )
+                if !phone.isEmpty {
+                    Button(L10n.notifyViaMessage) {
+                        CancelNotify.sendMessage(to: phone, body: body)
+                    }
+                }
+                Button(L10n.notifyViaEmail) {
+                    CancelNotify.sendEmail(
+                        to: booking.email,
+                        subject: L10n.bookingCancelledSubject,
+                        body: body
+                    )
+                }
+                Button(L10n.notifyLater, role: .cancel) {}
+            } message: { booking in
+                Text(L10n.notifyUserMessage(booking.user))
+            }
             .confirmationDialog(L10n.adminCancelBooking, isPresented: $showAdminCancelAlert, titleVisibility: .visible) {
                 Button(L10n.cancelAndNotify, role: .destructive) {
                     if let booking = adminCancelTarget {
@@ -213,7 +252,6 @@ struct OverviewView: View {
                 Text(L10n.executiveMobility)
                     .font(.caption)
                     .fontWeight(.bold)
-                    .tracking(3)
                     .foregroundStyle(AppConfig.subtleGray)
 
                 Text(L10n.parkingDot)
@@ -270,14 +308,22 @@ struct OverviewView: View {
         } label: {
             ZStack {
                 RoundedRectangle(cornerRadius: pillRadius, style: .continuous)
-                    .fill(isSelected ? AppConfig.pillSelected : AppConfig.cardBg)
+                    .fill(AppConfig.cardBg)
                     .frame(width: innerWidth, height: innerHeight)
+
+                // Selected background is one shared shape that slides between pills.
+                if isSelected {
+                    RoundedRectangle(cornerRadius: pillRadius, style: .continuous)
+                        .fill(AppConfig.pillSelected)
+                        .matchedGeometryEffect(id: "datePillSelection", in: datePillSelectionNS)
+                        .frame(width: innerWidth, height: innerHeight)
+                }
 
                 VStack(spacing: 4) {
                     Text(dayName)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.caption.weight(.semibold))
                     Text("\(dayNum)")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .font(.system(.title3, design: .rounded, weight: .bold))
                 }
                 .foregroundStyle(isSelected ? .white : AppConfig.darkText)
                 .frame(width: innerWidth, height: innerHeight)
@@ -290,15 +336,19 @@ struct OverviewView: View {
     // MARK: - Stats Bar (Tappable Filters)
 
     private var statsBar: some View {
-        HStack(spacing: 8) {
-            let total = bookingManager.parkingSpots.count
-            let booked = Set(allBookingsForDate.map { bookingManager.normalizedSpotKey($0.spot) }).count
-            let blocked = AppConfig.blockedSpotIDs.count
-            let free = max(0, total - booked - blocked)
+        // Adjacent glass shapes must share one container to blend correctly.
+        GlassEffectContainer {
+            HStack(spacing: 8) {
+                let pool = visibleSpots
+                let bookedKeys = Set(allBookingsForDate.map { bookingManager.normalizedSpotKey($0.spot) })
+                let blocked = pool.filter { AppConfig.blockedSpotIDs.contains($0.id) }.count
+                let booked = pool.filter { bookedKeys.contains(bookingManager.normalizedSpotKey($0.label)) }.count
+                let free = max(0, pool.count - booked - blocked)
 
-            filterPill(value: "\(free)", label: L10n.free, color: AppConfig.spotAvailable, filter: .available)
-            filterPill(value: "\(booked)", label: L10n.booked, color: AppConfig.spotOccupied, filter: .occupied)
-            filterPill(value: "\(blocked)", label: L10n.blocked, color: AppConfig.spotBlocked, filter: .blocked)
+                filterPill(value: "\(free)", label: L10n.free, color: AppConfig.spotAvailable, filter: .available)
+                filterPill(value: "\(booked)", label: L10n.booked, color: AppConfig.spotOccupied, filter: .occupied)
+                filterPill(value: "\(blocked)", label: L10n.blocked, color: AppConfig.spotBlocked, filter: .blocked)
+            }
         }
         .padding(.horizontal)
     }
@@ -313,15 +363,17 @@ struct OverviewView: View {
         } label: {
             VStack(spacing: 3) {
                 Text(value)
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .font(.system(.title3, design: .rounded, weight: .bold))
                     .foregroundStyle(color)
+                    .contentTransition(.numericText(countsDown: true))
+                    .animation(.motionStandard, value: value)
                 Text(label)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(isActive ? AppConfig.darkText : AppConfig.subtleGray)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24))
+            .glassEffect(.frosted, in: RoundedRectangle(cornerRadius: 24))
             .overlay(
                 isActive ?
                 RoundedRectangle(cornerRadius: 24)
@@ -343,6 +395,11 @@ struct OverviewView: View {
                     spot: spot,
                     status: cellStatus,
                     mode: .full,
+                    spotGroupBadges: AppConfig.spotGroupBadges(
+                        spotID: spot.id,
+                        viewerCompany: bookingManager.currentUserCompany,
+                        isAdmin: bookingManager.isAdmin
+                    ),
                     isFavourite: favouriteSpotIDs.contains(spot.id),
                     onFavouriteTap: { toggleFavourite(spot.id) }
                 ) {
@@ -458,7 +515,7 @@ struct OverviewView: View {
                     .fill(isMine ? AppConfig.accent.opacity(0.2) : AppConfig.surfaceHigh)
                     .frame(width: 40, height: 40)
                 Text(userInitials(booking.user))
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(.system(.footnote, design: .rounded, weight: .bold))
                     .foregroundStyle(isMine ? AppConfig.darkText : AppConfig.subtleGray)
             }
 
@@ -506,14 +563,14 @@ struct OverviewView: View {
             Spacer(minLength: 0)
 
             Text(booking.spotNumber)
-                .font(.system(size: 20, weight: .black, design: .rounded))
+                .font(.system(.title3, design: .rounded, weight: .black))
                 .foregroundStyle(AppConfig.darkText)
                 .frame(width: 44, height: 44)
                 .background(isMine ? AppConfig.surfaceHigh : AppConfig.surfaceLow)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
 
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.4))
         }
         .padding(.horizontal, 14)
@@ -560,7 +617,7 @@ struct OverviewView: View {
             // Accessibility legend item
             HStack(spacing: 4) {
                 Image(systemName: "figure.roll")
-                    .font(.system(size: 10))
+                    .font(.caption2)
                     .foregroundStyle(Color(red: 0.2, green: 0.6, blue: 1.0))
                 Text(L10n.accessible)
                     .foregroundStyle(AppConfig.subtleGray)
@@ -594,8 +651,15 @@ struct OverviewView: View {
         let error = await bookingManager.adminCancelBooking(booking)
         if error == nil {
             Haptics.notify(.success)
+            // Offer instant out-of-band notification (Message / Email).
+            notifyAfterCancel = booking
+            showNotifyPrompt = true
         }
         presentCancellationErrorIfNeeded(error)
+    }
+
+    private func cancelledUserPhone(_ booking: Booking) -> String {
+        usersByEmailLowercased[booking.email.lowercased()]?.phone ?? ""
     }
 
     private func performCancellation(of booking: Booking) async {

@@ -43,21 +43,21 @@ struct BookingShareCardView: View {
         VStack(spacing: 14) {
             HStack(spacing: 10) {
                 Image(systemName: "car")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.footnote.weight(.bold))
                     .foregroundStyle(onAccent)
                     .frame(width: 28, height: 28)
                     .background(accent)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
                 Text("EL Parking")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.footnote.weight(.bold))
                     .foregroundStyle(.white.opacity(0.75))
 
                 Spacer()
 
                 if let days = dayCount {
                     Text("\(days)d")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(accent)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
@@ -66,7 +66,7 @@ struct BookingShareCardView: View {
                 }
 
                 Text(dateLabel)
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.caption.weight(.bold))
                     .tracking(1.0)
                     .foregroundStyle(accent)
             }
@@ -74,7 +74,7 @@ struct BookingShareCardView: View {
             HStack(alignment: .bottom, spacing: 14) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("SPOT")
-                        .font(.system(size: 9, weight: .black))
+                        .font(.caption2.weight(.black))
                         .tracking(2.5)
                         .foregroundStyle(.white.opacity(0.4))
                     Text(booking.spotNumber)
@@ -95,7 +95,7 @@ struct BookingShareCardView: View {
 
             HStack {
                 Text(AppConfig.companyName.uppercased())
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.caption2.weight(.semibold))
                     .tracking(2)
                     .foregroundStyle(.white.opacity(0.22))
                 Spacer()
@@ -103,8 +103,8 @@ struct BookingShareCardView: View {
         }
         .padding(18)
         .background(cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .shadow(color: .black.opacity(0.2), radius: 20, y: 8)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .raisedShadow()
     }
 
     private func infoCell(_ label: String, value: String) -> some View {
@@ -114,7 +114,7 @@ struct BookingShareCardView: View {
                 .tracking(1.5)
                 .foregroundStyle(.white.opacity(0.45))
             Text(value)
-                .font(.system(size: 13, weight: .bold))
+                .font(.footnote.weight(.bold))
                 .foregroundStyle(.white.opacity(0.9))
                 .multilineTextAlignment(.trailing)
                 .lineLimit(2)
@@ -148,7 +148,7 @@ struct BookingShareSheet: View {
                         } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: "square.and.arrow.up")
-                                    .font(.system(size: 16, weight: .semibold))
+                                    .font(.body.weight(.semibold))
                                 Text(L10n.shareBooking)
                                     .font(.body.weight(.bold))
                             }
@@ -156,7 +156,7 @@ struct BookingShareSheet: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 18)
                             .background(AppConfig.accent)
-                            .clipShape(Capsule())
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             .shadow(color: AppConfig.accent.opacity(0.35), radius: 12, y: 4)
                         }
                         .buttonStyle(ScaleButtonStyle())
@@ -168,7 +168,7 @@ struct BookingShareSheet: View {
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "envelope")
-                                    .font(.system(size: 14))
+                                    .font(.subheadline)
                                 Text(L10n.shareAsText)
                                     .font(.footnote.weight(.semibold))
                             }

@@ -85,10 +85,10 @@ struct PendingApprovalView: View {
                 }
                 .padding(20)
                 .background(
-                    RoundedRectangle(cornerRadius: 20)
+                    RoundedRectangle(cornerRadius: 16)
                         .fill(Color.white.opacity(0.05))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 20)
+                            RoundedRectangle(cornerRadius: 16)
                                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
                         )
                 )
@@ -112,7 +112,7 @@ struct PendingApprovalView: View {
                 .buttonStyle(ScaleButtonStyle())
 
                 Text(AppConfig.companyName)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .tracking(2)
                     .foregroundStyle(.white.opacity(0.2))
                     .padding(.bottom, 32)
@@ -123,7 +123,7 @@ struct PendingApprovalView: View {
     private func infoRow(icon: String, text: String, accent: Color = AppConfig.accentFg) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 14))
+                .font(.subheadline)
                 .foregroundStyle(accent.opacity(0.8))
                 .frame(width: 20)
             Text(text)

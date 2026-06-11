@@ -14,7 +14,9 @@
 
 import Foundation
 @preconcurrency import FirebaseFirestore
+import FirebaseAuth
 import UserNotifications
+import BackgroundTasks
 import Combine
 
 @MainActor
@@ -100,6 +102,83 @@ class PushNotificationManager: ObservableObject {
         let trigger       = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         let request       = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
         try? await UNUserNotificationCenter.current().add(request)
+    }
+
+
+    // MARK: - Background sync (free killed-app delivery via BGAppRefreshTask)
+    //
+    // iOS wakes the app opportunistically (typically a handful of times a day
+    // for an app the user opens regularly); we drain the Firestore inbox and
+    // recent broadcasts into local notifications. Not instant like real FCM
+    // push, but completely free — no Cloud Functions / Blaze required.
+
+    static let backgroundTaskID = "com.StivMalakjan.EL-PARKING-APP.notificationSync"
+    private static let lastBroadcastSyncKey = "lastBroadcastBackgroundSync"
+
+    /// Call once from application(_:didFinishLaunchingWithOptions:).
+    static func registerBackgroundTask() {
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: backgroundTaskID, using: nil
+        ) { task in
+            guard let refreshTask = task as? BGAppRefreshTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            scheduleBackgroundSync() // keep the chain alive
+            let work = Task {
+                await backgroundSyncOnce()
+                refreshTask.setTaskCompleted(success: true)
+            }
+            refreshTask.expirationHandler = {
+                work.cancel()
+                refreshTask.setTaskCompleted(success: false)
+            }
+        }
+    }
+
+    /// Call whenever the app goes to background.
+    static func scheduleBackgroundSync() {
+        let request = BGAppRefreshTaskRequest(identifier: backgroundTaskID)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        try? BGTaskScheduler.shared.submit(request)
+    }
+
+    /// One-shot drain of undelivered inbox docs + new broadcasts.
+    static func backgroundSyncOnce() async {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        let db = Firestore.firestore()
+
+        // Per-user inbox
+        if let snapshot = try? await db
+            .collection("users").document(uid)
+            .collection("notifications")
+            .whereField("delivered", isEqualTo: false)
+            .getDocuments() {
+            for doc in snapshot.documents {
+                let data = doc.data()
+                guard let title = data["title"] as? String,
+                      let body  = data["body"]  as? String else { continue }
+                await scheduleLocal(id: doc.documentID, title: title, body: body)
+                try? await doc.reference.updateData(["delivered": true])
+            }
+        }
+
+        // Broadcasts newer than the last background pass
+        let defaults = UserDefaults.standard
+        let last = defaults.object(forKey: lastBroadcastSyncKey) as? Date
+            ?? Date().addingTimeInterval(-24 * 3600)
+        if let snapshot = try? await db
+            .collection("broadcast_notifications")
+            .whereField("createdAt", isGreaterThan: Timestamp(date: last))
+            .getDocuments() {
+            for doc in snapshot.documents {
+                let data = doc.data()
+                guard let title = data["title"] as? String,
+                      let body  = data["body"]  as? String else { continue }
+                await scheduleLocal(id: "bc_\(doc.documentID)", title: title, body: body)
+            }
+        }
+        defaults.set(Date(), forKey: lastBroadcastSyncKey)
     }
 
     // MARK: - Write helpers (called by admins)

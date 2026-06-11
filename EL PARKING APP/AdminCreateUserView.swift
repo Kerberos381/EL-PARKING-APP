@@ -206,7 +206,7 @@ struct AdminCreateUserView: View {
                             }
                         } label: {
                             Image(systemName: "arrow.clockwise.circle")
-                                .font(.system(size: 20))
+                                .font(.title3)
                                 .foregroundStyle(.secondary)
                         }
                         .buttonStyle(ScaleButtonStyle())
@@ -229,13 +229,12 @@ struct AdminCreateUserView: View {
             if let err = errorMsg {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: errorBannerIcon)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(errorBannerColor)
                         .frame(width: 20)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(errorBannerTitle)
                             .font(.caption.weight(.bold))
-                            .tracking(1)
                             .foregroundStyle(errorBannerColor)
                         Text(err)
                             .font(.subheadline)
@@ -292,7 +291,7 @@ struct AdminCreateUserView: View {
             .padding(20)
             .background(AppConfig.cardBg)
             .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: .black.opacity(0.06), radius: 10, y: 3)
+            .cardShadow()
             .padding(.horizontal)
 
             // Email button – opens Mail with recipient pre-filled
@@ -309,7 +308,7 @@ struct AdminCreateUserView: View {
                         Image(systemName: "envelope.fill")
                         Text(L10n.sendViaEmail)
                     }
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
@@ -329,7 +328,7 @@ struct AdminCreateUserView: View {
                     Image(systemName: "square.and.arrow.up")
                     Text(L10n.shareCredentials)
                 }
-                .font(.system(size: 15, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AppConfig.darkText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
@@ -450,7 +449,7 @@ struct AdminCreateUserView: View {
 
     private var errorBannerColor: Color {
         guard let errorMsg else { return AppConfig.spotOccupied }
-        if errorMsg.contains("Firestore") { return .orange }
+        if errorMsg.contains("Firestore") { return AppConfig.warning }
         if errorMsg.contains("Authentication") { return AppConfig.spotOccupied }
         return AppConfig.spotOccupied
     }
@@ -478,10 +477,10 @@ struct AdminCreateUserView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(AppConfig.subtleGray)
                 Text(title)
-                    .font(.system(size: 19, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                     .foregroundStyle(AppConfig.subtleGray)
             }
             .padding(.horizontal, 4)
@@ -489,7 +488,7 @@ struct AdminCreateUserView: View {
                 .padding(16)
                 .background(AppConfig.cardBg)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
-                .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
+                .cardShadow()
         }
         .padding(.horizontal)
     }
@@ -498,7 +497,7 @@ struct AdminCreateUserView: View {
     private func inlineValidation(_ message: String, isError: Bool) -> some View {
         HStack(spacing: 6) {
             Image(systemName: isError ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
-                .font(.system(size: 12))
+                .font(.caption)
             Text(message)
                 .font(.caption)
         }
@@ -543,7 +542,7 @@ struct AdminCreateUserView: View {
                 .foregroundStyle(AppConfig.subtleGray)
                 .lineLimit(1)
             Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.65))
         }
         .padding(14)

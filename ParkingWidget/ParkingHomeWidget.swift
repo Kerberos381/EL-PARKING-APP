@@ -10,19 +10,60 @@ import WidgetKit
 import SwiftUI
 import AppIntents
 
-// MARK: - Design Tokens
+// MARK: - Design Tokens (palette-aware)
 
-private let accentGreen  = Color(red: 177/255, green: 248/255, blue:   0/255)
-private let onAccent     = Color(red:  19/255, green:  31/255, blue:   0/255)
-private let obsidian     = Color(red:  26/255, green:  28/255, blue:  30/255)
-private let dangerRed    = Color(red: 186/255, green:  26/255, blue:  26/255)
+/// The main app mirrors its "appPalette" setting into the shared app group
+/// so widgets can follow the user's Default/Calm choice.
+private var widgetIsCalm: Bool {
+    (UserDefaults(suiteName: "group.com.StivMalakjan.EL-PARKING-APP") ?? .standard)
+        .integer(forKey: "appPalette") == 1
+}
 
-/// Adaptive background: obsidian in dark mode, light grey in light mode.
-private let widgetAdaptiveBg = Color(UIColor { tc in
-    tc.userInterfaceStyle == .dark
-        ? UIColor(red: 26/255, green: 28/255, blue: 30/255, alpha: 1)
-        : UIColor(red: 245/255, green: 247/255, blue: 250/255, alpha: 1)
-})
+private var accentGreen: Color {
+    widgetIsCalm
+        ? Color(red: 127/255, green: 160/255, blue: 140/255)   // sage
+        : Color(red: 177/255, green: 248/255, blue:   0/255)
+}
+private var onAccent: Color {
+    widgetIsCalm ? .white : Color(red: 19/255, green: 31/255, blue: 0/255)
+}
+private var obsidian: Color {
+    widgetIsCalm
+        ? Color(red: 34/255, green: 40/255, blue: 31/255)      // forest
+        : Color(red: 26/255, green: 28/255, blue: 30/255)
+}
+private var dangerRed: Color {
+    widgetIsCalm
+        ? Color(red: 192/255, green: 112/255, blue: 79/255)    // clay
+        : Color(red: 186/255, green: 26/255, blue: 26/255)
+}
+/// Positive/confirming green used on light surfaces.
+private var positiveGreen: Color {
+    widgetIsCalm
+        ? Color(red: 68/255, green: 115/255, blue: 94/255)     // pine
+        : Color(red: 75/255, green: 155/255, blue: 0/255)
+}
+
+/// Adaptive background: obsidian/forest in dark mode, light grey/paper in light.
+private var widgetAdaptiveBg: Color {
+    let calm = widgetIsCalm
+    return Color(UIColor { tc in
+        if tc.userInterfaceStyle == .dark {
+            return calm
+                ? UIColor(red: 29/255, green: 28/255, blue: 26/255, alpha: 1)
+                : UIColor(red: 26/255, green: 28/255, blue: 30/255, alpha: 1)
+        }
+        return calm
+            ? UIColor(red: 244/255, green: 244/255, blue: 241/255, alpha: 1)
+            : UIColor(red: 245/255, green: 247/255, blue: 250/255, alpha: 1)
+    })
+}
+
+private var widgetLightContainerBg: Color {
+    widgetIsCalm
+        ? Color(red: 244/255, green: 244/255, blue: 241/255)
+        : Color(red: 245/255, green: 247/255, blue: 250/255)
+}
 
 // MARK: - Theme
 
@@ -56,8 +97,8 @@ struct WidgetColors {
     )
 
     static let light = WidgetColors(
-        primary:    Color(red: 75/255, green: 155/255, blue: 0/255),
-        statusText: Color(red: 75/255, green: 155/255, blue: 0/255),
+        primary:    positiveGreen,
+        statusText: positiveGreen,
         textMain:   obsidian,
         textSub:    obsidian.opacity(0.65),
         textFaint:  obsidian.opacity(0.42),
@@ -294,7 +335,7 @@ struct ParkingHomeWidgetLight: Widget {
         StaticConfiguration(kind: kind, provider: ParkingTimelineProvider()) { entry in
             ParkingWidgetEntryView(entry: entry)
                 .environment(\.colorScheme, .light)
-                .containerBackground(Color(red: 245/255, green: 247/255, blue: 250/255), for: .widget)
+                .containerBackground(widgetLightContainerBg, for: .widget)
         }
         .configurationDisplayName("EL Parking (Light)")
         .description("Your upcoming parking spot — light style.")
@@ -332,7 +373,7 @@ struct ParkingTimelineCardEntryView: View {
     private var titleColor: Color { isDark ? .white.opacity(0.95) : obsidian }
     private var subtitleColor: Color { isDark ? .white.opacity(0.72) : obsidian.opacity(0.7) }
     private var faintTrack: Color { isDark ? .white.opacity(0.2) : obsidian.opacity(0.16) }
-    private var strongTrack: Color { isDark ? .white.opacity(0.95) : Color(red: 0.95, green: 0.3, blue: 0.12) }
+    private var strongTrack: Color { isDark ? .white.opacity(0.95) : (widgetIsCalm ? Color(red: 0.75, green: 0.44, blue: 0.31) : Color(red: 0.95, green: 0.3, blue: 0.12)) }
     private var bubbleFg: Color { .white }
 
     var body: some View {
@@ -488,7 +529,7 @@ struct ParkingTimelineCardEntryView: View {
             Spacer()
             Text("\(entry.availableCount) spots free")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(isDark ? accentGreen : Color(red: 0.2, green: 0.55, blue: 0.1))
+                .foregroundStyle(isDark ? accentGreen : positiveGreen)
             Button(intent: WidgetBookFavoriteIntent()) {
                 Text("Book favorite")
                     .font(.system(size: 12, weight: .bold))
@@ -515,7 +556,7 @@ struct ParkingTimelineCardEntryView: View {
             HStack {
                 Text("\(entry.availableCount) / \(entry.totalCount) spots free")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(isDark ? accentGreen : Color(red: 0.2, green: 0.55, blue: 0.1))
+                    .foregroundStyle(isDark ? accentGreen : positiveGreen)
                 Spacer()
                 Button(intent: WidgetBookFavoriteIntent()) {
                     Text("Book favorite")
@@ -563,11 +604,11 @@ struct ParkingTimelineCardEntryView: View {
 
         if now < window.start {
             let hours = max(1, Int(ceil(window.start.timeIntervalSince(now) / 3600)))
-            return ("+\(hours)H", Color(red: 0.2, green: 0.78, blue: 0.3))
+            return ("+\(hours)H", widgetIsCalm ? Color(red: 0.42, green: 0.58, blue: 0.47) : Color(red: 0.2, green: 0.78, blue: 0.3))
         }
         if now <= window.end {
             let hours = max(1, Int(ceil(window.end.timeIntervalSince(now) / 3600)))
-            return ("-\(hours)H", Color(red: 0.95, green: 0.32, blue: 0.12))
+            return ("-\(hours)H", widgetIsCalm ? Color(red: 0.75, green: 0.44, blue: 0.31) : Color(red: 0.95, green: 0.32, blue: 0.12))
         }
         return ("Done", Color.gray.opacity(0.55))
     }

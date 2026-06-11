@@ -65,7 +65,7 @@ private struct NotificationCardView: View {
                     )
 
                 Text(booking.isToday ? "ACTIVE NOW" : "UPCOMING")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.caption2.weight(.bold))
                     .tracking(2)
                     .foregroundStyle(accentGreen)
 
@@ -90,27 +90,27 @@ private struct NotificationCardView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     // Date
                     Text(booking.naturalDate)
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.footnote.weight(.bold))
                         .tracking(1)
                         .foregroundStyle(.white.opacity(0.55))
 
                     // Time
                     HStack(spacing: 6) {
                         Image(systemName: "clock")
-                            .font(.system(size: 10))
+                            .font(.caption2)
                             .foregroundStyle(.white.opacity(0.4))
                         Text("\(booking.fromTime) – \(booking.toTime)")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.white.opacity(0.85))
                     }
 
                     // Location
                     HStack(spacing: 6) {
                         Image(systemName: "mappin.circle")
-                            .font(.system(size: 10))
+                            .font(.caption2)
                             .foregroundStyle(.white.opacity(0.4))
                         Text(AppConfig.locationName)
-                            .font(.system(size: 11))
+                            .font(.caption)
                             .foregroundStyle(.white.opacity(0.45))
                             .lineLimit(1)
                     }
@@ -122,6 +122,6 @@ private struct NotificationCardView: View {
             .padding(.bottom, 20)
         }
         .background(obsidian)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 }

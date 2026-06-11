@@ -31,27 +31,24 @@ struct ContentView: View {
     @State private var didRunPostLoginFlow   = false
     @State private var selectedTab: MainTab = .home
     @State private var lastNonLoadingState: AuthState = .unauthenticated
-    @State private var ambientScale: CGFloat = 0.8
-    @State private var ambientOpacity: Double = 0.2
-    @State private var logoScale: CGFloat = 0.96
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var launchTransition: Animation {
-        reduceMotion ? .linear(duration: 0.25) : .spring(duration: 0.45, bounce: 0.0)
+        reduceMotion ? .linear(duration: 0.25) : .smooth(duration: 0.55)
     }
 
     var body: some View {
         ZStack {
             authContent(for: stageState)
-                .scaleEffect(authManager.authState == .loading ? 0.95 : 1.0)
+                .scaleEffect(authManager.authState == .loading ? 0.96 : 1.0)
 
             if authManager.authState == .loading {
-                splashView
+                SplashView()
                     .transition(
                         .asymmetric(
                             insertion: .identity,
-                            removal: .opacity.combined(with: .scale(scale: 1.08))
+                            removal: .opacity.combined(with: .scale(scale: 1.06))
                         )
                     )
             }
@@ -198,10 +195,8 @@ struct ContentView: View {
                 OverviewView()
             }
 
-            if !bookingManager.isAdmin {
-                Tab("Info", systemImage: "newspaper", value: MainTab.info) {
-                    HomeView(screenMode: .infoHub)
-                }
+            Tab("Info", systemImage: "newspaper", value: MainTab.info) {
+                HomeView(screenMode: .infoHub)
             }
 
             if bookingManager.isAdmin {
@@ -233,51 +228,8 @@ struct ContentView: View {
                 selectedTab = .home
             }
         }
-        .onChange(of: bookingManager.isAdmin) { _, isAdmin in
-            if isAdmin, selectedTab == .info {
-                selectedTab = .home
-            }
-        }
-    }
-
-    // MARK: - Splash
-
-    private var splashView: some View {
-        ZStack {
-            Color(red: 0.039, green: 0.039, blue: 0.055)
-                .ignoresSafeArea()
-
-            ZStack {
-                Circle()
-                    .fill(AppConfig.accent)
-                    .frame(width: 280, height: 280)
-                    .blur(radius: 60)
-                    .opacity(ambientOpacity * 0.5)
-
-                Circle()
-                    .fill(AppConfig.accent.opacity(0.15))
-                    .frame(width: 400, height: 400)
-                    .blur(radius: 80)
-                    .scaleEffect(ambientScale)
-                    .opacity(ambientOpacity)
-            }
-
-            Image("AppIconImage")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 100, height: 100)
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .shadow(color: Color.black.opacity(0.4), radius: 20, x: 0, y: 10)
-                .scaleEffect(logoScale)
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
-                ambientScale = 1.3
-                ambientOpacity = 0.4
-            }
-            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
-                logoScale = 1.02
-            }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToSettingsTab)) { _ in
+            selectedTab = .settings
         }
     }
 

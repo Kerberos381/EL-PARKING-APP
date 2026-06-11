@@ -29,7 +29,7 @@ struct AdminInfoView: View {
                 if let err = infoManager.errorMessage {
                     HStack(spacing: 10) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(AppConfig.warning)
                         Text(err)
                             .font(.caption)
                             .foregroundStyle(AppConfig.darkText)
@@ -41,7 +41,7 @@ struct AdminInfoView: View {
                         .accessibilityLabel("Dismiss error")
                     }
                     .padding(12)
-                    .background(Color.orange.opacity(0.12))
+                    .background(AppConfig.warning.opacity(0.12))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal)
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -77,7 +77,7 @@ struct AdminInfoView: View {
                                         .fill(AppConfig.surfaceHigh)
                                         .frame(width: 44, height: 44)
                                     Image(systemName: item.icon)
-                                        .font(.system(size: 16, weight: .semibold))
+                                        .font(.body.weight(.semibold))
                                         .foregroundStyle(.secondary)
                                 }
 
@@ -106,7 +106,7 @@ struct AdminInfoView: View {
                                 } label: {
                                     Image(systemName: pushSentFor == item.id ? "checkmark.circle.fill" : "bell.badge.fill")
                                         .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(pushSentFor == item.id ? .blue : Color.secondary)
+                                        .foregroundStyle(pushSentFor == item.id ? AppConfig.infoTint : Color.secondary)
                                         .frame(width: 32, height: 32)
                                         .background(AppConfig.surfaceLow)
                                         .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -142,9 +142,12 @@ struct AdminInfoView: View {
                     }
                 }
                 .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
+                .background(AppConfig.groupedPageBg.ignoresSafeArea())
+                .scrollEdgeEffectStyle(.soft, for: .top)
                 .refreshable {
-                    Haptics.selection()
                     await infoManager.refresh()
+                    Haptics.refreshCompleted()
                 }
             }
         }
@@ -206,7 +209,7 @@ struct AdminInfoView: View {
             ForEach(0..<5, id: \.self) { _ in
                 HStack(spacing: 14) {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color(uiColor: .tertiarySystemFill))
+                        .fill(AppConfig.tertiaryFillBg)
                         .frame(width: 40, height: 40)
                         .shimmering(active: true)
 
@@ -331,7 +334,7 @@ struct InfoItemFormView: View {
                                                 RoundedRectangle(cornerRadius: 12)
                                                     .fill(selectedIcon == icon ? AppConfig.surfaceHigh : AppConfig.cardBg)
                                                 Image(systemName: icon)
-                                                    .font(.system(size: 18, weight: .semibold))
+                                                    .font(.title3.weight(.semibold))
                                                     .foregroundStyle(selectedIcon == icon ? AppConfig.darkText : AppConfig.subtleGray)
                                             }
                                             .overlay(
@@ -382,7 +385,7 @@ struct InfoItemFormView: View {
                                                         }
                                                     } label: {
                                                         Image(systemName: "xmark.circle.fill")
-                                                            .font(.system(size: 20))
+                                                            .font(.title3)
                                                             .foregroundStyle(.white, .black.opacity(0.5))
                                                     }
                                                     .offset(x: 6, y: -6)
@@ -412,7 +415,7 @@ struct InfoItemFormView: View {
                                                         }
                                                 } label: {
                                                     Image(systemName: "xmark.circle.fill")
-                                                        .font(.system(size: 20))
+                                                        .font(.title3)
                                                         .foregroundStyle(.white, .black.opacity(0.5))
                                                 }
                                                 .offset(x: 6, y: -6)
@@ -434,7 +437,7 @@ struct InfoItemFormView: View {
                                                         }
                                                     } label: {
                                                         Image(systemName: "xmark.circle.fill")
-                                                            .font(.system(size: 20))
+                                                            .font(.title3)
                                                             .foregroundStyle(.white, .black.opacity(0.5))
                                                     }
                                                     .offset(x: 6, y: -6)
@@ -501,7 +504,7 @@ struct InfoItemFormView: View {
                             } label: {
                                 HStack(spacing: 10) {
                                     Image(systemName: "photo.badge.plus")
-                                        .font(.system(size: 14, weight: .semibold))
+                                        .font(.subheadline.weight(.semibold))
                                         .foregroundStyle(AppConfig.subtleGray)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("Use custom photo")
@@ -514,7 +517,7 @@ struct InfoItemFormView: View {
                                     Spacer()
                                     if selectedImageData != nil || existingImageURL != nil || existingImageBase64 != nil {
                                         Image(systemName: "checkmark.circle.fill")
-                                            .font(.system(size: 14))
+                                            .font(.subheadline)
                                             .foregroundStyle(AppConfig.darkText)
                                     }
                                 }
@@ -611,7 +614,7 @@ struct InfoItemFormView: View {
                     .fill(sendPush ? Color.blue.opacity(0.15) : AppConfig.surfaceHigh)
                     .frame(width: 44, height: 44)
                 Image(systemName: sendPush ? "bell.badge.fill" : "bell.fill")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                     .foregroundStyle(sendPush ? Color.blue : AppConfig.subtleGray)
             }
 
@@ -632,9 +635,9 @@ struct InfoItemFormView: View {
         }
         .padding(16)
         .background(sendPush ? Color.blue.opacity(0.07) : AppConfig.cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: 16)
                 .stroke(sendPush ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 1.5)
         )
         .animation(reduceMotion ? .none : .standard, value: sendPush)
@@ -691,9 +694,8 @@ struct InfoItemFormView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
         .background(AppConfig.cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .shadow(color: .black.opacity(0.06), radius: 10, y: 3)
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(AppConfig.separatorSoft, lineWidth: 1.5))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .cardShadow()
     }
 
     // MARK: - Contact Field Row
@@ -716,7 +718,7 @@ struct InfoItemFormView: View {
                         .fill(AppConfig.surfaceHigh)
                         .frame(width: 36, height: 36)
                     Image(systemName: field.wrappedValue.type.icon)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -752,7 +754,7 @@ struct InfoItemFormView: View {
                 withAnimation { onDelete() }
             } label: {
                 Image(systemName: "minus.circle.fill")
-                    .font(.system(size: 20))
+                    .font(.title3)
                     .foregroundStyle(AppConfig.spotOccupied.opacity(0.7))
             }
             .buttonStyle(ScaleButtonStyle())
@@ -769,7 +771,7 @@ struct InfoItemFormView: View {
     private func formSection<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(label)
-                .font(.system(size: 19, weight: .semibold))
+                .font(.title3.weight(.semibold))
                 .foregroundStyle(AppConfig.subtleGray)
             content()
         }

@@ -353,12 +353,12 @@ struct MyBookingsView: View {
                 withAnimation(.standard) { showingDelegated = false }
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "car").font(.system(size: 12))
+                    Image(systemName: "car").font(.caption)
                     Text(L10n.myBookings)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                     if !showingDelegated && !myUpcoming.isEmpty {
                         Text("\(myUpcoming.count)")
-                            .font(.system(size: 10, weight: .bold).monospacedDigit())
+                            .font(.caption2.weight(.bold).monospacedDigit())
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(AppConfig.onAccent.opacity(0.25))
                             .clipShape(Capsule())
@@ -378,19 +378,19 @@ struct MyBookingsView: View {
                 withAnimation(.standard) { showingDelegated = true }
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "person.2").font(.system(size: 12))
+                    Image(systemName: "person.2").font(.caption)
                     Text(L10n.delegatedBookings)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .lineLimit(1).minimumScaleFactor(0.8)
                     if showingDelegated && delegatedTotal > 0 {
                         Text("\(delegatedTotal)")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.caption2.weight(.bold))
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(Color(red: 19/255, green: 31/255, blue: 0/255).opacity(0.25))
                             .clipShape(Capsule())
                     } else if !showingDelegated && delegatedTotal > 0 {
                         Text("\(delegatedTotal)")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(blueAccent)
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(blueAccent.opacity(0.15))
@@ -408,7 +408,7 @@ struct MyBookingsView: View {
         .padding(4)
         .background(AppConfig.surfaceHigh)
         .clipShape(Capsule())
-        .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
+        .cardShadow()
         .padding(.horizontal)
         .padding(.top, 4)
     }
@@ -443,10 +443,10 @@ struct MyBookingsView: View {
                 if isForOther {
                     // Delegation indicator — name right in the status bar
                     Image(systemName: "person.badge.plus")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(accentColor)
                     Text("FOR \(booking.user.uppercased())")
-                        .font(.system(size: 10, weight: .bold)).tracking(1.5)
+                        .font(.caption2.weight(.bold)).tracking(1.5)
                         .foregroundStyle(accentColor)
                         .lineLimit(1)
                 } else {
@@ -460,15 +460,15 @@ struct MyBookingsView: View {
                     }
                     if group.isActive {
                         Text(L10n.activeNow)
-                            .font(.system(size: 10, weight: .bold)).tracking(2)
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(AppConfig.accentFg)
                     } else if group.isRange {
                         Text(L10n.rangeNDays(group.dayCount))
-                            .font(.system(size: 10, weight: .bold)).tracking(1.5)
+                            .font(.caption2.weight(.bold)).tracking(1.5)
                             .foregroundStyle(Color.blue.opacity(0.85))
                     } else {
                         Text(L10n.upcoming)
-                            .font(.system(size: 10, weight: .bold)).tracking(2)
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(AppConfig.accentFg)
                     }
                 }
@@ -482,14 +482,14 @@ struct MyBookingsView: View {
                         Image(systemName: "arrow.right").font(.system(size: 8, weight: .bold))
                         Text(end.formatNaturalShort())
                     }
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.65))
                     .padding(.horizontal, 10).padding(.vertical, 5)
                     .background(.white.opacity(0.1))
                     .clipShape(Capsule())
                 } else {
                     Text(booking.richDate)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.7))
                 }
             }
@@ -521,14 +521,14 @@ struct MyBookingsView: View {
                     if isForOther {
                         // Show recipient's email
                         HStack(spacing: 5) {
-                            Image(systemName: "envelope").font(.system(size: 9))
+                            Image(systemName: "envelope").font(.caption2)
                                 .foregroundStyle(accentColor.opacity(0.7))
                             Text(booking.email)
                                 .font(.caption).foregroundStyle(accentColor.opacity(0.85))
                                 .lineLimit(1).minimumScaleFactor(0.75)
                         }
                     } else if isBookedForMe {
-                        delegationBadge(icon: "gift", label: L10n.bookedForYou, color: .orange)
+                        delegationBadge(icon: "gift", label: L10n.bookedForYou, color: AppConfig.warning)
                     }
                 }
                 Spacer()
@@ -648,7 +648,7 @@ struct MyBookingsView: View {
                     let isActive = Calendar.current.isDateInToday(b.date)
                     VStack(spacing: 1) {
                         Text(dayFmt.string(from: b.date))
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(.system(.footnote, design: .rounded, weight: .bold))
                             .foregroundStyle(
                                 isActive ? AppConfig.onAccent
                                 : isPast  ? .white.opacity(0.25)
@@ -685,7 +685,7 @@ struct MyBookingsView: View {
         return HStack(spacing: 14) {
             // Spot badge — blue tint for delegated
             Text(group.spotNumber)
-                .font(.system(size: 20, weight: .black, design: .rounded))
+                .font(.system(.title3, design: .rounded, weight: .black))
                 .foregroundStyle(isForOther ? blueAccent.opacity(0.8) : AppConfig.subtleGray)
                 .frame(width: 50, height: 50)
                 .background(isForOther
@@ -712,7 +712,7 @@ struct MyBookingsView: View {
                 }
                 if isForOther {
                     HStack(spacing: 5) {
-                        Image(systemName: "person.badge.plus").font(.system(size: 9))
+                        Image(systemName: "person.badge.plus").font(.caption2)
                         Text(booking.user)
                             .font(.caption).fontWeight(.semibold)
                     }
@@ -732,11 +732,11 @@ struct MyBookingsView: View {
         }
         .padding(16)
         .background(AppConfig.surfaceLow)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
             Group {
                 if isForOther {
-                    RoundedRectangle(cornerRadius: 20)
+                    RoundedRectangle(cornerRadius: 16)
                         .stroke(blueAccent.opacity(0.2), lineWidth: 1)
                 }
             }
@@ -799,9 +799,9 @@ struct SwipeToCancelModifier: ViewModifier {
                     } label: {
                         VStack(spacing: 4) {
                             Image(systemName: "trash.fill")
-                                .font(.system(size: 17, weight: .semibold))
+                                .font(.body.weight(.semibold))
                             Text("Cancel")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(.caption2.weight(.semibold))
                         }
                         .foregroundStyle(.white)
                         .frame(width: actionWidth)
@@ -893,8 +893,8 @@ extension MyBookingsView {
 
     private func delegationBadge(icon: String, label: String, color: Color) -> some View {
         HStack(spacing: 5) {
-            Image(systemName: icon).font(.system(size: 10, weight: .semibold))
-            Text(label).font(.system(size: 11, weight: .semibold))
+            Image(systemName: icon).font(.caption2.weight(.semibold))
+            Text(label).font(.caption.weight(.semibold))
         }
         .foregroundStyle(color)
         .padding(.horizontal, 8).padding(.vertical, 4)
@@ -1095,8 +1095,8 @@ struct RangeEditSheet: View {
                         }
                         .padding(18)
                         .background(AppConfig.cardBg)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .shadow(color: .black.opacity(0.05), radius: 10, y: 3)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .cardShadow()
 
                         // ── Spot ─────────────────────────────────────────
                         sectionCard(title: L10n.spot, icon: "car.fill") {
@@ -1192,11 +1192,11 @@ struct RangeEditSheet: View {
                         if let err = errorMessage {
                             HStack(spacing: 10) {
                                 Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundStyle(.orange)
+                                    .foregroundStyle(AppConfig.warning)
                                 Text(err).font(.subheadline).foregroundStyle(AppConfig.darkText)
                             }
                             .padding(14)
-                            .background(Color.orange.opacity(0.1))
+                            .background(AppConfig.warning.opacity(0.1))
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
 
@@ -1214,9 +1214,9 @@ struct RangeEditSheet: View {
                                     .font(.body.weight(.bold))
                             }
                             .foregroundStyle(timeFrom < timeTo ? AppConfig.onAccent : AppConfig.subtleGray)
-                            .frame(maxWidth: .infinity).padding(.vertical, 18)
+                            .frame(maxWidth: .infinity).frame(height: 50)
                             .background(timeFrom < timeTo ? AppConfig.accent : AppConfig.surfaceHigh)
-                            .clipShape(Capsule())
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                         .disabled(timeFrom >= timeTo || isSubmitting)
                         .buttonStyle(ScaleButtonStyle())
@@ -1310,7 +1310,7 @@ struct RangeEditSheet: View {
         .padding(18)
         .background(AppConfig.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: 24))
-        .shadow(color: .black.opacity(0.03), radius: 8, y: 2)
+        .cardShadow()
     }
 }
 

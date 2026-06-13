@@ -2119,6 +2119,27 @@ h3 {
 .density-compact h3 { margin-bottom: 8px; }
 .density-compact .settings-section-block { margin-top: 12px; }
 
+/* Compact: announcements + info collapse into a denser grid of small tiles
+   side by side — same idea as the iOS compact home layout. */
+.density-compact #announcementsList,
+.density-compact #infoList {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  align-items: start;
+}
+.density-compact .announcement { border-radius: 14px; }
+.density-compact .announcement-media { aspect-ratio: 16 / 9; }
+.density-compact .announcement-body { padding: 9px 10px; }
+.density-compact .announcement h4 { font-size: 13.5px; line-height: 1.25; }
+.density-compact .announcement p {
+  font-size: 12px;
+  margin-top: 3px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* ════════════════════════════════════════════════════════════════════════
    Segmented control — Appearance settings
    ════════════════════════════════════════════════════════════════════════ */

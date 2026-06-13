@@ -2072,3 +2072,78 @@ h3 {
 .dark-mode .theme-btn.active {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
+
+
+/* ════════════════════════════════════════════════════════════════════════
+   Calm (Nordic) palette — toggled via .palette-calm on <html>
+   ════════════════════════════════════════════════════════════════════════ */
+.palette-calm {
+  --bg: #ECEEE7;
+  --card: #F7F8F3;
+  --text: #282E26;
+  --subtle: #5E6B5C;
+  --line: #D6DBCF;
+  --accent: #5E8E74;
+  --danger: #B5603F;
+  --surface: #F0F2EB;
+  --surface-strong: #E7EAE0;
+  --shadow-soft: 0 8px 28px rgba(40, 50, 38, 0.07);
+}
+.palette-calm.dark-mode {
+  --bg: #14180F;
+  --card: #1E241A;
+  --text: #E7EBDF;
+  --subtle: #97A28F;
+  --line: #2D3528;
+  --accent: #7FA08C;
+  --danger: #C77E5C;
+  --surface: #222820;
+  --surface-strong: #2A3126;
+  --dark-card: #0E120B;
+}
+.palette-calm .tab.active { background: rgba(94, 142, 116, 0.16); color: var(--accent); }
+.palette-calm.dark-mode .tab.active { background: #20301f; color: #9ec3ab; }
+.palette-calm .yours { color: #3b6d4f; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   Compact density — toggled via .density-compact on <html>
+   ════════════════════════════════════════════════════════════════════════ */
+.density-compact {
+  --radius-card: 18px;
+  --radius-control: 13px;
+}
+.density-compact .card { padding: 14px; }
+.density-compact .tabbar { padding: 4px; }
+.density-compact .tab { padding: 9px 6px; }
+.density-compact .field { margin-bottom: 8px; }
+.density-compact h3 { margin-bottom: 8px; }
+.density-compact .settings-section-block { margin-top: 12px; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   Segmented control — Appearance settings
+   ════════════════════════════════════════════════════════════════════════ */
+.seg {
+  display: flex;
+  gap: 6px;
+  background: var(--surface);
+  padding: 4px;
+  border-radius: var(--radius-control);
+}
+.seg-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: transparent;
+  color: var(--subtle);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: calc(var(--radius-control) - 4px);
+  transition: background 140ms ease, color 140ms ease;
+}
+.seg-btn.active {
+  background: var(--card);
+  color: var(--text);
+  box-shadow: var(--shadow-control);
+}

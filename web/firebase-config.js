@@ -1,5 +1,5 @@
 export const firebaseConfig = {
-  apiKey: "AIzaSyD1XYo3kV4vGKhOvFJrndNMrL2LhEuIg1o",
+  apiKey: "AIzaSyB86tWJY_xXGt2jF9osE1YNDF9UQqUkdwA",
   authDomain: "el-parking-app.firebaseapp.com",
   projectId: "el-parking-app",
   storageBucket: "el-parking-app.firebasestorage.app",

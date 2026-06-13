@@ -15,7 +15,7 @@
   --shadow-soft: 0 8px 28px rgba(18, 24, 36, 0.06);
   --shadow-control: 0 2px 10px rgba(17, 24, 39, 0.06);
   --page-gutter: clamp(16px, 4vw, 56px);
-  --content-max: 1120px;
+  --content-max: 820px;
 }
 
 * {
@@ -2077,33 +2077,36 @@ h3 {
 /* ════════════════════════════════════════════════════════════════════════
    Calm (Nordic) palette — toggled via .palette-calm on <html>
    ════════════════════════════════════════════════════════════════════════ */
+/* Calm = cool, muted slate-grey tones with CRISP white cards (contrast =
+   sharpness) and one restrained pine accent. Grey base, not washed beige. */
 .palette-calm {
-  --bg: #ECEEE7;
-  --card: #F7F8F3;
-  --text: #282E26;
-  --subtle: #5E6B5C;
-  --line: #D6DBCF;
-  --accent: #5E8E74;
+  --bg: #E3E6EA;
+  --card: #FFFFFF;
+  --text: #1B2128;
+  --subtle: #687078;
+  --line: #CCD2D9;
+  --accent: #43795F;
   --danger: #B5603F;
-  --surface: #F0F2EB;
-  --surface-strong: #E7EAE0;
-  --shadow-soft: 0 8px 28px rgba(40, 50, 38, 0.07);
+  --surface: #DADFE4;
+  --surface-strong: #CFD5DC;
+  --shadow-soft: 0 8px 26px rgba(27, 33, 40, 0.10);
 }
 .palette-calm.dark-mode {
-  --bg: #14180F;
-  --card: #1E241A;
-  --text: #E7EBDF;
-  --subtle: #97A28F;
-  --line: #2D3528;
-  --accent: #7FA08C;
+  --bg: #121417;
+  --card: #1D2024;
+  --text: #EAEDF0;
+  --subtle: #99A1AA;
+  --line: #2E343B;
+  --accent: #6FA086;
   --danger: #C77E5C;
-  --surface: #222820;
-  --surface-strong: #2A3126;
-  --dark-card: #0E120B;
+  --surface: #22272F;
+  --surface-strong: #2A3038;
+  --dark-card: #0C0E10;
 }
-.palette-calm .tab.active { background: rgba(94, 142, 116, 0.16); color: var(--accent); }
-.palette-calm.dark-mode .tab.active { background: #20301f; color: #9ec3ab; }
-.palette-calm .yours { color: #3b6d4f; }
+.palette-calm .tab.active { background: rgba(67, 121, 95, 0.16); color: var(--accent); }
+.palette-calm.dark-mode .tab.active { background: #1f2e26; color: #93c2a8; }
+.palette-calm .yours { color: #356b4f; }
+.palette-calm .announcement { border-color: var(--line); }
 
 /* ════════════════════════════════════════════════════════════════════════
    Compact density — toggled via .density-compact on <html>
@@ -2123,7 +2126,7 @@ h3 {
    side by side — same idea as the iOS compact home layout. */
 .density-compact #announcementsList,
 .density-compact #infoList {
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
   align-items: start;
 }

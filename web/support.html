@@ -114,6 +114,30 @@
   }
   .callout strong { font-weight: 600; }
 
+  /* ── Contact form ── */
+  .contact-form { display: flex; flex-direction: column; gap: 14px; margin: 28px 0 4px; }
+  .contact-form label {
+    display: flex; flex-direction: column; gap: 6px;
+    font-size: 13.5px; font-weight: 600; color: var(--muted);
+  }
+  .contact-form input, .contact-form textarea {
+    font: inherit; font-weight: 400; font-size: 16px; color: var(--ink);
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 14px; outline: none; width: 100%; resize: vertical;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+  }
+  .contact-form input:focus, .contact-form textarea:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--tint);
+  }
+  .contact-form button {
+    align-self: flex-start; font: inherit; font-weight: 600; font-size: 16px;
+    color: #fff; background: var(--accent); border: none; border-radius: 12px;
+    padding: 13px 28px; cursor: pointer; transition: opacity 140ms ease;
+  }
+  .contact-form button:hover { opacity: 0.9; }
+  .form-note { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .form-note a { color: var(--accent); }
+
   section.block { padding: 36px 0 8px; }
   h2 { font-size: 23px; font-weight: 600; letter-spacing: -0.015em; margin-bottom: 18px; }
 
@@ -177,20 +201,26 @@
       <strong>Need help fast?</strong> Contact your office administrator at the email address shown in the app (Settings → Need Help?), or use the options below.
     </div>
 
-    <div class="actions">
-      <a class="action" href="https://github.com/Kerberos381/EL-PARKING-APP/issues/new" target="_blank" rel="noopener noreferrer">
-        <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg></div>
-        <div class="t">Submit a request</div>
-        <div class="d">Report a bug or ask for help with your account or a booking.</div>
-        <span class="go">Open a request &rsaquo;</span>
-      </a>
-      <a class="action" href="https://github.com/Kerberos381/EL-PARKING-APP/issues" target="_blank" rel="noopener noreferrer">
-        <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10" stroke-linecap="round"/></svg></div>
-        <div class="t">View existing issues</div>
-        <div class="d">Check whether your question has already been answered.</div>
-        <span class="go">Browse issues &rsaquo;</span>
-      </a>
-    </div>
+    <section class="block">
+      <h2>Submit a request</h2>
+      <form class="contact-form" action="https://formsubmit.co/stiv.malakjan@gmail.com" method="POST">
+        <input type="hidden" name="_subject" value="EL Parking — Support request">
+        <input type="hidden" name="_captcha" value="true">
+        <input type="hidden" name="_template" value="table">
+        <input type="text" name="_honey" style="display:none" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <label>Your name
+          <input type="text" name="name" required autocomplete="name" maxlength="80">
+        </label>
+        <label>Your email
+          <input type="email" name="email" required autocomplete="email" maxlength="120">
+        </label>
+        <label>How can we help?
+          <textarea name="message" rows="5" required maxlength="2000" placeholder="Describe your account issue, a booking problem, or a bug — include dates and spot numbers where relevant."></textarea>
+        </label>
+        <button type="submit">Send request</button>
+        <p class="form-note">A captcha appears before sending to keep out spam. We reply to the email you enter, usually within 2 business days.</p>
+      </form>
+    </section>
 
     <section class="block">
       <h2>Frequently asked questions</h2>

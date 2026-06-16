@@ -3,7 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; form-action https://formsubmit.co; base-uri 'self'; object-src 'none';">
 <title>EL Parking — Support</title>
+<link rel="icon" type="image/png" sizes="256x256" href="./app-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="./app-icon.png">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#35c759">
 <meta name="description" content="Support and frequently asked questions for EL Parking, the internal corporate parking reservation app by EssilorLuxottica.">
 <style>
   :root {
@@ -203,7 +208,7 @@
 
     <section class="block">
       <h2>Submit a request</h2>
-      <form class="contact-form" action="https://formsubmit.co/stiv.malakjan@gmail.com" method="POST">
+      <form class="contact-form" action="https://formsubmit.co/support@elpark.cz" method="POST">
         <input type="hidden" name="_subject" value="EL Parking — Support request">
         <input type="hidden" name="_captcha" value="true">
         <input type="hidden" name="_template" value="table">

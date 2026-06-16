@@ -1,7 +1,8 @@
-# ── Secrets ────────────────────────────────────────────────────────────────
-# Firebase config — never commit; distribute out-of-band
-GoogleService-Info.plist
-google-services.json
+# ── Firebase client config ─────────────────────────────────────────────────
+# GoogleService-Info.plist is PUBLIC client config (it ships inside every iOS app)
+# and MUST be committed — otherwise Xcode Cloud / CI does a clean checkout WITHOUT
+# it and the app crashes at launch because FirebaseApp.configure() can't find it.
+# Do NOT re-ignore it. (google-services.json is the Android equivalent.)
 
 # Android signing credentials
 *.keystore

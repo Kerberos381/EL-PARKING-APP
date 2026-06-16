@@ -122,6 +122,7 @@ service cloud.firestore {
         && request.resource.data.createdAt is timestamp
         && request.resource.data.expiresAt is timestamp
         && (!request.resource.data.keys().hasAny(['groupID'])
+            || request.resource.data.groupID == null
             || request.resource.data.groupID is string)
         && (!request.resource.data.keys().hasAny(['spotID'])
             || request.resource.data.spotID is string)
@@ -161,8 +162,11 @@ service cloud.firestore {
     }
 
     function canModifyBooking() {
-      return resource.data.email == myEmail()
-        || resource.data.createdBy == myEmail()
+      // Case-insensitive so a stored email/createdBy that differs only in letter
+      // case from the user's profile email still authorizes cancel/edit (the app
+      // matches case-insensitively for display, so the rule must too).
+      return resource.data.email.lower() == myEmail().lower()
+        || resource.data.createdBy.lower() == myEmail().lower()
         || isAdmin();
     }
 
@@ -385,6 +389,23 @@ service cloud.firestore {
                     && resource.data.delivered == false
                     && request.resource.data.diff(resource.data).affectedKeys()
                         .hasOnly(['delivered']);
+    }
+
+    // ── /direct_notifications/{notifId} ───────────────────────────────────────
+    // Email-addressed user notifications. Any active app user can send (no
+    // /users email lookup needed, so privileged/non-admin senders aren't blocked);
+    // only the named recipient can read it or mark it delivered.
+    match /direct_notifications/{notifId} {
+      allow read:   if signedIn() && resource.data.toEmail == userData().email;
+      allow create: if hasAppAccess()
+                    && request.resource.data.toEmail is string
+                    && request.resource.data.delivered == false;
+      allow update: if signedIn()
+                    && resource.data.toEmail == userData().email
+                    && request.resource.data.delivered == true
+                    && resource.data.delivered == false
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['delivered']);
+      allow delete: if isAdmin();
     }
 
     // ── /invites/{email} ──────────────────────────────────────────────────────

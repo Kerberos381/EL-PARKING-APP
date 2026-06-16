@@ -298,6 +298,51 @@ class BookingManager: ObservableObject {
         }
     }
 
+    /// Deletes bookings older than `olderThanDays` days. The in-memory list only holds
+    /// the last couple of days (see `shouldKeepLocally`), so it can't see old docs —
+    /// we query the server directly with an inequality on `bookingDate`, then batch-
+    /// delete. **Admin-only**: only an admin may delete other users' bookings under the
+    /// Firestore rules, so this keeps the WHOLE collection trimmed, which is what keeps
+    /// whole-collection reads cheap as the app scales. (Legacy bookings stored with a
+    /// string `bookingDate` instead of a Timestamp won't match — they're a small fixed
+    /// set, not the growing tail.) Costs reads only for the old docs being deleted.
+    func purgeOldBookings(olderThanDays: Int = 2) async -> Int {
+        guard isAdmin else { return 0 }
+        let cutoff = Calendar.current.date(
+            byAdding: .day,
+            value: -max(0, olderThanDays),
+            to: Calendar.current.startOfDay(for: Date())
+        ) ?? Date()
+
+        let docs: [QueryDocumentSnapshot]
+        do {
+            docs = try await db.collection("bookings")
+                .whereField("bookingDate", isLessThan: Timestamp(date: cutoff))
+                .getDocuments()
+                .documents
+        } catch {
+            print("purgeOldBookings query error: \(error.localizedDescription)")
+            return 0
+        }
+        guard !docs.isEmpty else { return 0 }
+
+        var deleted = 0
+        var index = 0
+        while index < docs.count {
+            let slice = docs[index..<min(index + 400, docs.count)] // Firestore batch cap = 500
+            let batch = db.batch()
+            for doc in slice { batch.deleteDocument(doc.reference) }
+            do {
+                try await batch.commit()
+                deleted += slice.count
+            } catch {
+                print("purgeOldBookings batch error: \(error.localizedDescription)")
+            }
+            index += 400
+        }
+        return deleted
+    }
+
     private func refreshSpots() async {
         do {
             let snapshot = try await db.collection("parkingSpots").getDocuments()
@@ -1549,6 +1594,19 @@ class BookingManager: ObservableObject {
         saveLocalCache()
         updateWidgetData()
         scheduleDailyReminders()
+        runSessionPurgeIfNeeded()
+    }
+
+    /// Per-session housekeeping: once per app launch, after bookings have loaded,
+    /// delete old bookings this user is allowed to remove (their own for a regular/
+    /// privileged user; everything for an admin). Runs off the already-loaded list —
+    /// no extra reads. This keeps the shared `bookings` collection small as users
+    /// open the app, so whole-collection reads stay cheap at scale (no TTL needed).
+    private var didRunSessionPurge = false
+    private func runSessionPurgeIfNeeded() {
+        guard !didRunSessionPurge, isAdmin else { return }
+        didRunSessionPurge = true
+        Task { [weak self] in _ = await self?.purgeOldBookings() }
     }
 
     private func applySpotsSnapshot(spots: [ParkingSpot], blocked: Set<String>) {

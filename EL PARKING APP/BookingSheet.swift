@@ -44,6 +44,7 @@ struct BookingSheet: View {
     @State private var errorMessage = ""
     @State private var showSuccess = false
     @State private var showShareOptions = false
+    @AppStorage("shareDelegateNavGuide") private var includeNavGuide = true
     @State private var isSubmitting = false
     @State private var confirmVisualState: ConfirmVisualState = .idle
     @State private var isForOthersToggle: Bool
@@ -164,6 +165,7 @@ struct BookingSheet: View {
                             // Person fields when booking for others
                             if isForOthersToggle {
                                 personSection
+                                delegateNavGuideCard
                             }
 
                             // 2. Time selection
@@ -860,6 +862,45 @@ struct BookingSheet: View {
         .padding(.horizontal)
     }
 
+    // MARK: - Delegate Navigation Guide Card
+
+    private var delegateNavGuideCard: some View {
+        VStack(spacing: 10) {
+            DelegateNavGuideCard()
+
+            // Let the sender opt out of attaching the route photos.
+            Toggle(isOn: $includeNavGuide.animation(.motionSelection)) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L10n.shareIncludeNavGuide)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(AppConfig.darkText)
+                    Text(L10n.shareIncludeNavGuideHint)
+                        .font(.caption2)
+                        .foregroundStyle(AppConfig.subtleGray)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .tint(AppConfig.accent)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(AppConfig.cardBg)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .padding(.horizontal)
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+
+    /// Renders the photo navigation guide as a share-ready image.
+    private func renderNavGuideImage() -> UIImage? {
+        let renderer = ImageRenderer(content:
+            NavigationGuideShareCardView(spotNumber: syntheticBooking.spotNumber)
+                .frame(width: 360)
+                .environment(\.colorScheme, .dark)
+        )
+        renderer.scale = 3.0
+        return renderer.uiImage
+    }
+
     // MARK: - Person Fields
 
     private var personSection: some View {
@@ -1515,12 +1556,10 @@ struct BookingSheet: View {
             .environment(\.colorScheme, .dark)
         )
         renderer.scale = 3.0
-        let items: [Any]
-        if let img = renderer.uiImage {
-            items = [img, delegationShareText]
-        } else {
-            items = [delegationShareText]
-        }
+        var items: [Any] = []
+        if let img = renderer.uiImage { items.append(img) }
+        if includeNavGuide, let navImg = renderNavGuideImage() { items.append(navImg) }
+        items.append(delegationShareText)
         let av = UIActivityViewController(activityItems: items, applicationActivities: nil)
         av.overrideUserInterfaceStyle = .light
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
@@ -1528,6 +1567,12 @@ struct BookingSheet: View {
         else { return }
         var top = root
         while let presented = top.presentedViewController { top = presented }
+        // iPad requires an anchor for UIActivityViewController or it crashes on present.
+        if let pop = av.popoverPresentationController {
+            pop.sourceView = top.view
+            pop.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0)
+            pop.permittedArrowDirections = []
+        }
         top.present(av, animated: true)
     }
 
@@ -1539,6 +1584,12 @@ struct BookingSheet: View {
         else { return }
         var top = root
         while let presented = top.presentedViewController { top = presented }
+        // iPad requires an anchor for UIActivityViewController or it crashes on present.
+        if let pop = av.popoverPresentationController {
+            pop.sourceView = top.view
+            pop.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0)
+            pop.permittedArrowDirections = []
+        }
         top.present(av, animated: true)
     }
 
@@ -1577,6 +1628,9 @@ struct BookingSheet: View {
         renderer.scale = 3.0
         if let img = renderer.uiImage, let data = img.pngData() {
             composer.addAttachmentData(data, mimeType: "image/png", fileName: "parking-booking.png")
+        }
+        if includeNavGuide, let navImg = renderNavGuideImage(), let navData = navImg.pngData() {
+            composer.addAttachmentData(navData, mimeType: "image/png", fileName: "how-to-find-your-spot.png")
         }
 
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
@@ -1794,6 +1848,77 @@ struct CancelSuccessOverlay: View {
         Task {
             try? await Task.sleep(for: .milliseconds(reduceMotion ? 60 : 130))
             onDismiss()
+        }
+    }
+}
+
+// MARK: - Delegate Navigation Guide Card
+
+private struct DelegateNavGuideCard: View {
+
+    private static let photos = ["ParkingGarage1", "ParkingGarage2", "ParkingGarage3", "ParkingGarage4"]
+    @State private var photoIndex = 0
+
+    var body: some View {
+        HStack(spacing: 0) {
+            // Photo side
+            ZStack {
+                ForEach(0..<Self.photos.count, id: \.self) { i in
+                    Image(Self.photos[i])
+                        .resizable()
+                        .scaledToFill()
+                        .opacity(photoIndex == i ? 1 : 0)
+                }
+                // Blue chevron badge matching real-world arrows
+                Image(systemName: "chevron.up.2")
+                    .font(.system(size: 18, weight: .black))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.5), radius: 4, y: 2)
+            }
+            .frame(width: 110)
+            .clipped()
+
+            // Text side
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(AppConfig.accentFg)
+                    Text(L10n.delegateNavGuideTitle)
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(AppConfig.darkText)
+                }
+
+                Text(L10n.delegateNavGuideDesc)
+                    .font(.caption)
+                    .foregroundStyle(AppConfig.subtleGray)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                // Photo dots
+                HStack(spacing: 4) {
+                    ForEach(0..<Self.photos.count, id: \.self) { i in
+                        Capsule()
+                            .fill(photoIndex == i ? AppConfig.accentFg : AppConfig.subtleGray.opacity(0.3))
+                            .frame(width: photoIndex == i ? 14 : 5, height: 5)
+                            .animation(.motionSelection, value: photoIndex)
+                    }
+                }
+                .padding(.top, 2)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(height: 110)
+        .background(AppConfig.cardBg)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .cardShadow()
+        .onAppear {
+            Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
+                withAnimation(.easeInOut(duration: 0.8)) {
+                    photoIndex = (photoIndex + 1) % Self.photos.count
+                }
+            }
         }
     }
 }

@@ -672,6 +672,16 @@ struct SettingsView: View {
                             .foregroundStyle(AppConfig.subtleGray)
                     }
                 }
+                Link(destination: AppConfig.supportURL) {
+                    HStack {
+                        Text(L10n.support)
+                            .foregroundStyle(AppConfig.darkText)
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppConfig.subtleGray)
+                    }
+                }
             }.listRowBackground(AppConfig.groupedCardBg)
 
             Section {

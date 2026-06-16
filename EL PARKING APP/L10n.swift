@@ -709,6 +709,29 @@ struct L10n {
             : "Head to the Parking tab and tap any green spot to make your first booking."
     }
 
+    // Parking photo onboarding page
+    static var onboardingGarageTitle: String { isCzech ? "Sledujte\nmodrou čáru" : "Follow\nthe Blue Line" }
+    static var onboardingGarageDesc: String {
+        isCzech
+            ? "Modrý navigační pruh vede přímo k místům 63–82. Bílé šipky vás dovedou přesně na vaše rezervované místo."
+            : "The blue navigation lane leads directly to spots 63–82. White arrows guide you straight to your reserved spot."
+    }
+    static var onboardingGarageCaption: String {
+        isCzech ? "Rohanske nábřeží 721/39, Praha" : "Rohanske nabrezi 721/39, Prague"
+    }
+
+    // Delegated booking navigation guide
+    static var delegateNavGuideTitle: String { isCzech ? "Jak najít místo" : "How to Find the Spot" }
+    static var shareIncludeNavGuide: String { isCzech ? "Přiložit fotonavigaci" : "Attach photo directions" }
+    static var support: String { isCzech ? "Podpora" : "Support" }
+    static var onboardingSwipeHint: String { isCzech ? "Přejeďte" : "Swipe" }
+    static var shareIncludeNavGuideHint: String { isCzech ? "Přidá fotky cesty k místu do sdílené zprávy." : "Adds the photo route to the spot to the shared message." }
+    static var delegateNavGuideDesc: String {
+        isCzech
+            ? "Sdílejte číslo místa s příjemcem. Ať sleduje modrou čáru — šipky ho přivedou přímo tam."
+            : "Share the spot number with the recipient. Have them follow the blue lane — arrows lead right there."
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // MARK: Admin — Users
     // ─────────────────────────────────────────────────────────────────────────

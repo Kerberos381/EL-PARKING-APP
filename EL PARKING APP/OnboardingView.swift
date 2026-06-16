@@ -13,87 +13,60 @@ struct OnboardingView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var currentPage = 0
+    @State private var photoIndex = 0
     // Local preview choices — applied when onboarding closes so the palette
     // rebuild doesn't tear the sheet down mid-flow.
     @State private var previewCalm = UserDefaults.standard.integer(forKey: "appPalette") == 1
     @State private var previewCompact = UserDefaults.standard.string(forKey: "homeStyle") == "compact"
     @ObservedObject private var lang = LanguageManager.shared
 
-    private struct Page {
-        let title: String
-        var showsAppIcon: Bool = false
-        var features: [(icon: String, title: String, description: String)] = []
-        var isPersonalize: Bool = false
+    private static let garagePhotos = ["ParkingGarage1", "ParkingGarage2", "ParkingGarage3", "ParkingGarage4"]
+
+    private enum PageKind {
+        case garage
+        case features(title: String, showsIcon: Bool, rows: [(icon: String, title: String, description: String)])
+        case personalize(title: String)
     }
 
     // Computed so L10n is evaluated at render time (language switching).
-    private var pages: [Page] {[
-        Page(
+    private var pages: [PageKind] {[
+        .garage,
+        .features(
             title: L10n.onboardingWelcomeTitle,
-            showsAppIcon: true,
-            features: [
-                ("house.fill",
-                 L10n.onboardingHomeTitle,
-                 L10n.onboardingHomeDesc),
-                ("square.grid.3x3.fill",
-                 L10n.onboardingGridTitle,
-                 L10n.onboardingGridDesc),
-                ("calendar.badge.plus",
-                 L10n.onboardingBookTitle,
-                 L10n.onboardingBookDesc),
+            showsIcon: true,
+            rows: [
+                ("house.fill",         L10n.onboardingHomeTitle,  L10n.onboardingHomeDesc),
+                ("square.grid.3x3.fill", L10n.onboardingGridTitle, L10n.onboardingGridDesc),
+                ("calendar.badge.plus", L10n.onboardingBookTitle, L10n.onboardingBookDesc),
             ]
         ),
-        Page(
+        .features(
             title: L10n.onboardingPage2Title,
-            features: [
-                ("bell.badge.fill",
-                 L10n.onboardingRemTitle,
-                 L10n.onboardingRemDesc),
-                ("rectangle.3.group.fill",
-                 L10n.onboardingWidgetsTitle,
-                 L10n.onboardingWidgetsDesc),
-                ("plus.circle.fill",
-                 L10n.onboardingWidgetsSub,
-                 L10n.onboardingWidgetsTip),
+            showsIcon: false,
+            rows: [
+                ("bell.badge.fill",       L10n.onboardingRemTitle,     L10n.onboardingRemDesc),
+                ("rectangle.3.group.fill", L10n.onboardingWidgetsTitle, L10n.onboardingWidgetsDesc),
+                ("plus.circle.fill",      L10n.onboardingWidgetsSub,   L10n.onboardingWidgetsTip),
             ]
         ),
-        Page(title: L10n.onboardingPersonalizeTitle, isPersonalize: true),
-        Page(
+        .personalize(title: L10n.onboardingPersonalizeTitle),
+        .features(
             title: L10n.onboardingPage3Title,
-            features: [
-                ("calendar.badge.clock",
-                 L10n.onboardingWindowsTitle,
-                 L10n.onboardingWindowsDesc),
-                ("checkmark.shield.fill",
-                 L10n.onboardingWarningsTitle,
-                 L10n.onboardingWarningsDesc),
-                ("parkingsign.square.fill",
-                 L10n.onboardingSpotGroupsTitle,
-                 L10n.onboardingSpotGroupsDesc),
-                ("arrow.right.circle.fill",
-                 L10n.onboardingDoneTitle,
-                 L10n.onboardingDoneDesc),
+            showsIcon: false,
+            rows: [
+                ("calendar.badge.clock",    L10n.onboardingWindowsTitle,   L10n.onboardingWindowsDesc),
+                ("checkmark.shield.fill",   L10n.onboardingWarningsTitle,  L10n.onboardingWarningsDesc),
+                ("parkingsign.square.fill", L10n.onboardingSpotGroupsTitle, L10n.onboardingSpotGroupsDesc),
+                ("arrow.right.circle.fill", L10n.onboardingDoneTitle,      L10n.onboardingDoneDesc),
             ]
         ),
     ]}
 
     private var isLastPage: Bool { currentPage == pages.count - 1 }
+    private var isGaragePage: Bool { currentPage == 0 }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Skip (hidden on last page; cleared frame keeps layout stable)
-            HStack {
-                Spacer()
-                Button(L10n.skip) { applySelections(); dismiss() }
-                    .font(.body)
-                    .foregroundStyle(AppConfig.subtleGray)
-                    .padding(.horizontal, 24)
-                    .opacity(isLastPage ? 0 : 1)
-                    .disabled(isLastPage)
-            }
-            .frame(height: 44)
-            .padding(.top, 8)
-
+        ZStack(alignment: .bottom) {
             TabView(selection: $currentPage) {
                 ForEach(0..<pages.count, id: \.self) { idx in
                     pageView(pages[idx]).tag(idx)
@@ -101,40 +74,58 @@ struct OnboardingView: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .animation(.motionStandard, value: currentPage)
+            .ignoresSafeArea(edges: isGaragePage ? .top : [])
 
-            // Page dots
-            HStack(spacing: 8) {
-                ForEach(0..<pages.count, id: \.self) { i in
-                    Circle()
-                        .fill(i == currentPage
-                              ? AppConfig.darkText
-                              : AppConfig.subtleGray.opacity(0.3))
-                        .frame(width: 7, height: 7)
+            // Bottom chrome — floats over the garage photo on page 0
+            VStack(spacing: 0) {
+                // Skip button
+                HStack {
+                    Spacer()
+                    Button(L10n.skip) { applySelections(); dismiss() }
+                        .font(.body)
+                        .foregroundStyle(isGaragePage ? .white.opacity(0.75) : AppConfig.subtleGray)
+                        .padding(.horizontal, 24)
+                        .opacity(isLastPage ? 0 : 1)
+                        .disabled(isLastPage)
                 }
-            }
-            .animation(.motionSelection, value: currentPage)
-            .padding(.bottom, 20)
+                .frame(height: 44)
 
-            Button {
-                if isLastPage {
-                    applySelections()
-                    dismiss()
-                } else {
-                    Haptics.selection()
-                    withAnimation(.motionStandard) { currentPage += 1 }
+                Spacer()
+
+                // Page dots
+                HStack(spacing: 8) {
+                    ForEach(0..<pages.count, id: \.self) { i in
+                        Circle()
+                            .fill(i == currentPage
+                                  ? (isGaragePage ? Color.white : AppConfig.darkText)
+                                  : (isGaragePage ? Color.white.opacity(0.35) : AppConfig.subtleGray.opacity(0.3)))
+                            .frame(width: 7, height: 7)
+                    }
                 }
-            } label: {
-                Text(isLastPage ? L10n.getStarted : L10n.continueBtn)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(AppConfig.onAccent)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(AppConfig.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .animation(.motionSelection, value: currentPage)
+                .padding(.bottom, 16)
+
+                Button {
+                    if isLastPage {
+                        applySelections()
+                        dismiss()
+                    } else {
+                        Haptics.selection()
+                        withAnimation(.motionStandard) { currentPage += 1 }
+                    }
+                } label: {
+                    Text(isLastPage ? L10n.getStarted : L10n.continueBtn)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(isGaragePage ? Color(red: 0.039, green: 0.039, blue: 0.055) : AppConfig.onAccent)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(isGaragePage ? Color.white : AppConfig.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
             }
-            .buttonStyle(ScaleButtonStyle())
-            .padding(.horizontal, 24)
-            .padding(.bottom, 24)
         }
         .background(AppConfig.pageBg.ignoresSafeArea())
         .interactiveDismissDisabled()
@@ -143,18 +134,104 @@ struct OnboardingView: View {
     // MARK: - Page Layout
 
     @ViewBuilder
-    private func pageView(_ page: Page) -> some View {
-        if page.isPersonalize {
-            personalizePage(page)
-        } else {
-            featuresPage(page)
+    private func pageView(_ page: PageKind) -> some View {
+        switch page {
+        case .garage:
+            garagePage
+        case .features(let title, let showsIcon, let rows):
+            featuresPage(title: title, showsIcon: showsIcon, rows: rows)
+        case .personalize(let title):
+            personalizePage(title: title)
         }
     }
 
-    private func featuresPage(_ page: Page) -> some View {
+    // MARK: - Garage Photo Page
+
+    private var garagePage: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .bottom) {
+                // Swipeable photo carousel — drag horizontally to browse the route
+                TabView(selection: $photoIndex) {
+                    ForEach(0..<Self.garagePhotos.count, id: \.self) { i in
+                        Image(Self.garagePhotos[i])
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geo.size.width, height: geo.size.height)
+                            .clipped()
+                            .tag(i)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .frame(width: geo.size.width, height: geo.size.height)
+
+                // Gradient scrim
+                LinearGradient(
+                    colors: [.clear, .clear, Color.black.opacity(0.35), Color.black.opacity(0.85)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .allowsHitTesting(false)
+
+                // Text overlay
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(L10n.onboardingGarageTitle)
+                        .font(.system(size: 36, weight: .bold, design: .default))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.4), radius: 8, y: 2)
+
+                    Text(L10n.onboardingGarageDesc)
+                        .font(.body)
+                        .foregroundStyle(.white.opacity(0.88))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .shadow(color: .black.opacity(0.3), radius: 4, y: 1)
+
+                    HStack(spacing: 6) {
+                        Image(systemName: "mappin.circle.fill")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.6))
+                        Text(L10n.onboardingGarageCaption)
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.55))
+                    }
+                    .padding(.top, 2)
+
+                    // Photo dots + a one-time swipe hint
+                    HStack(spacing: 10) {
+                        HStack(spacing: 5) {
+                            ForEach(0..<Self.garagePhotos.count, id: \.self) { i in
+                                Capsule()
+                                    .fill(photoIndex == i ? Color.white : Color.white.opacity(0.35))
+                                    .frame(width: photoIndex == i ? 18 : 6, height: 6)
+                                    .animation(.motionSelection, value: photoIndex)
+                            }
+                        }
+                        if photoIndex == 0 {
+                            HStack(spacing: 4) {
+                                Image(systemName: "hand.draw")
+                                    .font(.caption2)
+                                Text(L10n.onboardingSwipeHint)
+                                    .font(.caption2.weight(.semibold))
+                            }
+                            .foregroundStyle(.white.opacity(0.55))
+                            .transition(.opacity)
+                        }
+                    }
+                    .animation(.motionStandard, value: photoIndex)
+                    .padding(.top, 4)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 28)
+                .padding(.bottom, 148) // leaves room for the floating chrome
+                .allowsHitTesting(false) // let swipes reach the photo carousel
+            }
+        }
+        .ignoresSafeArea()
+    }
+
+    private func featuresPage(title: String, showsIcon: Bool, rows: [(icon: String, title: String, description: String)]) -> some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
-                if page.showsAppIcon {
+                if showsIcon {
                     Image("AppIconImage")
                         .resizable()
                         .scaledToFit()
@@ -168,25 +245,21 @@ struct OnboardingView: View {
                         .accessibilityHidden(true)
                 }
 
-                Text(page.title)
+                Text(title)
                     .font(.largeTitle.bold())
                     .foregroundStyle(AppConfig.darkText)
                     .multilineTextAlignment(.center)
 
                 VStack(alignment: .leading, spacing: 28) {
-                    ForEach(page.features, id: \.title) { feature in
-                        FeatureListRow(
-                            icon: feature.icon,
-                            title: feature.title,
-                            description: feature.description
-                        )
+                    ForEach(rows, id: \.title) { row in
+                        FeatureListRow(icon: row.icon, title: row.title, description: row.description)
                     }
                 }
                 .padding(.top, 40)
                 .padding(.horizontal, 36)
             }
-            .padding(.top, page.showsAppIcon ? 20 : 40)
-            .padding(.bottom, 24)
+            .padding(.top, showsIcon ? 20 : 40)
+            .padding(.bottom, 100) // room for the floating bottom chrome
         }
     }
 
@@ -197,10 +270,10 @@ struct OnboardingView: View {
         UserDefaults.standard.set(previewCompact ? "compact" : "roomy", forKey: "homeStyle")
     }
 
-    private func personalizePage(_ page: Page) -> some View {
+    private func personalizePage(title: String) -> some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
-                Text(page.title)
+                Text(title)
                     .font(.largeTitle.bold())
                     .foregroundStyle(AppConfig.darkText)
                     .multilineTextAlignment(.center)
@@ -240,7 +313,7 @@ struct OnboardingView: View {
                 .padding(.horizontal, 36)
             }
             .padding(.top, 40)
-            .padding(.bottom, 24)
+            .padding(.bottom, 100)
         }
         .onChange(of: previewCalm) { _, _ in Haptics.selection() }
         .onChange(of: previewCompact) { _, _ in Haptics.selection() }

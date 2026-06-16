@@ -122,6 +122,98 @@ struct BookingShareCardView: View {
     }
 }
 
+// MARK: - Navigation Guide Share Card
+
+/// A branded, shareable image of the photo route to the spot. Attached to
+/// delegated-booking shares (email / iMessage) so the recipient can find
+/// their way. Mirrors the dark/lime look of BookingShareCardView so the two
+/// images read as a set.
+struct NavigationGuideShareCardView: View {
+    let spotNumber: String
+
+    private static let photos = ["ParkingGarage1", "ParkingGarage2", "ParkingGarage3", "ParkingGarage4"]
+    private let cardBg   = Color(red: 26/255,  green: 28/255,  blue: 30/255)
+    private let accent   = Color(red: 177/255, green: 248/255, blue: 0/255)
+    private let onAccent = Color(red: 19/255,  green: 31/255,  blue: 0/255)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Header: brand + title + spot
+            HStack(spacing: 10) {
+                Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(onAccent)
+                    .frame(width: 28, height: 28)
+                    .background(accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("EL Parking")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white.opacity(0.55))
+                    Text(L10n.delegateNavGuideTitle)
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(.white)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text("SPOT")
+                        .font(.system(size: 8, weight: .black)).tracking(2)
+                        .foregroundStyle(.white.opacity(0.4))
+                    Text(spotNumber)
+                        .font(.system(size: 30, weight: .black, design: .rounded))
+                        .foregroundStyle(accent)
+                        .lineLimit(1).minimumScaleFactor(0.5)
+                }
+            }
+
+            // 2x2 photo grid with numbered step badges
+            VStack(spacing: 8) {
+                ForEach(0..<2, id: \.self) { row in
+                    HStack(spacing: 8) {
+                        ForEach(0..<2, id: \.self) { col in
+                            let i = row * 2 + col
+                            ZStack(alignment: .topLeading) {
+                                Image(Self.photos[i])
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(height: 88)
+                                    .frame(maxWidth: .infinity)
+                                    .clipped()
+                                Text("\(i + 1)")
+                                    .font(.caption2.weight(.black))
+                                    .foregroundStyle(onAccent)
+                                    .frame(width: 18, height: 18)
+                                    .background(accent)
+                                    .clipShape(Circle())
+                                    .padding(6)
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }
+                    }
+                }
+            }
+
+            Text(L10n.delegateNavGuideDesc)
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.7))
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 6) {
+                Image(systemName: "mappin.and.ellipse")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(accent)
+                Text(AppConfig.locationName)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .lineLimit(1)
+            }
+        }
+        .padding(18)
+        .background(cardBg)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+}
+
 // MARK: - Share Sheet Wrapper
 
 struct BookingShareSheet: View {
@@ -210,6 +302,12 @@ struct BookingShareSheet: View {
         else { return }
         var top = root
         while let presented = top.presentedViewController { top = presented }
+        // iPad requires an anchor for UIActivityViewController or it crashes on present.
+        if let pop = av.popoverPresentationController {
+            pop.sourceView = top.view
+            pop.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0)
+            pop.permittedArrowDirections = []
+        }
         top.present(av, animated: true)
     }
 

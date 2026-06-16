@@ -25,6 +25,9 @@ struct AdminDashboardView: View {
     @State private var showPurgeConfirm     = false
     @State private var purgeResult: Int?
     @State private var isPurging            = false
+    @State private var showOldCleanupConfirm = false
+    @State private var oldCleanupResult: Int?
+    @State private var isCleaningOld         = false
 
     private enum QuickFilterRoute: String, Identifiable {
         case active
@@ -176,6 +179,18 @@ struct AdminDashboardView: View {
                                          badge: 0)
                             }
                             .buttonStyle(ScaleButtonStyle())
+
+                            Button {
+                                Haptics.selection()
+                                showOldCleanupConfirm = true
+                            } label: {
+                                rowLabel(icon: "calendar.badge.minus",
+                                         iconColor: tileColor(AppConfig.warning),
+                                         title: "Clean Up Old Bookings",
+                                         subtitle: isCleaningOld ? "Deleting\u{2026}" : "Delete bookings older than 2 days",
+                                         badge: 0)
+                            }
+                            .buttonStyle(ScaleButtonStyle())
                         }
 
                         // ── Recent Activations ────────────────────────────────
@@ -224,11 +239,33 @@ struct AdminDashboardView: View {
             } message: {
                 Text("This will permanently delete all booking documents that fail to parse (empty email, missing fields, etc.).")
             }
+            .alert("Clean Up Old Bookings", isPresented: $showOldCleanupConfirm) {
+                Button("Delete", role: .destructive) {
+                    isCleaningOld = true
+                    oldCleanupResult = nil
+                    Task {
+                        let count = await bookingManager.purgeOldBookings(olderThanDays: 2)
+                        isCleaningOld = false
+                        oldCleanupResult = count
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Permanently deletes bookings whose date is more than 2 days in the past, to keep the database small. Today and future bookings are kept.")
+            }
         }
         .onAppear {
             if !didPrefetchAdminData {
                 didPrefetchAdminData = true
                 Task(priority: .utility) { await refreshDashboard() }
+            }
+            // Auto-clean old bookings at most once per day when an admin opens the dashboard.
+            let cleanupKey = "lastOldBookingsCleanup"
+            let today = Calendar.current.startOfDay(for: Date())
+            let last = UserDefaults.standard.object(forKey: cleanupKey) as? Date
+            if last == nil || last! < today {
+                UserDefaults.standard.set(Date(), forKey: cleanupKey)
+                Task(priority: .background) { _ = await bookingManager.purgeOldBookings(olderThanDays: 2) }
             }
         }
     }

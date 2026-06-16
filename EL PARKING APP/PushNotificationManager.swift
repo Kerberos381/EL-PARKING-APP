@@ -47,12 +47,13 @@ class PushNotificationManager: ObservableObject {
         broadcastListener = nil
     }
 
-    // MARK: - Per-user inbox  (/users/{uid}/notifications)
+    // MARK: - Per-user inbox  (/direct_notifications, addressed by email)
 
     private func listenInbox(uid: String) {
+        guard let email = Auth.auth().currentUser?.email?.lowercased() else { return }
         inboxListener = db
-            .collection("users").document(uid)
-            .collection("notifications")
+            .collection("direct_notifications")
+            .whereField("toEmail", isEqualTo: email)
             .whereField("delivered", isEqualTo: false)
             .addSnapshotListener { snapshot, _ in
                 guard let snapshot else { return }
@@ -148,10 +149,11 @@ class PushNotificationManager: ObservableObject {
         guard let uid = Auth.auth().currentUser?.uid else { return }
         let db = Firestore.firestore()
 
-        // Per-user inbox
-        if let snapshot = try? await db
-            .collection("users").document(uid)
-            .collection("notifications")
+        // Per-user inbox (email-addressed)
+        if let email = Auth.auth().currentUser?.email?.lowercased(),
+           let snapshot = try? await db
+            .collection("direct_notifications")
+            .whereField("toEmail", isEqualTo: email)
             .whereField("delivered", isEqualTo: false)
             .getDocuments() {
             for doc in snapshot.documents {
@@ -184,22 +186,21 @@ class PushNotificationManager: ObservableObject {
     // MARK: - Write helpers (called by admins)
 
     /// Send a notification to a specific user identified by email.
-    /// Looks up the UID from Firestore /users, then writes to their inbox.
+    /// Writes to /direct_notifications keyed by toEmail — no /users lookup, so
+    /// non-admin senders (e.g. privileged delegated bookings) aren't blocked by
+    /// the admin-only users query.
     static func sendToUser(email: String, title: String, body: String) {
-        let db = Firestore.firestore()
-        db.collection("users")
-            .whereField("email", isEqualTo: email)
-            .getDocuments { snapshot, _ in
-                guard let uid = snapshot?.documents.first?.documentID else { return }
-                db.collection("users").document(uid)
-                    .collection("notifications")
-                    .addDocument(data: [
-                        "title":     title,
-                        "body":      body,
-                        "delivered": false,
-                        "createdAt": Timestamp(date: Date())
-                    ])
-            }
+        let normalized = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalized.isEmpty else { return }
+        Firestore.firestore()
+            .collection("direct_notifications")
+            .addDocument(data: [
+                "toEmail":   normalized,
+                "title":     title,
+                "body":      body,
+                "delivered": false,
+                "createdAt": Timestamp(date: Date())
+            ])
     }
 
     /// Broadcast a notification to all users.

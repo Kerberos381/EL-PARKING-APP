@@ -182,7 +182,8 @@ struct AppConfig {
     static let locationLatitude = 50.097098416842265
     static let locationLongitude = 14.459462896988791
     static let googleMapsURL = "maps://?daddr=50.097098416842265,14.459462896988791&dirflg=d"
-    static let privacyPolicyURL = URL(string: "https://kerberos381.github.io/EL-PARKING-APP/privacy-policy.html")!
+    static let privacyPolicyURL = URL(string: "https://elpark.cz/privacy-policy.html")!
+    static let supportURL = URL(string: "https://elpark.cz/support.html")!
     static let proximityReminderRadiusMeters: Double = 500
     static let proximityReminderHoursAfterStart: Int = 2
     static let appTitle = "EL Parking"

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; form-action 'none'; base-uri 'self'; object-src 'none';">
+<title>EL Parking — Delete Account</title>
+<link rel="icon" type="image/png" sizes="256x256" href="./app-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="./app-icon.png">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#35c759">
+<meta name="description" content="How to delete your EL Parking account and what data is removed.">
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --card: #ffffff;
+    --ink: #1d1d1f;
+    --muted: #6e6e73;
+    --line: #e6e6ea;
+    --accent: #1f7a52;
+    --accent-ink: #14613f;
+    --tint: rgba(31, 122, 82, 0.075);
+    --tint-line: rgba(31, 122, 82, 0.22);
+    --shadow: 0 4px 24px rgba(20, 26, 38, 0.06);
+    --radius: 22px;
+    --header-bg: rgba(245, 245, 247, 0.72);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000; --card: #1c1c1e; --ink: #f5f5f7; --muted: #98989d;
+      --line: rgba(255,255,255,0.10); --accent: #5fd398; --accent-ink: #8fe6b6;
+      --tint: rgba(95,211,152,0.10); --tint-line: rgba(95,211,152,0.30);
+      --shadow: 0 4px 24px rgba(0,0,0,0.4); --header-bg: rgba(0,0,0,0.62);
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.62; font-size: 17px;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility;
+  }
+  header.nav {
+    position: sticky; top: 0; z-index: 50; background: var(--header-bg);
+    backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--line);
+  }
+  .nav-inner { max-width: 760px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 11px; }
+  .nav-icon { width: 30px; height: 30px; border-radius: 8px; object-fit: cover; flex: none; box-shadow: 0 1px 3px rgba(0,0,0,0.18); }
+  .nav-title { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+  .nav-spacer { flex: 1; }
+  .nav-link { font-size: 15px; color: var(--accent); text-decoration: none; font-weight: 500; }
+  .nav-link:hover { text-decoration: underline; }
+  main { max-width: 760px; margin: 0 auto; padding: 0 24px 96px; }
+  .hero { padding: 64px 0 36px; }
+  .eyebrow { display: inline-block; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
+  h1 { font-size: clamp(34px, 6vw, 52px); font-weight: 600; letter-spacing: -0.025em; line-height: 1.06; }
+  .updated { display: inline-flex; align-items: center; gap: 7px; margin-top: 22px; padding: 7px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 980px; font-size: 13.5px; color: var(--muted); box-shadow: var(--shadow); }
+  .updated .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .callout { background: var(--tint); border: 1px solid var(--tint-line); border-radius: var(--radius); padding: 22px 24px; margin: 14px 0 8px; font-size: 16px; }
+  .callout strong { color: var(--ink); font-weight: 600; }
+  section.block { padding: 34px 0; border-top: 1px solid var(--line); }
+  section.block:first-of-type { border-top: none; }
+  h2 { font-size: 23px; font-weight: 600; letter-spacing: -0.015em; margin-bottom: 16px; }
+  p { margin-bottom: 14px; } p:last-child { margin-bottom: 0; }
+  ol, ul { list-style: none; margin: 6px 0 14px; padding: 0; }
+  li { position: relative; padding-left: 30px; margin-bottom: 11px; }
+  ol { counter-reset: step; }
+  ol li::before { counter-increment: step; content: counter(step); position: absolute; left: 0; top: 1px; width: 21px; height: 21px; border-radius: 50%; background: var(--tint); color: var(--accent); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  ul li::before { content: ""; position: absolute; left: 8px; top: 11px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); opacity: 0.7; }
+  strong { font-weight: 600; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: var(--accent-ink); text-decoration: underline; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; background: var(--tint); padding: 2px 7px; border-radius: 6px; color: var(--accent-ink); }
+  footer { max-width: 760px; margin: 0 auto; padding: 32px 24px 64px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13.5px; }
+  footer p { margin-bottom: 4px; } footer .brand { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+  <header class="nav">
+    <div class="nav-inner">
+      <img class="nav-icon" src="./app-icon.png" alt="EL Parking">
+      <span class="nav-title">EL Parking</span>
+      <span class="nav-spacer"></span>
+      <a class="nav-link" href="./privacy-policy.html">Privacy</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="hero">
+      <span class="eyebrow">Account</span>
+      <h1>Delete your account</h1>
+      <div class="updated"><span class="dot"></span>Last updated: June 15, 2026</div>
+    </div>
+
+    <div class="callout">
+      <strong>In-app deletion is available.</strong> You can permanently delete your EL Parking account and its associated data directly in the app under <strong>Settings → Delete Account</strong>.
+    </div>
+
+    <section class="block">
+      <h2>How to request account deletion</h2>
+      <ol>
+        <li>Open <strong>EL Parking</strong>.</li>
+        <li>Go to <strong>Settings</strong>.</li>
+        <li>Tap <strong>Delete Account</strong>.</li>
+        <li>Confirm deletion when prompted (you'll re-authenticate for security).</li>
+      </ol>
+      <p>If you cannot access the app, contact the administrator from the in-app <strong>Help</strong> section, or via the <a href="./support.html">Support page</a>, and request manual account deletion.</p>
+    </section>
+
+    <section class="block">
+      <h2>What data is deleted</h2>
+      <ul>
+        <li>Your user profile — name, email, vehicle details, and registration plate.</li>
+        <li>Your authentication account (Firebase Authentication record).</li>
+        <li>Booking records owned by your account.</li>
+      </ul>
+    </section>
+
+    <section class="block">
+      <h2>What may be retained</h2>
+      <ul>
+        <li>Security and audit-log entries required for compliance and abuse prevention.</li>
+        <li>Operational backups for a limited retention period, after which they are removed automatically.</li>
+      </ul>
+    </section>
+
+    <section class="block">
+      <h2>Retention period</h2>
+      <p>Primary account data is removed <strong>immediately</strong> after a successful deletion. Backup retention follows our infrastructure policy and is time-limited.</p>
+    </section>
+
+    <section class="block">
+      <h2>Privacy policy</h2>
+      <p>Read the full policy on the <a href="./privacy-policy.html">EL Parking Privacy Policy</a> page.</p>
+    </section>
+  </main>
+
+  <footer>
+    <p class="brand">EL Parking — Internal Corporate Parking Application</p>
+    <p>&copy; 2026 EssilorLuxottica. All rights reserved.</p>
+  </footer>
+</body>
+</html>

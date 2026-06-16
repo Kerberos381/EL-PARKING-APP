@@ -21,10 +21,14 @@ private final class ELAppCheckProviderFactory: NSObject, AppCheckProviderFactory
         #if DEBUG
         return AppCheckDebugProvider(app: app)
         #else
-        if #available(iOS 14.0, *) {
-            return AppAttestProvider(app: app)
-        }
-        return DeviceCheckProvider(app: app)
+        // App Attest needs the App Attest capability (Apple Developer portal) + a matching
+        // entitlement + provisioning profile — none of which are set up yet. Forcing it in
+        // Release crashed the app at launch on real devices (Debug + Simulator can't run
+        // App Attest, so it only ever surfaced on TestFlight). Disable App Check in Release
+        // until App Attest is configured properly. Firestore Security Rules + Firebase Auth
+        // still fully protect all data, and App Check isn't enforced on the backend, so this
+        // is functionally a no-op — it just stops the launch crash.
+        return nil
         #endif
     }
 }

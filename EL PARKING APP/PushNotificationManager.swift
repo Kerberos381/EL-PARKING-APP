@@ -146,7 +146,7 @@ class PushNotificationManager: ObservableObject {
 
     /// One-shot drain of undelivered inbox docs + new broadcasts.
     static func backgroundSyncOnce() async {
-        guard let uid = Auth.auth().currentUser?.uid else { return }
+        guard Auth.auth().currentUser != nil else { return }
         let db = Firestore.firestore()
 
         // Per-user inbox (email-addressed)

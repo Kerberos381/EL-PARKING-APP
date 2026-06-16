@@ -105,10 +105,11 @@ struct FeedCardScrollTransition: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
+        let reduce = reduceMotion
         content.scrollTransition(.interactive) { view, phase in
             view
                 .opacity(phase.isIdentity ? 1 : 0.75)
-                .scaleEffect(phase.isIdentity || reduceMotion ? 1 : 0.97)
+                .scaleEffect(phase.isIdentity || reduce ? 1 : 0.97)
         }
     }
 }

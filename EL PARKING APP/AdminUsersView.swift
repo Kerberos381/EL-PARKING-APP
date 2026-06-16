@@ -452,7 +452,7 @@ struct AdminUsersView: View {
 
     private var selectedCompanyFilterLabel: String {
         switch selectedCompanyFilter {
-        case .none:
+        case nil:
             return L10n.all
         case .some(.omega):
             return L10n.omegaLabel
@@ -467,7 +467,7 @@ struct AdminUsersView: View {
 
     private var selectedCompanyCount: Int {
         switch selectedCompanyFilter {
-        case .none:
+        case nil:
             return authManager.allUsers.count
         case .some(.omega):
             return companyCounts.omega
@@ -482,7 +482,7 @@ struct AdminUsersView: View {
 
     private var selectedCompanyChipLabel: String {
         switch selectedCompanyFilter {
-        case .none: return L10n.all
+        case nil: return L10n.all
         case .some(.omega): return "Omega"
         case .some(.essilorLuxottica): return "EL"
         case .some(.grandVision): return "GV"

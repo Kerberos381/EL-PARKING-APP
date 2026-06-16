@@ -1667,7 +1667,6 @@ struct HomeView: View {
         let primaryTextColor: Color = useLightText ? .white : .black
         let secondaryTextColor: Color = useLightText ? .white.opacity(0.82) : .black.opacity(0.78)
         let badgeTextColor: Color = useLightText ? .white.opacity(0.76) : .black.opacity(0.72)
-        let closeIconColor: Color = useLightText ? .white.opacity(0.86) : .black.opacity(0.86)
         let headerOverlayColors: [Color] = isImageBacked
             ? [.clear, .black.opacity(0.20), .black.opacity(0.72)]
             : (useLightText ? [.clear, .clear, .black.opacity(0.50)] : [.clear, .clear, .white.opacity(0.60)])

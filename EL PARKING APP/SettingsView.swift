@@ -528,7 +528,19 @@ struct SettingsView: View {
                             }
                         }
                     } label: {
-                        LabeledContent("Remind Me", value: nativeReminderIntervalDisplay)
+                        Label {
+                            HStack {
+                                Text("Remind Me")
+                                Spacer()
+                                Text(nativeReminderIntervalDisplay)
+                                    .font(.body.weight(.medium))
+                                    .foregroundStyle(AppConfig.accent)
+                            }
+                        } icon: {
+                            Image(systemName: "clock.fill")
+                                .font(.callout)
+                                .foregroundStyle(AppConfig.accent)
+                        }
                     }
                 }
             }.listRowBackground(AppConfig.groupedCardBg)

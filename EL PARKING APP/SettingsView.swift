@@ -17,6 +17,7 @@ struct SettingsView: View {
     @AppStorage("appPalette") private var paletteRaw: Int = 0
     @AppStorage("homeStyle") private var homeStyleRaw: String = "roomy"
     @State private var phoneField: String = ""
+    @State private var phoneSaveTask: Task<Void, Never>?
     @AppStorage("dailyReminderEnabled")   private var reminderEnabled      = false
     @AppStorage("reminderMinutesBefore")  private var reminderMinutesBefore = 60
     @AppStorage("biometricLockEnabled")   private var biometricEnabled      = false
@@ -566,7 +567,11 @@ struct SettingsView: View {
                     )
                 }
                 .onChange(of: phoneField) { _, newValue in
-                    Task {
+                    // Debounce: save once typing pauses, not on every keystroke.
+                    phoneSaveTask?.cancel()
+                    phoneSaveTask = Task {
+                        try? await Task.sleep(for: .milliseconds(600))
+                        guard !Task.isCancelled else { return }
                         await authManager.updateProfile(
                             displayName: bookingManager.currentUserName,
                             plate: bookingManager.registrationPlate,

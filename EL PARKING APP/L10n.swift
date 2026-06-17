@@ -534,6 +534,16 @@ struct L10n {
             : "If an account exists for \(email), a password reset link has been sent."
     }
 
+    // Admin-triggered password reset (sends the user a reset link)
+    static var adminResetPassword:    String { isCzech ? "Obnovit heslo"        : "Reset Password" }
+    static var adminResetPasswordSent:String { isCzech ? "E-mail pro obnovení hesla byl odeslán." : "Password reset email sent." }
+    static var adminResetPasswordFail:String { isCzech ? "E-mail se nepodařilo odeslat." : "Couldn't send the reset email." }
+    static func adminResetPasswordConfirm(_ email: String) -> String {
+        isCzech
+            ? "Odeslat e-mail pro obnovení hesla na \(email)? Uživatel si nastaví nové heslo sám."
+            : "Send a password reset email to \(email)? They'll set a new password themselves."
+    }
+
     static func biometricWelcome(_ name: String) -> String {
         isCzech ? "Vítejte zpět" : "Welcome back"
     }

@@ -59,6 +59,12 @@ struct AdminUsersView: View {
     @State private var tappedUserID: String?
     @State private var userDetailSheetUser: AppUser?
 
+    // Admin password-reset
+    @State private var userToResetPassword: AppUser?
+    @State private var showResetPasswordAlert = false
+    @State private var resetPasswordResultMessage = ""
+    @State private var showResetPasswordResult = false
+
     // MARK: - Filtered Users
 
     private var normalizedSearchQuery: String {
@@ -205,6 +211,28 @@ struct AdminUsersView: View {
                 if let user = userToDelete {
                     Text(L10n.confirmDeleteUser(user.displayName))
                 }
+            }
+            .confirmationDialog(L10n.adminResetPassword, isPresented: $showResetPasswordAlert, titleVisibility: .visible) {
+                Button(L10n.sendResetLink) {
+                    if let user = userToResetPassword {
+                        let email = user.email
+                        Task {
+                            let ok = await authManager.adminSendPasswordReset(to: email)
+                            resetPasswordResultMessage = ok ? L10n.adminResetPasswordSent : L10n.adminResetPasswordFail
+                            showResetPasswordResult = true
+                        }
+                    }
+                }
+                Button(L10n.cancel, role: .cancel) {}
+            } message: {
+                if let user = userToResetPassword {
+                    Text(L10n.adminResetPasswordConfirm(user.email))
+                }
+            }
+            .alert(L10n.adminResetPassword, isPresented: $showResetPasswordResult) {
+                Button(L10n.ok, role: .cancel) {}
+            } message: {
+                Text(resetPasswordResultMessage)
             }
             .task { await refresh() }
             .onChange(of: selectedFilter) {
@@ -1357,6 +1385,14 @@ struct AdminUsersView: View {
                                 DispatchQueue.main.async {
                                     strikeReason = ""
                                     userToStrike = liveUser
+                                }
+                            }
+
+                            detailActionButton(title: L10n.adminResetPassword, icon: "key.fill") {
+                                userDetailSheetUser = nil
+                                DispatchQueue.main.async {
+                                    userToResetPassword = liveUser
+                                    showResetPasswordAlert = true
                                 }
                             }
 

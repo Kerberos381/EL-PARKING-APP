@@ -479,6 +479,7 @@ class AuthManager: ObservableObject {
             currentUser?.carDescription    = carDescription
             currentUser?.vehicleMiniaturePresetID = vehicleMiniaturePresetID
             currentUser?.preferredVocative = trimmedVocative
+            if let phone { currentUser?.phone = phone.trimmingCharacters(in: .whitespacesAndNewlines) }
             if !carColor.isEmpty { currentUser?.carColor = carColor }
             if !carType.isEmpty  { currentUser?.carType  = carType  }
             if let companyBadge { currentUser?.companyBadge = companyBadge }
@@ -1016,6 +1017,26 @@ class AuthManager: ObservableObject {
             return true
         } catch {
             errorMessage = friendlyError(error)
+            return false
+        }
+    }
+
+    /// Admin-triggered reset: emails the target user a Firebase reset link so they
+    /// set their own new password. Admins never see or handle the password.
+    func adminSendPasswordReset(to email: String) async -> Bool {
+        let email = email.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !email.isEmpty else { return false }
+        do {
+            try await Auth.auth().sendPasswordReset(withEmail: email)
+            AuditLogger.log(
+                action: "admin_send_password_reset",
+                detail: "Sent password reset email to \(email)",
+                performedBy: currentUser?.uid ?? "unknown",
+                targetUID: email
+            )
+            return true
+        } catch {
+            print("AuthManager adminSendPasswordReset error: \(error.localizedDescription)")
             return false
         }
     }

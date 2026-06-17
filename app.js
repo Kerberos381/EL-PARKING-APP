@@ -566,12 +566,9 @@ function bindEvents() {
   });
   ui.spotSearch?.addEventListener("input", () => renderParking());
 
-  ui.themeToggleBtn?.addEventListener("click", () => {
-    const isDark = document.documentElement.classList.contains("dark-mode");
-    const next = isDark ? "light" : "dark";
-    localStorage.setItem("el-parking-theme", next);
-    applyTheme(next);
-  });
+  // NOTE: the dark/light toggle is owned by theme-init.js (it runs pre-paint and
+  // is CSP-safe). A second handler here double-toggled and cancelled the first,
+  // so the button appeared dead — do NOT re-add a themeToggleBtn click listener.
 
   ui.tabs.forEach((tab) => tab.addEventListener("click", () => {
     if (tab.dataset.tab !== "settings" && state.profileDirty) {

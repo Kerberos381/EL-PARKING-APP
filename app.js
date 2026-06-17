@@ -181,6 +181,7 @@ const ui = {
   authError: byId("authError"),
   loginForm: byId("loginForm"),
   loginButton: byId("loginButton"),
+  forgotPasswordBtn: byId("forgotPasswordBtn"),
   emailInput: byId("emailInput"),
   passwordInput: byId("passwordInput"),
   rememberMeInput: byId("rememberMeInput"),
@@ -309,6 +310,13 @@ const ui = {
   adminTodayBooked: byId("adminTodayBooked"),
   adminTodayFree: byId("adminTodayFree"),
   themeToggleBtn: byId("themeToggleBtn"),
+  tutorialHelpBtn: byId("tutorialHelpBtn"),
+  tutorialModal: byId("tutorialModal"),
+  tutorialBody: byId("tutorialBody"),
+  tutorialDots: byId("tutorialDots"),
+  tutorialBack: byId("tutorialBack"),
+  tutorialNext: byId("tutorialNext"),
+  tutorialSkip: byId("tutorialSkip"),
   tabs: [...document.querySelectorAll(".tab")],
   tabPanels: {
     home: byId("homeTab"),
@@ -443,6 +451,11 @@ function initThemeToggle() {
 
 function bindEvents() {
   ui.loginForm?.addEventListener("submit", onLoginSubmit);
+  ui.forgotPasswordBtn?.addEventListener("click", onForgotPassword);
+  ui.tutorialHelpBtn?.addEventListener("click", openTutorial);
+  ui.tutorialNext?.addEventListener("click", tutorialNext);
+  ui.tutorialBack?.addEventListener("click", tutorialBack);
+  ui.tutorialSkip?.addEventListener("click", closeTutorial);
   ui.signOutButton?.addEventListener("click", () => signOut(auth));
   ui.pendingSignOut?.addEventListener("click", () => signOut(auth));
   ui.finishRegForm?.addEventListener("submit", onFinishRegSubmit);
@@ -646,6 +659,7 @@ function enterApp() {
   renderGreeting();
   switchTab("home");
   subscribeCoreData();
+  maybeShowTutorial();
 }
 
 function showFinishRegistration() {
@@ -653,6 +667,109 @@ function showFinishRegistration() {
   ui.finishPlate.value = state.profile.registrationPlate || "";
   ui.finishCar.value = state.profile.carDescription || "";
   ui.finishError.textContent = "";
+}
+
+// ── First-run tutorial (mirrors the iOS/Android onboarding) ──────────────────
+const TUTORIAL_SEEN_KEY = "el-parking-tutorial-seen";
+const SVG = {
+  park: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg>',
+  grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+  calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>',
+  bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
+  list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
+  car: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l1.5-4.5A2 2 0 0 1 8.4 7h7.2a2 2 0 0 1 1.9 1.5L19 13"/><path d="M5 13h14v4a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H8v1a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/><circle cx="7.5" cy="13.5" r=".5"/><circle cx="16.5" cy="13.5" r=".5"/></svg>',
+  shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.2 7.7-8 9-4.8-1.3-8-4.5-8-9V6z"/><polyline points="9 12 11 14 15 10"/></svg>',
+};
+
+const TUTORIAL_STEPS = [
+  {
+    icon: SVG.park,
+    title: "Welcome to EL Parking",
+    intro: "Reserve a spot in the Karlín office garage in seconds — right from your browser.",
+    rows: [],
+  },
+  {
+    icon: SVG.grid,
+    title: "Find & book a spot",
+    rows: [
+      [SVG.calendar, "Pick a day", "Use the day selector at the top of the Parking tab."],
+      [SVG.grid, "Choose a free spot", "Green spots are free — tap one to select it."],
+      [SVG.clock, "Set your time", "Adjust the from/to times and confirm. Done."],
+    ],
+  },
+  {
+    icon: SVG.bell,
+    title: "Manage your bookings",
+    rows: [
+      [SVG.list, "My Bookings", "View, edit or cancel your reservations any time."],
+      [SVG.car, "Your vehicle", "Add your plate + car so colleagues know whose spot it is."],
+    ],
+  },
+  {
+    icon: SVG.shield,
+    title: "Good to know",
+    rows: [
+      [SVG.calendar, "Booking windows", "Spots open on a rolling schedule — book early."],
+      [SVG.shield, "Be considerate", "Cancel if plans change; repeated no-shows earn warnings."],
+    ],
+  },
+];
+
+let tutorialStep = 0;
+
+function renderTutorialStep() {
+  const step = TUTORIAL_STEPS[tutorialStep];
+  const rows = (step.rows || [])
+    .map(
+      ([icon, title, desc]) =>
+        `<div class="tutorial-row"><span class="tutorial-row-icon">${icon}</span><div><strong>${title}</strong><p>${desc}</p></div></div>`
+    )
+    .join("");
+  ui.tutorialBody.innerHTML =
+    `<div class="tutorial-hero">${step.icon}</div>` +
+    `<h3 id="tutorialTitle">${step.title}</h3>` +
+    (step.intro ? `<p class="tutorial-intro">${step.intro}</p>` : "") +
+    (rows ? `<div class="tutorial-rows">${rows}</div>` : "");
+  ui.tutorialDots.innerHTML = TUTORIAL_STEPS.map(
+    (_, i) => `<span class="tutorial-dot${i === tutorialStep ? " active" : ""}"></span>`
+  ).join("");
+  const last = tutorialStep === TUTORIAL_STEPS.length - 1;
+  ui.tutorialBack.classList.toggle("hidden", tutorialStep === 0);
+  ui.tutorialNext.textContent = last ? "Get started" : "Next";
+}
+
+function openTutorial() {
+  tutorialStep = 0;
+  renderTutorialStep();
+  ui.tutorialModal.classList.remove("hidden");
+}
+
+function closeTutorial() {
+  ui.tutorialModal.classList.add("hidden");
+  try { localStorage.setItem(TUTORIAL_SEEN_KEY, "1"); } catch (_) {}
+}
+
+function tutorialNext() {
+  if (tutorialStep < TUTORIAL_STEPS.length - 1) {
+    tutorialStep += 1;
+    renderTutorialStep();
+  } else {
+    closeTutorial();
+  }
+}
+
+function tutorialBack() {
+  if (tutorialStep > 0) {
+    tutorialStep -= 1;
+    renderTutorialStep();
+  }
+}
+
+function maybeShowTutorial() {
+  let seen = false;
+  try { seen = localStorage.getItem(TUTORIAL_SEEN_KEY) === "1"; } catch (_) {}
+  if (!seen) openTutorial();
 }
 
 async function onFinishRegSubmit(event) {
@@ -679,6 +796,25 @@ async function onFinishRegSubmit(event) {
     ui.finishError.textContent = "Could not save — please try again.";
   } finally {
     ui.finishSubmit.disabled = false;
+  }
+}
+
+async function onForgotPassword() {
+  const email = ui.emailInput.value.trim().toLowerCase();
+  if (!email) {
+    ui.authError.textContent = "Enter your email above first, then tap Forgot password.";
+    ui.emailInput.focus();
+    return;
+  }
+  ui.authError.textContent = "";
+  ui.forgotPasswordBtn.disabled = true;
+  try {
+    await sendPasswordResetEmail(auth, email);
+    showToast(`If an account exists for ${email}, a reset link has been sent.`);
+  } catch (err) {
+    showToast(friendlyAuthError(err), "error");
+  } finally {
+    ui.forgotPasswordBtn.disabled = false;
   }
 }
 

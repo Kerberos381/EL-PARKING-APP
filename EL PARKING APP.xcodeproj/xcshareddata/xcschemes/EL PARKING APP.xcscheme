@@ -70,6 +70,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "757BEE442F7556A800AA1F6F"
             BuildableName = "EL PARKING APP.app"
+            BlueprintName = "EL PARKING APP"
             ReferencedContainer = "container:EL PARKING APP.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

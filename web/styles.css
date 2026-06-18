@@ -502,6 +502,85 @@ h3 {
   cursor: default;
 }
 
+.btn-link {
+  align-self: center;
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 4px 8px;
+  margin-top: -2px;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 640;
+  cursor: pointer;
+}
+
+.btn-link:hover { text-decoration: underline; }
+.btn-link:disabled { opacity: 0.56; cursor: default; }
+
+/* ── First-run tutorial ── */
+.tutorial-card {
+  position: relative;
+  text-align: center;
+  gap: 14px;
+  padding-top: 30px;
+}
+.tutorial-skip {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  margin: 0;
+}
+.tutorial-hero {
+  width: 64px;
+  height: 64px;
+  margin: 4px auto 0;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: var(--surface-strong);
+  color: var(--accent);
+}
+.tutorial-hero svg { width: 30px; height: 30px; }
+.tutorial-card h3 { font-size: 20px; margin: 0; }
+.tutorial-intro {
+  font-size: 15px;
+  color: var(--text);
+  opacity: 0.66;
+  margin: 0 auto;
+  max-width: 36ch;
+}
+.tutorial-rows { display: grid; gap: 14px; text-align: left; margin-top: 2px; }
+.tutorial-row {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.tutorial-row-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--accent);
+}
+.tutorial-row-icon svg { width: 19px; height: 19px; }
+.tutorial-row strong { display: block; font-size: 15px; color: var(--text); }
+.tutorial-row p { margin: 2px 0 0; font-size: 13.5px; color: var(--text); opacity: 0.62; }
+.tutorial-dots { display: flex; justify-content: center; gap: 7px; margin-top: 2px; }
+.tutorial-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--line);
+  transition: width 0.18s ease, background 0.18s ease;
+}
+.tutorial-dot.active { background: var(--accent); width: 18px; }
+.tutorial-actions { justify-content: space-between; }
+
 .auth-card,
 .pending-card {
   max-width: 420px;

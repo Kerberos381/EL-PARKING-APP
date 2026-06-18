@@ -1,16 +1,31 @@
 {
+  "id": "/",
   "name": "EL Parking",
   "short_name": "EL Parking",
+  "description": "Book a parking spot at the EssilorLuxottica Karlín office.",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#35c759",
   "icons": [
     {
-      "src": "./app-icon.png",
-      "sizes": "256x256",
+      "src": "./icon-192.png",
+      "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

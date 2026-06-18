@@ -15,7 +15,9 @@ import {
   doc,
   getDocsFromServer,
   getDoc,
-  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   onSnapshot,
   query,
   runTransaction,
@@ -310,6 +312,8 @@ const ui = {
   adminTodayBooked: byId("adminTodayBooked"),
   adminTodayFree: byId("adminTodayFree"),
   themeToggleBtn: byId("themeToggleBtn"),
+  menuBtn: byId("menuBtn"),
+  headerMenu: byId("headerMenu"),
   tutorialHelpBtn: byId("tutorialHelpBtn"),
   tutorialModal: byId("tutorialModal"),
   tutorialBody: byId("tutorialBody"),
@@ -384,7 +388,16 @@ async function boot() {
 
     const app = initializeApp(firebaseConfig);
     auth = getAuth(app);
-    db = getFirestore(app);
+    // Offline persistence: serve last-synced data instantly + survive flaky signal
+    // (multi-tab safe). Falls back to in-memory if the browser blocks storage.
+    try {
+      db = initializeFirestore(app, {
+        localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+      });
+    } catch (cacheError) {
+      console.warn("Firestore persistent cache unavailable, using default:", cacheError);
+      db = initializeFirestore(app, {});
+    }
     try {
       await setPersistence(auth, currentAuthPersistence());
     } catch (persistError) {
@@ -562,9 +575,24 @@ function bindEvents() {
       closeVehiclePicker();
       resolveConfirm(false);
       closeContentModal();
+      closeTutorial();
+      closeHeaderMenu();
     }
   });
   ui.spotSearch?.addEventListener("input", () => renderParking());
+
+  // Header overflow menu (theme / help / sign out tucked away)
+  ui.menuBtn?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleHeaderMenu();
+  });
+  ui.headerMenu?.addEventListener("click", () => closeHeaderMenu());
+  document.addEventListener("click", (event) => {
+    if (!ui.headerMenu || ui.headerMenu.classList.contains("hidden")) return;
+    if (!ui.headerMenu.contains(event.target) && event.target !== ui.menuBtn && !ui.menuBtn.contains(event.target)) {
+      closeHeaderMenu();
+    }
+  });
 
   // NOTE: the dark/light toggle is owned by theme-init.js (it runs pre-paint and
   // is CSP-safe). A second handler here double-toggled and cancelled the first,
@@ -740,10 +768,13 @@ function openTutorial() {
   tutorialStep = 0;
   renderTutorialStep();
   ui.tutorialModal.classList.remove("hidden");
+  ui.tutorialModal.setAttribute("aria-hidden", "false");
 }
 
 function closeTutorial() {
+  if (!ui.tutorialModal || ui.tutorialModal.classList.contains("hidden")) return;
   ui.tutorialModal.classList.add("hidden");
+  ui.tutorialModal.setAttribute("aria-hidden", "true");
   try { localStorage.setItem(TUTORIAL_SEEN_KEY, "1"); } catch (_) {}
 }
 
@@ -767,6 +798,18 @@ function maybeShowTutorial() {
   let seen = false;
   try { seen = localStorage.getItem(TUTORIAL_SEEN_KEY) === "1"; } catch (_) {}
   if (!seen) openTutorial();
+}
+
+// ── Header overflow menu ─────────────────────────────────────────────────────
+function toggleHeaderMenu() {
+  if (!ui.headerMenu) return;
+  const open = ui.headerMenu.classList.toggle("hidden");
+  ui.menuBtn?.setAttribute("aria-expanded", open ? "false" : "true");
+}
+function closeHeaderMenu() {
+  if (!ui.headerMenu || ui.headerMenu.classList.contains("hidden")) return;
+  ui.headerMenu.classList.add("hidden");
+  ui.menuBtn?.setAttribute("aria-expanded", "false");
 }
 
 async function onFinishRegSubmit(event) {
@@ -862,13 +905,10 @@ function subscribeSpots() {
       renderAdminSpots();
       renderDayPills();
     },
-    () => {
-      state.spots = [];
-      renderSpotSelect();
-      recalculateDerivedBookings();
-      renderParking();
-      renderAdminSpots();
-      renderDayPills();
+    (error) => {
+      // Keep last-known spots so a brief signal drop doesn't flash an empty grid;
+      // the persistent cache reconciles when the listener recovers.
+      console.warn("spots listener error — keeping last-known data:", error?.code || error);
     }
   );
 }
@@ -910,16 +950,10 @@ function subscribeAllBookings() {
       renderAdminDashboard();
       renderDayPills();
     },
-    () => {
-      state.allBookings = [];
-      recalculateDerivedBookings();
-      ensureSelectedSpotIsValid();
-      renderHomeHero();
-      renderMyBookings();
-      renderParking();
-      renderAdminSpotInspector();
-      renderAdminDashboard();
-      renderDayPills();
+    (error) => {
+      // Keep last-known bookings on a transient listener error rather than
+      // blanking everything; cache reconciles on recovery.
+      console.warn("bookings listener error — keeping last-known data:", error?.code || error);
     }
   );
 }
@@ -2831,7 +2865,9 @@ function switchTab(tab) {
     panel.classList.toggle("hidden", name !== tab);
   }
   for (const btn of ui.tabs) {
-    btn.classList.toggle("active", btn.dataset.tab === tab);
+    const isActive = btn.dataset.tab === tab;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
   }
 }
 
@@ -3297,3 +3333,10 @@ function friendlyAuthError(err) {
 }
 
 boot();
+
+// Register the service worker for offline support / installable PWA (secure-context only).
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch((err) => console.warn("SW registration failed:", err));
+  });
+}

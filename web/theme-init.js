@@ -11,11 +11,19 @@
   // (Inline scripts are blocked by the page CSP, so all wiring lives here.)
   function wire() {
     var themeBtn = document.getElementById("themeToggleBtn");
+    var themeLabel = document.getElementById("themeMenuLabel");
+    function syncThemeBtn() {
+      var isDark = root.classList.contains("dark-mode");
+      if (themeBtn) themeBtn.setAttribute("aria-pressed", isDark ? "true" : "false");
+      if (themeLabel) themeLabel.textContent = isDark ? "Light mode" : "Dark mode";
+    }
     if (themeBtn) {
       themeBtn.addEventListener("click", function () {
         var isDark = root.classList.toggle("dark-mode");
         localStorage.setItem("el-parking-theme", isDark ? "dark" : "light");
+        syncThemeBtn();
       });
+      syncThemeBtn();
     }
 
     function bindSeg(segId, attr, cls, storageKey, activeValue) {

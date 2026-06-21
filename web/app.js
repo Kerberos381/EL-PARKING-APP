@@ -705,39 +705,53 @@ const SVG = {
   list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
   car: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l1.5-4.5A2 2 0 0 1 8.4 7h7.2a2 2 0 0 1 1.9 1.5L19 13"/><path d="M5 13h14v4a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H8v1a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/><circle cx="7.5" cy="13.5" r=".5"/><circle cx="16.5" cy="13.5" r=".5"/></svg>',
   shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.2 7.7-8 9-4.8-1.3-8-4.5-8-9V6z"/><polyline points="9 12 11 14 15 10"/></svg>',
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+  swipe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 7 18 12 13 17"/><polyline points="6 7 11 12 6 17" opacity="0.45"/></svg>',
 };
 
 const TUTORIAL_STEPS = [
   {
-    icon: SVG.park,
-    title: "Welcome to EL Parking",
-    intro: "Reserve a spot in the Karlín office garage in seconds — right from your browser.",
-    rows: [],
+    type: "garage",
+    title: "Follow the Blue Line",
+    desc: "The blue navigation lane leads directly to spots 63–82. White arrows guide you straight to your reserved spot.",
+    caption: "Rohanske nabrezi 721/39, Prague",
+    photos: ["./garage-1.jpg", "./garage-2.jpg", "./garage-3.jpg", "./garage-4.jpg"],
   },
   {
-    icon: SVG.grid,
-    title: "Find & book a spot",
+    icon: SVG.park,
+    title: "Welcome to EL Parking",
+    intro: "Book spots in seconds, get reminded before your session starts, and manage your reservations — all from your phone.",
     rows: [
-      [SVG.calendar, "Pick a day", "Use the day selector at the top of the Parking tab."],
-      [SVG.grid, "Choose a free spot", "Green spots are free — tap one to select it."],
-      [SVG.clock, "Set your time", "Adjust the from/to times and confirm. Done."],
+      [SVG.home, "Home", "See your active booking, upcoming sessions and today's parking status at a glance."],
+      [SVG.grid, "Parking Grid", "Every spot in real time. Free spots are green — tap one to book instantly. Taken spots show who has them."],
+      [SVG.calendar, "Make a Booking", "Choose a spot, set your date and time, and confirm. You can also book for a colleague by name."],
     ],
   },
   {
     icon: SVG.bell,
-    title: "Manage your bookings",
+    title: "Stay on Time",
     rows: [
-      [SVG.list, "My Bookings", "View, edit or cancel your reservations any time."],
-      [SVG.car, "Your vehicle", "Add your plate + car so colleagues know whose spot it is."],
+      [SVG.bell, "Smart Reminders", "Enable notifications and choose how far ahead you're reminded — from 30 minutes to 2 days before."],
+      [SVG.download, "Add to Home Screen", "Install EL Parking for one-tap access and offline use — open your browser menu and choose “Add to Home Screen”."],
     ],
   },
   {
     icon: SVG.shield,
-    title: "Good to know",
+    title: "Good to Know",
     rows: [
-      [SVG.calendar, "Booking windows", "Spots open on a rolling schedule — book early."],
-      [SVG.shield, "Be considerate", "Cancel if plans change; repeated no-shows earn warnings."],
+      [SVG.calendar, "When to Book", "Standard users book for today or tomorrow (after 18:00). Privileged users up to 3 days ahead."],
+      [SVG.shield, "Fair Play", "Misbehaviour can earn a warning. Three warnings trigger a 2-week suspension that lifts automatically."],
+      [SVG.park, "Spot Groups", "Spots 74–76 are reserved for GrandVision. From 8:00 daily, any free spot opens to everyone — for that day."],
     ],
+  },
+  {
+    icon: SVG.check,
+    title: "You're All Set!",
+    intro: "Head to the Parking tab and tap any green spot to make your first booking.",
+    rows: [],
   },
 ];
 
@@ -745,17 +759,29 @@ let tutorialStep = 0;
 
 function renderTutorialStep() {
   const step = TUTORIAL_STEPS[tutorialStep];
-  const rows = (step.rows || [])
-    .map(
-      ([icon, title, desc]) =>
-        `<div class="tutorial-row"><span class="tutorial-row-icon">${icon}</span><div><strong>${title}</strong><p>${desc}</p></div></div>`
-    )
-    .join("");
-  ui.tutorialBody.innerHTML =
-    `<div class="tutorial-hero">${step.icon}</div>` +
-    `<h3 id="tutorialTitle">${step.title}</h3>` +
-    (step.intro ? `<p class="tutorial-intro">${step.intro}</p>` : "") +
-    (rows ? `<div class="tutorial-rows">${rows}</div>` : "");
+  if (step.type === "garage") {
+    const imgs = step.photos
+      .map((src, i) => `<img class="tutorial-photo" src="${src}" alt="Parking route photo ${i + 1}" loading="lazy" draggable="false" />`)
+      .join("");
+    ui.tutorialBody.innerHTML =
+      `<div class="tutorial-carousel" aria-label="Parking route photos">${imgs}</div>` +
+      `<p class="tutorial-swipe-hint">${SVG.swipe}<span>Swipe through the route</span></p>` +
+      `<h3 id="tutorialTitle">${step.title}</h3>` +
+      `<p class="tutorial-intro">${step.desc}</p>` +
+      `<p class="tutorial-caption">${SVG.pin}<span>${step.caption}</span></p>`;
+  } else {
+    const rows = (step.rows || [])
+      .map(
+        ([icon, title, desc]) =>
+          `<div class="tutorial-row"><span class="tutorial-row-icon">${icon}</span><div><strong>${title}</strong><p>${desc}</p></div></div>`
+      )
+      .join("");
+    ui.tutorialBody.innerHTML =
+      `<div class="tutorial-hero">${step.icon}</div>` +
+      `<h3 id="tutorialTitle">${step.title}</h3>` +
+      (step.intro ? `<p class="tutorial-intro">${step.intro}</p>` : "") +
+      (rows ? `<div class="tutorial-rows">${rows}</div>` : "");
+  }
   ui.tutorialDots.innerHTML = TUTORIAL_STEPS.map(
     (_, i) => `<span class="tutorial-dot${i === tutorialStep ? " active" : ""}"></span>`
   ).join("");

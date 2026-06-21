@@ -581,6 +581,43 @@ h3 {
 .tutorial-dot.active { background: var(--accent); width: 18px; }
 .tutorial-actions { justify-content: space-between; }
 
+/* Tutorial garage photo carousel (mirrors the iOS onboarding) */
+.tutorial-carousel {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin: 0 0 2px;
+  border-radius: 16px;
+}
+.tutorial-carousel::-webkit-scrollbar { display: none; }
+.tutorial-photo {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  border-radius: 16px;
+  scroll-snap-align: center;
+  background: var(--surface);
+  user-select: none;
+}
+.tutorial-swipe-hint,
+.tutorial-caption {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin: 2px auto 0;
+  font-size: 12.5px;
+  color: var(--text);
+  opacity: 0.5;
+}
+.tutorial-swipe-hint { font-weight: 600; }
+.tutorial-swipe-hint svg { width: 15px; height: 15px; }
+.tutorial-caption svg { width: 14px; height: 14px; flex: 0 0 auto; }
+
 .auth-card,
 .pending-card {
   max-width: 420px;

@@ -66,8 +66,12 @@ struct OverviewView: View {
     }
 
     /// Fast lookup map to avoid repeated user searches in booking rows/cells.
+    /// NOTE: use uniquingKeysWith — `Dictionary(uniqueKeysWithValues:)` crashes with a
+    /// fatalError if two user docs share a lowercased email (e.g. case-only difference
+    /// or a genuine duplicate). This map is admin-only, so the crash looked admin-specific.
     private var usersByEmailLowercased: [String: AppUser] {
-        Dictionary(uniqueKeysWithValues: authManager.allUsers.map { ($0.email.lowercased(), $0) })
+        Dictionary(authManager.allUsers.map { ($0.email.lowercased(), $0) },
+                   uniquingKeysWith: { first, _ in first })
     }
 
     /// Spot status computed once per render pass.

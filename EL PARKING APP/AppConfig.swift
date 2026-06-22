@@ -100,8 +100,8 @@ struct AppConfig {
 
     // MARK: - Booking Constraints (Privileged Users booking for OTHERS)
 
-    /// Maximum days in advance for booking for others
-    static let othersBookingMaxAdvanceDays: Int = 7
+    /// Maximum days in advance for booking for others (privileged window = today..+3, per server rules)
+    static let othersBookingMaxAdvanceDays: Int = 3
 
     /// Maximum booking duration for privileged users (in days)
     static let othersBookingMaxDurationDays: Int = 5
@@ -109,8 +109,8 @@ struct AppConfig {
     /// Maximum delegated bookings per day for non-admin privileged users
     static let delegatedBookingMaxPerDay: Int = 2
 
-    /// Maximum days in advance admins can book for others
-    static let adminBookingMaxAdvanceDays: Int = 10
+    /// Admins have no server-side date restriction; keep a high client cap (effectively unlimited)
+    static let adminBookingMaxAdvanceDays: Int = 365
 
     // MARK: - Company Spot Policy (GrandVision reservation, from 22 June 2026)
 

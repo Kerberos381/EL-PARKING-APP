@@ -75,6 +75,13 @@ class BookingManager: ObservableObject {
     private var lastVehicleRenderHash: Int = 0
 
     init() {
+        // Reminders default ON @ 30 min before. register(defaults:) seeds the raw
+        // UserDefaults reads used by the scheduler (.bool/.integer) without persisting,
+        // so anyone who explicitly turned reminders OFF keeps their choice.
+        UserDefaults.standard.register(defaults: [
+            "dailyReminderEnabled": true,
+            "reminderMinutesBefore": 30,
+        ])
         loadSpotsCache()      // Cached spot list for offline use
         loadLocalCache()      // Fast local load for widget + offline
         loadUserProfile()

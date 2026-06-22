@@ -18,8 +18,8 @@ struct SettingsView: View {
     @AppStorage("homeStyle") private var homeStyleRaw: String = "roomy"
     @State private var phoneField: String = ""
     @State private var phoneSaveTask: Task<Void, Never>?
-    @AppStorage("dailyReminderEnabled")   private var reminderEnabled      = false
-    @AppStorage("reminderMinutesBefore")  private var reminderMinutesBefore = 60
+    @AppStorage("dailyReminderEnabled")   private var reminderEnabled      = true
+    @AppStorage("reminderMinutesBefore")  private var reminderMinutesBefore = 30
     @AppStorage("biometricLockEnabled")   private var biometricEnabled      = false
     @AppStorage("favoriteSpotID",   store: .appGroup) private var favoriteSpotID:   String = ""
     @AppStorage("favoriteFromTime", store: .appGroup) private var favoriteFromTime: String = AppConfig.defaultTimeFrom
@@ -136,6 +136,13 @@ struct SettingsView: View {
 
     private var isCustomValue: Bool {
         !reminderOptions.contains(where: { $0.minutes == reminderMinutesBefore })
+    }
+
+    /// The current user's real booking window, by role (matches the server rules).
+    private var myAdvanceWindow: String {
+        if bookingManager.isAdmin { return L10n.advanceWindowAdmin }
+        if bookingManager.isPrivileged { return L10n.advanceWindowPrivileged }
+        return L10n.advanceWindowStandard
     }
 
     private var reminderSummary: String {
@@ -648,8 +655,10 @@ struct SettingsView: View {
             }.listRowBackground(AppConfig.groupedCardBg)
 
             Section(L10n.bookingRules) {
-                LabeledContent(L10n.personalAdvance, value: "\(AppConfig.selfBookingMaxAdvanceDays) days")
-                LabeledContent(L10n.forOthersAdvance, value: "\(AppConfig.othersBookingMaxAdvanceDays) days")
+                LabeledContent(L10n.personalAdvance, value: myAdvanceWindow)
+                if bookingManager.isPrivileged {
+                    LabeledContent(L10n.forOthersAdvance, value: myAdvanceWindow)
+                }
                 LabeledContent(L10n.maxPerDay, value: "\(AppConfig.selfBookingMaxPerDay)")
             }.listRowBackground(AppConfig.groupedCardBg)
 
@@ -1416,8 +1425,10 @@ struct SettingsView: View {
     private var rulesSection: some View {
         settingsSection(title: L10n.bookingRules, icon: "checklist", iconTint: .indigo) {
             VStack(spacing: 0) {
-                infoRow(icon: "calendar", label: L10n.personalAdvance, value: "\(AppConfig.selfBookingMaxAdvanceDays) days")
-                infoRow(icon: "person.2", label: L10n.forOthersAdvance, value: "\(AppConfig.othersBookingMaxAdvanceDays) days")
+                infoRow(icon: "calendar", label: L10n.personalAdvance, value: myAdvanceWindow)
+                if bookingManager.isPrivileged {
+                    infoRow(icon: "person.2", label: L10n.forOthersAdvance, value: myAdvanceWindow)
+                }
                 infoRow(icon: "1.circle", label: L10n.maxPerDay, value: "\(AppConfig.selfBookingMaxPerDay)")
                 infoRow(icon: "clock", label: L10n.defaultTime, value: "\(AppConfig.defaultTimeFrom) – \(AppConfig.defaultTimeTo)")
                 infoRow(icon: "moon.fill", label: L10n.autoAdvanceAfter, value: "\(AppConfig.autoAdvanceHour):00")

@@ -456,6 +456,10 @@ struct L10n {
     // Rules labels
     static var personalAdvance:    String { isCzech ? "Osobní předstih"          : "Personal advance" }
     static var forOthersAdvance:   String { isCzech ? "Předstih pro ostatní"     : "For others advance" }
+    // Accurate booking-window descriptions per role (match firestore.rules bookingDateAllowedForActor)
+    static var advanceWindowStandard:   String { isCzech ? "Dnes / zítra po 18:00" : "Today / tomorrow after 18:00" }
+    static var advanceWindowPrivileged: String { isCzech ? "Až 3 dny dopředu"      : "Up to 3 days ahead" }
+    static var advanceWindowAdmin:      String { isCzech ? "Bez omezení data"      : "No date limit" }
     static var maxPerDay:          String { isCzech ? "Max. za den (osobní)"     : "Max per day (personal)" }
     static var defaultTime:        String { isCzech ? "Výchozí čas"              : "Default time" }
     static var autoAdvanceAfter:   String { isCzech ? "Automatický posun po"     : "Auto-advance after" }

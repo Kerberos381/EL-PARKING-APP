@@ -520,6 +520,11 @@ function bindEvents() {
 
   ui.bookForm?.addEventListener("submit", onBookSubmit);
   ui.profileForm?.addEventListener("submit", onSaveProfile);
+  // Phone field: numeric only, but allow + # * ( ) space and dash (no letters).
+  ui.phoneInput?.addEventListener("input", () => {
+    const cleaned = ui.phoneInput.value.replace(/[^0-9+#*()\s-]/g, "");
+    if (cleaned !== ui.phoneInput.value) ui.phoneInput.value = cleaned;
+  });
   ui.vehicleMakeButton?.addEventListener("click", openMakePicker);
   ui.vehicleModelSelect?.addEventListener("change", () => {
     state.selectedVehicleModel = ui.vehicleModelSelect.value;

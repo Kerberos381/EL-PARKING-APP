@@ -249,6 +249,7 @@ const ui = {
   nameInput: byId("nameInput"),
   vocativeInput: byId("vocativeInput"),
   plateInput: byId("plateInput"),
+  phoneInput: byId("phoneInput"),
   carInput: byId("carInput"),
   vehiclePreview: byId("vehiclePreview"),
   vehicleMakeButton: byId("vehicleMakeButton"),
@@ -2553,6 +2554,7 @@ async function onSaveProfile(event) {
   const displayName = ui.nameInput.value.trim();
   const preferredVocative = ui.vocativeInput.value.trim();
   const registrationPlate = ui.plateInput.value.trim().toUpperCase();
+  const phone = ui.phoneInput.value.trim();
   syncCarDescriptionField();
   const carDescription = ui.carInput.value.trim();
   const vehicleMiniaturePresetID = state.selectedVehiclePresetID || "";
@@ -2569,6 +2571,7 @@ async function onSaveProfile(event) {
       displayName,
       preferredVocative,
       registrationPlate,
+      phone,
       carDescription,
       carColor,
       carType: "",
@@ -2579,6 +2582,7 @@ async function onSaveProfile(event) {
       displayName,
       preferredVocative,
       registrationPlate,
+      phone,
       carDescription,
       carColor,
       carType: "",
@@ -2598,6 +2602,7 @@ function hydrateProfileForm() {
   ui.nameInput.value = state.profile?.displayName || "";
   ui.vocativeInput.value = state.profile?.preferredVocative || "";
   ui.plateInput.value = state.profile?.registrationPlate || "";
+  ui.phoneInput.value = state.profile?.phone || "";
   ui.carInput.value = state.profile?.carDescription || "";
   hydrateVehicleSelection();
   state.profileDirty = false;
@@ -3259,6 +3264,7 @@ function parseUser(data, docId = "") {
     role: String(data.role ?? "user"),
     status: String(data.status ?? "pending"),
     registrationPlate: String(data.registrationPlate ?? ""),
+    phone: String(data.phone ?? ""),
     carDescription: String(data.carDescription ?? ""),
     needsFinishRegistration: Boolean(data.needsFinishRegistration ?? false),
     carType: String(data.carType ?? ""),

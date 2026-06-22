@@ -104,11 +104,12 @@ struct BookingSheet: View {
         )
     }
 
+    /// Role-based booking window (matches firestore.rules bookingDateAllowedForActor):
+    /// admin = unlimited, privileged = today..+3, standard user = today (tomorrow only after 18:00).
     private var maxAdvanceDays: Int {
-        if bookingManager.isAdmin && isForOthersToggle { return AppConfig.adminBookingMaxAdvanceDays }
-        return isForOthersToggle
-            ? AppConfig.othersBookingMaxAdvanceDays
-            : AppConfig.selfBookingMaxAdvanceDays
+        if bookingManager.isAdmin { return AppConfig.adminBookingMaxAdvanceDays }
+        if bookingManager.isPrivileged { return AppConfig.othersBookingMaxAdvanceDays }
+        return Calendar.current.component(.hour, from: Date()) >= 18 ? 1 : 0
     }
 
     private var maxDate: Date {
@@ -575,7 +576,7 @@ struct BookingSheet: View {
                     HStack(spacing: 8) {
                         let calendar = Calendar.current
                         let today = calendar.startOfDay(for: Date())
-                        let days = isForOthersToggle ? AppConfig.othersBookingMaxAdvanceDays : AppConfig.selfBookingMaxAdvanceDays
+                        let days = maxAdvanceDays
                         ForEach(0..<min(days + 1, 8), id: \.self) { offset in
                             if let date = calendar.date(byAdding: .day, value: offset, to: today) {
                                 quickDateButton(date: date, offset: offset)
@@ -1194,7 +1195,9 @@ struct BookingSheet: View {
         let advanceDays = calendar.dateComponents([.day], from: calendar.startOfDay(for: Date()), to: calendar.startOfDay(for: bookingDate)).day ?? 0
 
         if advanceDays > maxAdvanceDays {
-            errorMessage = L10n.tooFarInAdvance(maxAdvanceDays)
+            errorMessage = bookingManager.isPrivileged
+                ? L10n.tooFarInAdvance(maxAdvanceDays)
+                : L10n.bookingWindowStandardError
             showingError = true
             await showFailureState()
             return

@@ -242,6 +242,11 @@ struct L10n {
             ? "Nelze rezervovat více než \(days) dní dopředu."
             : "Cannot book more than \(days) days in advance."
     }
+    static var bookingWindowStandardError: String {
+        isCzech
+            ? "Můžete rezervovat pouze na dnes, nebo na zítra po 18:00."
+            : "You can only book for today, or tomorrow after 18:00."
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // MARK: My Bookings

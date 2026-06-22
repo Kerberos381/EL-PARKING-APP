@@ -648,9 +648,16 @@ class BookingManager: ObservableObject {
         let rangeGroupID: UUID? = daysDiff > 0 ? UUID() : nil
 
         let isBookingForSelf = (userEmail == normalizedCurrentUserEmail)
-        let maxAdvanceDays = isAdmin && !isBookingForSelf
-            ? AppConfig.adminBookingMaxAdvanceDays
-            : (isBookingForSelf ? AppConfig.selfBookingMaxAdvanceDays : AppConfig.othersBookingMaxAdvanceDays)
+        // Role-based booking window (matches firestore.rules bookingDateAllowedForActor):
+        // admin = unlimited, privileged = today..+3, standard user = today (tomorrow only after 18:00).
+        let maxAdvanceDays: Int
+        if isAdmin {
+            maxAdvanceDays = AppConfig.adminBookingMaxAdvanceDays
+        } else if isPrivileged {
+            maxAdvanceDays = AppConfig.othersBookingMaxAdvanceDays
+        } else {
+            maxAdvanceDays = Calendar.current.component(.hour, from: Date()) >= 18 ? 1 : 0
+        }
 
         if !isBookingForSelf && !isAdmin && daysDiff + 1 > AppConfig.othersBookingMaxDurationDays {
             throw BookingError.invalidDuration

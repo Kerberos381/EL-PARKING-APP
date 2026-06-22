@@ -1097,9 +1097,9 @@ h3 {
 
 .settings-section-block {
   display: grid;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid #e7ebf2;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
   border-radius: 20px;
   background: var(--surface);
 }
@@ -1126,8 +1126,8 @@ h3 {
   gap: 12px;
   min-height: 112px;
   border-radius: 20px;
-  background: #fff;
-  border: 1px solid #e7ebf2;
+  background: var(--surface);
+  border: 1px solid var(--line);
   padding: 12px;
   overflow: hidden;
 }
@@ -1185,9 +1185,9 @@ h3 {
 .settings-row-button,
 .settings-link-card a {
   width: 100%;
-  border: 1px solid #e2e7ef;
+  border: 1px solid var(--line);
   border-radius: 18px;
-  background: #fff;
+  background: var(--surface);
   color: var(--text);
   padding: 14px;
   min-height: 58px;
@@ -2265,7 +2265,7 @@ h3 {
 .seg {
   display: flex;
   gap: 6px;
-  background: var(--surface);
+  background: var(--surface-strong);
   padding: 4px;
   border-radius: var(--radius-control);
 }
@@ -2420,3 +2420,29 @@ select,
   .topbar { padding-top: 6px; padding-bottom: 8px; }
   .topbar h1 { font-size: 20px; }
 }
+
+/* ===== Settings polish + tab centering (round 2) ===== */
+
+/* Tab bar was a fixed 5-column grid → with 4 visible tabs the 5th column was
+   empty and everything shifted left. Flex distributes 4 OR 5 evenly = centered. */
+.tabbar { display: flex; }
+.tab { flex: 1 1 0; min-width: 0; }
+
+/* Flatten the settings section: card → title → control (no extra bordered box),
+   so dark mode isn't a muddy nest of near-identical dark boxes. */
+.settings-section-block {
+  border: none;
+  background: transparent;
+  padding: 0;
+  gap: 8px;
+}
+.settings-section-block + .settings-section-block { margin-top: 16px; }
+
+/* Segmented control: recessed track + a clearly raised active pill in BOTH themes
+   (the old version made the active pill darker than its track in dark mode). */
+.seg { background: var(--surface); }
+.dark-mode .seg { background: rgba(0, 0, 0, 0.28); }
+.dark-mode .seg-btn.active { background: var(--surface-strong); box-shadow: none; }
+
+/* Privacy / Support rows: gap so their borders don't abut. */
+.settings-link-card { display: grid; gap: 10px; }

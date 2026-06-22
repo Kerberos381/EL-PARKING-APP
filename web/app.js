@@ -10,6 +10,7 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js";
 import {
+  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -2478,6 +2479,36 @@ async function cancelBooking(booking, confirmFirst = true) {
       transaction.delete(bookingRef);
     });
     if (confirmFirst) closeSpotDetailsModal();
+
+    // Admin cancelled someone else's booking → notify that user (in-app) + offer to email them.
+    if (myEmail !== ownerEmail) {
+      const spotNum = extractSpotNumber(booking.spot);
+      const dateStr = formatLongDate(booking.bookingDate);
+      try {
+        // keys must match firestore.rules /direct_notifications exactly
+        await addDoc(collection(db, "direct_notifications"), {
+          toEmail: ownerEmail,
+          title: "Booking Cancelled",
+          body: `Your booking for spot ${spotNum} on ${dateStr} was cancelled by an administrator.`,
+          delivered: false,
+          createdAt: serverTimestamp(),
+        });
+      } catch (notifyErr) {
+        console.warn("direct_notifications write failed:", notifyErr);
+      }
+      // Offer the admin a reliable out-of-band channel (email) to the user.
+      const emailUser = await showConfirm({
+        title: "Email the user?",
+        message: `Booking cancelled. Email ${ownerEmail} to let them know?`,
+        acceptLabel: "Email user",
+        cancelLabel: "Not now",
+      });
+      if (emailUser) {
+        const subject = encodeURIComponent("Parking booking cancelled");
+        const body = encodeURIComponent(`Hello,\n\nYour booking for parking spot ${spotNum} on ${dateStr} was cancelled by an administrator.\n\nEL Parking`);
+        window.open(`mailto:${ownerEmail}?subject=${subject}&body=${body}`, "_blank");
+      }
+    }
   } catch (err) {
     showToast(err?.message || "Cancel failed.", "error");
   }

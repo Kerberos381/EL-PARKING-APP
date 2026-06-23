@@ -683,8 +683,8 @@ async function handleAuthState(user) {
 function enterApp() {
   const role = (state.profile.role || "user").toLowerCase();
   showOnly("app");
-  ui.adminTab.classList.toggle("hidden", !(role === "admin" || role === "privileged"));
-  if (role !== "admin" && role !== "privileged" && currentTab() === "admin") {
+  ui.adminTab.classList.toggle("hidden", role !== "admin");
+  if (role !== "admin" && currentTab() === "admin") {
     switchTab("home");
   }
   hydrateProfileForm();

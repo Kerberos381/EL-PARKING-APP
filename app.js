@@ -10,12 +10,15 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js";
 import {
+  addDoc,
   collection,
   deleteDoc,
   doc,
   getDocsFromServer,
   getDoc,
-  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   onSnapshot,
   query,
   runTransaction,
@@ -246,6 +249,7 @@ const ui = {
   nameInput: byId("nameInput"),
   vocativeInput: byId("vocativeInput"),
   plateInput: byId("plateInput"),
+  phoneInput: byId("phoneInput"),
   carInput: byId("carInput"),
   vehiclePreview: byId("vehiclePreview"),
   vehicleMakeButton: byId("vehicleMakeButton"),
@@ -310,6 +314,8 @@ const ui = {
   adminTodayBooked: byId("adminTodayBooked"),
   adminTodayFree: byId("adminTodayFree"),
   themeToggleBtn: byId("themeToggleBtn"),
+  menuBtn: byId("menuBtn"),
+  headerMenu: byId("headerMenu"),
   tutorialHelpBtn: byId("tutorialHelpBtn"),
   tutorialModal: byId("tutorialModal"),
   tutorialBody: byId("tutorialBody"),
@@ -384,7 +390,16 @@ async function boot() {
 
     const app = initializeApp(firebaseConfig);
     auth = getAuth(app);
-    db = getFirestore(app);
+    // Offline persistence: serve last-synced data instantly + survive flaky signal
+    // (multi-tab safe). Falls back to in-memory if the browser blocks storage.
+    try {
+      db = initializeFirestore(app, {
+        localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+      });
+    } catch (cacheError) {
+      console.warn("Firestore persistent cache unavailable, using default:", cacheError);
+      db = initializeFirestore(app, {});
+    }
     try {
       await setPersistence(auth, currentAuthPersistence());
     } catch (persistError) {
@@ -505,6 +520,11 @@ function bindEvents() {
 
   ui.bookForm?.addEventListener("submit", onBookSubmit);
   ui.profileForm?.addEventListener("submit", onSaveProfile);
+  // Phone field: numeric only, but allow + # * ( ) space and dash (no letters).
+  ui.phoneInput?.addEventListener("input", () => {
+    const cleaned = ui.phoneInput.value.replace(/[^0-9+#*()\s-]/g, "");
+    if (cleaned !== ui.phoneInput.value) ui.phoneInput.value = cleaned;
+  });
   ui.vehicleMakeButton?.addEventListener("click", openMakePicker);
   ui.vehicleModelSelect?.addEventListener("change", () => {
     state.selectedVehicleModel = ui.vehicleModelSelect.value;
@@ -562,9 +582,24 @@ function bindEvents() {
       closeVehiclePicker();
       resolveConfirm(false);
       closeContentModal();
+      closeTutorial();
+      closeHeaderMenu();
     }
   });
   ui.spotSearch?.addEventListener("input", () => renderParking());
+
+  // Header overflow menu (theme / help / sign out tucked away)
+  ui.menuBtn?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleHeaderMenu();
+  });
+  ui.headerMenu?.addEventListener("click", () => closeHeaderMenu());
+  document.addEventListener("click", (event) => {
+    if (!ui.headerMenu || ui.headerMenu.classList.contains("hidden")) return;
+    if (!ui.headerMenu.contains(event.target) && event.target !== ui.menuBtn && !ui.menuBtn.contains(event.target)) {
+      closeHeaderMenu();
+    }
+  });
 
   // NOTE: the dark/light toggle is owned by theme-init.js (it runs pre-paint and
   // is CSP-safe). A second handler here double-toggled and cancelled the first,
@@ -648,8 +683,8 @@ async function handleAuthState(user) {
 function enterApp() {
   const role = (state.profile.role || "user").toLowerCase();
   showOnly("app");
-  ui.adminTab.classList.toggle("hidden", !(role === "admin" || role === "privileged"));
-  if (role !== "admin" && role !== "privileged" && currentTab() === "admin") {
+  ui.adminTab.classList.toggle("hidden", role !== "admin");
+  if (role !== "admin" && currentTab() === "admin") {
     switchTab("home");
   }
   hydrateProfileForm();
@@ -677,39 +712,53 @@ const SVG = {
   list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
   car: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l1.5-4.5A2 2 0 0 1 8.4 7h7.2a2 2 0 0 1 1.9 1.5L19 13"/><path d="M5 13h14v4a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H8v1a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/><circle cx="7.5" cy="13.5" r=".5"/><circle cx="16.5" cy="13.5" r=".5"/></svg>',
   shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.2 7.7-8 9-4.8-1.3-8-4.5-8-9V6z"/><polyline points="9 12 11 14 15 10"/></svg>',
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+  swipe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 7 18 12 13 17"/><polyline points="6 7 11 12 6 17" opacity="0.45"/></svg>',
 };
 
 const TUTORIAL_STEPS = [
   {
-    icon: SVG.park,
-    title: "Welcome to EL Parking",
-    intro: "Reserve a spot in the Karlín office garage in seconds — right from your browser.",
-    rows: [],
+    type: "garage",
+    title: "Follow the Blue Line",
+    desc: "The blue navigation lane leads directly to spots 63–82. White arrows guide you straight to your reserved spot.",
+    caption: "Rohanske nabrezi 721/39, Prague",
+    photos: ["./garage-1.jpg", "./garage-2.jpg", "./garage-3.jpg", "./garage-4.jpg"],
   },
   {
-    icon: SVG.grid,
-    title: "Find & book a spot",
+    icon: SVG.park,
+    title: "Welcome to EL Parking",
+    intro: "Book spots in seconds, get reminded before your session starts, and manage your reservations — all from your phone.",
     rows: [
-      [SVG.calendar, "Pick a day", "Use the day selector at the top of the Parking tab."],
-      [SVG.grid, "Choose a free spot", "Green spots are free — tap one to select it."],
-      [SVG.clock, "Set your time", "Adjust the from/to times and confirm. Done."],
+      [SVG.home, "Home", "See your active booking, upcoming sessions and today's parking status at a glance."],
+      [SVG.grid, "Parking Grid", "Every spot in real time. Free spots are green — tap one to book instantly. Taken spots show who has them."],
+      [SVG.calendar, "Make a Booking", "Choose a spot, set your date and time, and confirm. You can also book for a colleague by name."],
     ],
   },
   {
     icon: SVG.bell,
-    title: "Manage your bookings",
+    title: "Stay on Time",
     rows: [
-      [SVG.list, "My Bookings", "View, edit or cancel your reservations any time."],
-      [SVG.car, "Your vehicle", "Add your plate + car so colleagues know whose spot it is."],
+      [SVG.bell, "Smart Reminders", "Enable notifications and choose how far ahead you're reminded — from 30 minutes to 2 days before."],
+      [SVG.download, "Add to Home Screen", "Install EL Parking for one-tap access and offline use — open your browser menu and choose “Add to Home Screen”."],
     ],
   },
   {
     icon: SVG.shield,
-    title: "Good to know",
+    title: "Good to Know",
     rows: [
-      [SVG.calendar, "Booking windows", "Spots open on a rolling schedule — book early."],
-      [SVG.shield, "Be considerate", "Cancel if plans change; repeated no-shows earn warnings."],
+      [SVG.calendar, "When to Book", "Standard users book for today or tomorrow (after 18:00). Privileged users up to 3 days ahead."],
+      [SVG.shield, "Fair Play", "Misbehaviour can earn a warning. Three warnings trigger a 2-week suspension that lifts automatically."],
+      [SVG.park, "Spot Groups", "Spots 74–76 are reserved for GrandVision. From 8:00 daily, any free spot opens to everyone — for that day."],
     ],
+  },
+  {
+    icon: SVG.check,
+    title: "You're All Set!",
+    intro: "Head to the Parking tab and tap any green spot to make your first booking.",
+    rows: [],
   },
 ];
 
@@ -717,17 +766,29 @@ let tutorialStep = 0;
 
 function renderTutorialStep() {
   const step = TUTORIAL_STEPS[tutorialStep];
-  const rows = (step.rows || [])
-    .map(
-      ([icon, title, desc]) =>
-        `<div class="tutorial-row"><span class="tutorial-row-icon">${icon}</span><div><strong>${title}</strong><p>${desc}</p></div></div>`
-    )
-    .join("");
-  ui.tutorialBody.innerHTML =
-    `<div class="tutorial-hero">${step.icon}</div>` +
-    `<h3 id="tutorialTitle">${step.title}</h3>` +
-    (step.intro ? `<p class="tutorial-intro">${step.intro}</p>` : "") +
-    (rows ? `<div class="tutorial-rows">${rows}</div>` : "");
+  if (step.type === "garage") {
+    const imgs = step.photos
+      .map((src, i) => `<img class="tutorial-photo" src="${src}" alt="Parking route photo ${i + 1}" loading="lazy" draggable="false" />`)
+      .join("");
+    ui.tutorialBody.innerHTML =
+      `<div class="tutorial-carousel" aria-label="Parking route photos">${imgs}</div>` +
+      `<p class="tutorial-swipe-hint">${SVG.swipe}<span>Swipe through the route</span></p>` +
+      `<h3 id="tutorialTitle">${step.title}</h3>` +
+      `<p class="tutorial-intro">${step.desc}</p>` +
+      `<p class="tutorial-caption">${SVG.pin}<span>${step.caption}</span></p>`;
+  } else {
+    const rows = (step.rows || [])
+      .map(
+        ([icon, title, desc]) =>
+          `<div class="tutorial-row"><span class="tutorial-row-icon">${icon}</span><div><strong>${title}</strong><p>${desc}</p></div></div>`
+      )
+      .join("");
+    ui.tutorialBody.innerHTML =
+      `<div class="tutorial-hero">${step.icon}</div>` +
+      `<h3 id="tutorialTitle">${step.title}</h3>` +
+      (step.intro ? `<p class="tutorial-intro">${step.intro}</p>` : "") +
+      (rows ? `<div class="tutorial-rows">${rows}</div>` : "");
+  }
   ui.tutorialDots.innerHTML = TUTORIAL_STEPS.map(
     (_, i) => `<span class="tutorial-dot${i === tutorialStep ? " active" : ""}"></span>`
   ).join("");
@@ -740,10 +801,13 @@ function openTutorial() {
   tutorialStep = 0;
   renderTutorialStep();
   ui.tutorialModal.classList.remove("hidden");
+  ui.tutorialModal.setAttribute("aria-hidden", "false");
 }
 
 function closeTutorial() {
+  if (!ui.tutorialModal || ui.tutorialModal.classList.contains("hidden")) return;
   ui.tutorialModal.classList.add("hidden");
+  ui.tutorialModal.setAttribute("aria-hidden", "true");
   try { localStorage.setItem(TUTORIAL_SEEN_KEY, "1"); } catch (_) {}
 }
 
@@ -767,6 +831,18 @@ function maybeShowTutorial() {
   let seen = false;
   try { seen = localStorage.getItem(TUTORIAL_SEEN_KEY) === "1"; } catch (_) {}
   if (!seen) openTutorial();
+}
+
+// ── Header overflow menu ─────────────────────────────────────────────────────
+function toggleHeaderMenu() {
+  if (!ui.headerMenu) return;
+  const open = ui.headerMenu.classList.toggle("hidden");
+  ui.menuBtn?.setAttribute("aria-expanded", open ? "false" : "true");
+}
+function closeHeaderMenu() {
+  if (!ui.headerMenu || ui.headerMenu.classList.contains("hidden")) return;
+  ui.headerMenu.classList.add("hidden");
+  ui.menuBtn?.setAttribute("aria-expanded", "false");
 }
 
 async function onFinishRegSubmit(event) {
@@ -862,13 +938,10 @@ function subscribeSpots() {
       renderAdminSpots();
       renderDayPills();
     },
-    () => {
-      state.spots = [];
-      renderSpotSelect();
-      recalculateDerivedBookings();
-      renderParking();
-      renderAdminSpots();
-      renderDayPills();
+    (error) => {
+      // Keep last-known spots so a brief signal drop doesn't flash an empty grid;
+      // the persistent cache reconciles when the listener recovers.
+      console.warn("spots listener error — keeping last-known data:", error?.code || error);
     }
   );
 }
@@ -910,16 +983,10 @@ function subscribeAllBookings() {
       renderAdminDashboard();
       renderDayPills();
     },
-    () => {
-      state.allBookings = [];
-      recalculateDerivedBookings();
-      ensureSelectedSpotIsValid();
-      renderHomeHero();
-      renderMyBookings();
-      renderParking();
-      renderAdminSpotInspector();
-      renderAdminDashboard();
-      renderDayPills();
+    (error) => {
+      // Keep last-known bookings on a transient listener error rather than
+      // blanking everything; cache reconciles on recovery.
+      console.warn("bookings listener error — keeping last-known data:", error?.code || error);
     }
   );
 }
@@ -2418,6 +2485,36 @@ async function cancelBooking(booking, confirmFirst = true) {
       transaction.delete(bookingRef);
     });
     if (confirmFirst) closeSpotDetailsModal();
+
+    // Admin cancelled someone else's booking → notify that user (in-app) + offer to email them.
+    if (myEmail !== ownerEmail) {
+      const spotNum = extractSpotNumber(booking.spot);
+      const dateStr = formatLongDate(booking.bookingDate);
+      try {
+        // keys must match firestore.rules /direct_notifications exactly
+        await addDoc(collection(db, "direct_notifications"), {
+          toEmail: ownerEmail,
+          title: "Booking Cancelled",
+          body: `Your booking for spot ${spotNum} on ${dateStr} was cancelled by an administrator.`,
+          delivered: false,
+          createdAt: serverTimestamp(),
+        });
+      } catch (notifyErr) {
+        console.warn("direct_notifications write failed:", notifyErr);
+      }
+      // Offer the admin a reliable out-of-band channel (email) to the user.
+      const emailUser = await showConfirm({
+        title: "Email the user?",
+        message: `Booking cancelled. Email ${ownerEmail} to let them know?`,
+        acceptLabel: "Email user",
+        cancelLabel: "Not now",
+      });
+      if (emailUser) {
+        const subject = encodeURIComponent("Parking booking cancelled");
+        const body = encodeURIComponent(`Hello,\n\nYour booking for parking spot ${spotNum} on ${dateStr} was cancelled by an administrator.\n\nEL Parking`);
+        window.open(`mailto:${ownerEmail}?subject=${subject}&body=${body}`, "_blank");
+      }
+    }
   } catch (err) {
     showToast(err?.message || "Cancel failed.", "error");
   }
@@ -2462,6 +2559,7 @@ async function onSaveProfile(event) {
   const displayName = ui.nameInput.value.trim();
   const preferredVocative = ui.vocativeInput.value.trim();
   const registrationPlate = ui.plateInput.value.trim().toUpperCase();
+  const phone = ui.phoneInput.value.trim();
   syncCarDescriptionField();
   const carDescription = ui.carInput.value.trim();
   const vehicleMiniaturePresetID = state.selectedVehiclePresetID || "";
@@ -2478,6 +2576,7 @@ async function onSaveProfile(event) {
       displayName,
       preferredVocative,
       registrationPlate,
+      phone,
       carDescription,
       carColor,
       carType: "",
@@ -2488,6 +2587,7 @@ async function onSaveProfile(event) {
       displayName,
       preferredVocative,
       registrationPlate,
+      phone,
       carDescription,
       carColor,
       carType: "",
@@ -2507,6 +2607,7 @@ function hydrateProfileForm() {
   ui.nameInput.value = state.profile?.displayName || "";
   ui.vocativeInput.value = state.profile?.preferredVocative || "";
   ui.plateInput.value = state.profile?.registrationPlate || "";
+  ui.phoneInput.value = state.profile?.phone || "";
   ui.carInput.value = state.profile?.carDescription || "";
   hydrateVehicleSelection();
   state.profileDirty = false;
@@ -2831,7 +2932,9 @@ function switchTab(tab) {
     panel.classList.toggle("hidden", name !== tab);
   }
   for (const btn of ui.tabs) {
-    btn.classList.toggle("active", btn.dataset.tab === tab);
+    const isActive = btn.dataset.tab === tab;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
   }
 }
 
@@ -3166,6 +3269,7 @@ function parseUser(data, docId = "") {
     role: String(data.role ?? "user"),
     status: String(data.status ?? "pending"),
     registrationPlate: String(data.registrationPlate ?? ""),
+    phone: String(data.phone ?? ""),
     carDescription: String(data.carDescription ?? ""),
     needsFinishRegistration: Boolean(data.needsFinishRegistration ?? false),
     carType: String(data.carType ?? ""),
@@ -3297,3 +3401,10 @@ function friendlyAuthError(err) {
 }
 
 boot();
+
+// Register the service worker for offline support / installable PWA (secure-context only).
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch((err) => console.warn("SW registration failed:", err));
+  });
+}

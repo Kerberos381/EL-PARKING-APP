@@ -227,6 +227,11 @@ const ui = {
   bookTo: byId("bookTo"),
   bookButton: byId("bookButton"),
   bookError: byId("bookError"),
+  bookForOthersWrap: byId("bookForOthersWrap"),
+  bookForOthers: byId("bookForOthers"),
+  bookForOthersFields: byId("bookForOthersFields"),
+  delegateName: byId("delegateName"),
+  delegateEmail: byId("delegateEmail"),
   myBookingsList: byId("myBookingsList"),
   refreshBookings: byId("refreshBookings"),
   adminTab: byId("adminTab"),
@@ -519,6 +524,9 @@ function bindEvents() {
   });
 
   ui.bookForm?.addEventListener("submit", onBookSubmit);
+  ui.bookForOthers?.addEventListener("change", () => {
+    ui.bookForOthersFields?.classList.toggle("hidden", !ui.bookForOthers.checked);
+  });
   ui.profileForm?.addEventListener("submit", onSaveProfile);
   // Phone field: numeric only, but allow + # * ( ) space and dash (no letters).
   ui.phoneInput?.addEventListener("input", () => {
@@ -684,6 +692,8 @@ function enterApp() {
   const role = (state.profile.role || "user").toLowerCase();
   showOnly("app");
   ui.adminTab.classList.toggle("hidden", role !== "admin");
+  // Delegate booking ("book for someone else") is for privileged + admin only.
+  ui.bookForOthersWrap?.classList.toggle("hidden", !(role === "admin" || role === "privileged"));
   if (role !== "admin" && currentTab() === "admin") {
     switchTab("home");
   }
@@ -1825,6 +1835,42 @@ function renderParking() {
   updateAdminTodayBar();
 }
 
+function bookingShareText(booking) {
+  const spotNum = extractSpotNumber(booking.spot);
+  const dateStr = formatLongDate(booking.bookingDate);
+  const location = "Rohanske nabrezi 721/39, Praha";
+  const mapsUrl = "https://www.google.com/maps/dir/?api=1&destination=50.097098416842265,14.459462896988791";
+  const myEmail = (state.user?.email || "").toLowerCase();
+  const forSomeoneElse = booking.email && booking.email.toLowerCase() !== myEmail;
+  if (forSomeoneElse) {
+    const name = booking.user || "there";
+    return `Hi ${name},\n\nparking space ${spotNum} is booked for you on ${dateStr} from ${booking.fromTime} to ${booking.toTime}.\n\n`
+      + `Location: ${location}\nMap: ${mapsUrl}\n\nThis reservation is arranged internally; no app action is needed from your side.`;
+  }
+  return `EL Parking — Spot ${spotNum}\n${dateStr}, ${booking.fromTime} – ${booking.toTime}\n\nLocation: ${location}\nMap: ${mapsUrl}`;
+}
+
+// Share a booking via the native share sheet (mobile) or clipboard (desktop).
+async function shareBooking(booking) {
+  const text = bookingShareText(booking);
+  const title = `EL Parking — Spot ${extractSpotNumber(booking.spot)}`;
+  try {
+    if (navigator.share) {
+      await navigator.share({ title, text });
+      return;
+    }
+  } catch (err) {
+    if (err && err.name === "AbortError") return; // user dismissed the share sheet — not an error
+    // any other share failure: fall through to clipboard
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("Booking details copied to clipboard", "success");
+  } catch (_) {
+    showToast("Couldn't share the booking — please copy it manually.", "error");
+  }
+}
+
 function renderMyBookings() {
   ui.myBookingsList.textContent = "";
   const adminLike = isAdminLike();
@@ -1926,6 +1972,12 @@ function renderMyBookings() {
       calendar.textContent = "Calendar";
       calendar.addEventListener("click", () => downloadCalendarForBooking(booking));
       actions.append(calendar);
+      const adminShare = document.createElement("button");
+      adminShare.type = "button";
+      adminShare.className = "btn subtle small";
+      adminShare.textContent = "Share";
+      adminShare.addEventListener("click", () => shareBooking(booking));
+      actions.append(adminShare);
       if (!isPast) {
         const edit = document.createElement("button");
         edit.type = "button";
@@ -1950,8 +2002,11 @@ function renderMyBookings() {
     node.querySelector(".meta").textContent = `${booking.fromTime} – ${booking.toTime}`;
     const calendarButton = node.querySelector(".calendar-btn");
     const cancelBtn = node.querySelector(".cancel-btn");
+    const shareBtn = node.querySelector(".share-btn");
     calendarButton?.addEventListener("click", () => downloadCalendarForBooking(booking));
+    shareBtn?.addEventListener("click", () => shareBooking(booking));
     if (isPast) {
+      shareBtn?.remove();
       if (cancelBtn) cancelBtn.remove();
       const rebook = document.createElement("button");
       rebook.type = "button";
@@ -2257,12 +2312,38 @@ async function onBookSubmit(event) {
     return;
   }
 
+  // Delegate booking ("book for someone else") — privileged/admin only.
+  let delegate = null;
+  if (ui.bookForOthers?.checked && isAdminLike()) {
+    const dName = (ui.delegateName?.value || "").trim();
+    const dEmail = (ui.delegateEmail?.value || "").trim().toLowerCase();
+    if (!dName || !dEmail) {
+      ui.bookError.textContent = "Enter the person's name and email (or turn off “book for someone else”).";
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dEmail)) {
+      ui.bookError.textContent = "Enter a valid email for that person.";
+      return;
+    }
+    if (dEmail === (state.user.email || "").toLowerCase()) {
+      ui.bookError.textContent = "That's your own email — turn off “book for someone else” to book for yourself.";
+      return;
+    }
+    delegate = { name: dName, email: dEmail };
+  }
+
   ui.bookButton.disabled = true;
   try {
     const date = dayStart(dateYmd);
     enforceBookingRules(spot, dateYmd, fromTime, toTime);
-    await createBookingTransaction(spot, date, dateYmd, fromTime, toTime);
+    await createBookingTransaction(spot, date, dateYmd, fromTime, toTime, delegate);
     setSelectedSpot("");
+    if (ui.bookForOthers?.checked) {
+      ui.bookForOthers.checked = false;
+      if (ui.delegateName) ui.delegateName.value = "";
+      if (ui.delegateEmail) ui.delegateEmail.value = "";
+      ui.bookForOthersFields?.classList.add("hidden");
+    }
     state.lastBookedSummary = {
       id: `new-${dateYmd}-${extractSpotNumber(spot)}`,
       spot,
@@ -2271,6 +2352,14 @@ async function onBookSubmit(event) {
       toTime,
     };
     ui.bookError.textContent = "";
+    // A transaction write doesn't echo to the local onSnapshot instantly, so the
+    // new booking isn't in state yet. Pull the fresh list now so "My Bookings"
+    // already shows it the moment the user taps "Go" (no empty-looking page).
+    try {
+      await refreshBookingsFromServer();
+    } catch (_) {
+      // Booking already succeeded; the live listener will reconcile if this hiccups.
+    }
     showBookingSuccessModal(spot, date, fromTime, toTime);
   } catch (err) {
     const message = err?.message || "Could not create booking.";
@@ -2322,11 +2411,15 @@ function enforceBookingRules(spotLabel, dateYmd, fromTime, toTime) {
   if (conflict) throw new Error("This spot is already booked in that time range.");
 }
 
-async function createBookingTransaction(spotLabel, bookingDate, dateYmd, fromTime, toTime) {
+async function createBookingTransaction(spotLabel, bookingDate, dateYmd, fromTime, toTime, delegate) {
   const bookingRef = doc(collection(db, "bookings"));
   const lockRef = doc(db, "spot_locks", `${spotLabel}_${dateYmd}`);
-  const email = state.user.email.toLowerCase();
-  const displayName = state.profile.displayName || email;
+  const bookerEmail = state.user.email.toLowerCase();
+  // Delegate booking: the booking is recorded in the other person's name/email,
+  // but createdBy stays the booker (the Firestore rules authorize on createdBy).
+  const forOther = !!(delegate && delegate.email);
+  const email = forOther ? delegate.email.toLowerCase() : bookerEmail;
+  const displayName = forOther ? delegate.name : (state.profile.displayName || bookerEmail);
   const spotDoc = state.spots.find((spot) => normalizedSpotKey(spot.label) === normalizedSpotKey(spotLabel));
   const expiresAt = addDays(bookingEndDate(bookingDate, toTime), APP_RULES.bookingRetentionDays);
 
@@ -2350,10 +2443,10 @@ async function createBookingTransaction(spotLabel, bookingDate, dateYmd, fromTim
       spotID: spotDoc?.id || extractSpotNumber(spotLabel),
       user: displayName,
       email,
-      bookedForUid: state.user.uid,
+      bookedForUid: forOther ? "" : state.user.uid,
       fromTime,
       toTime,
-      createdBy: email,
+      createdBy: bookerEmail,
       bookingDate: Timestamp.fromDate(bookingDate),
       createdAt: serverTimestamp(),
       expiresAt: Timestamp.fromDate(expiresAt),

@@ -485,6 +485,31 @@ h3 {
   min-width: 0;
 }
 
+/* Delegate booking ("book for someone else") — privileged/admin only */
+.delegate-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.delegate-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+.delegate-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  flex: 0 0 auto;
+}
+
 .booking-time-grid .field {
   min-width: 0;
 }
@@ -1641,13 +1666,21 @@ h3 {
     gap: 10px;
   }
 
+  /* Flex-wrap so 2 or 3 buttons (Share / Calendar / Cancel) lay out evenly and
+     wrap cleanly on very narrow screens instead of leaving an empty grid cell. */
   .booking-row-actions {
     width: 100%;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
-  .booking-row .btn {
+  .booking-row-actions .btn {
+    flex: 1 1 auto;
+    min-width: 90px;
+  }
+
+  .booking-row .rebook-btn {
     width: 100%;
   }
 

@@ -213,6 +213,23 @@
                   <input id="bookTo" type="time" value="18:00" required />
                 </label>
               </div>
+              <div id="bookForOthersWrap" class="delegate-block hidden">
+                <label class="delegate-toggle">
+                  <input id="bookForOthers" type="checkbox" />
+                  <span>Book for someone else</span>
+                </label>
+                <div id="bookForOthersFields" class="stack hidden">
+                  <label class="field">
+                    <span>Their name</span>
+                    <input id="delegateName" type="text" autocomplete="off" maxlength="80" placeholder="e.g. Jan Novák" />
+                  </label>
+                  <label class="field">
+                    <span>Their email</span>
+                    <input id="delegateEmail" type="email" inputmode="email" autocomplete="off" maxlength="120" placeholder="name@company.com" />
+                  </label>
+                  <p class="muted tiny">Reserves the spot in their name. Use “Share” afterwards to send them the details — they don't need the app.</p>
+                </div>
+              </div>
               <button id="bookButton" class="btn primary" type="submit">Confirm Booking</button>
               <p id="bookError" class="error" role="alert"></p>
             </form>
@@ -518,6 +535,7 @@
             <p class="meta"></p>
           </div>
           <div class="booking-row-actions">
+            <button class="btn subtle share-btn" type="button">Share</button>
             <button class="btn subtle calendar-btn" type="button">Calendar</button>
             <button class="btn danger cancel-btn" type="button">Cancel</button>
           </div>

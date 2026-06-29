@@ -118,7 +118,7 @@ struct AdminCreateUserView: View {
             sectionCard(title: L10n.companyBadge, icon: "building.2.fill") {
                 VStack(spacing: 8) {
                     Menu {
-                        ForEach(CompanyBadge.allCases, id: \.rawValue) { badge in
+                        ForEach(CompanyBadge.sortedCases, id: \.rawValue) { badge in
                             Button {
                                 Haptics.selection()
                                 selectedCompanyBadge = badge

@@ -14,6 +14,9 @@ import CoreGraphics
 import CryptoKit
 import FirebaseFirestore
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// Lightweight struct for encoding booking data to shared UserDefaults for widgets
 struct WidgetBookingData: Codable {
@@ -1176,6 +1179,60 @@ class BookingManager: ObservableObject {
             .map { $0 }
     }
 
+    func bookingConflictExplanation(
+        spot: ParkingSpot,
+        on date: Date,
+        timeFrom: String,
+        timeTo: String,
+        candidateSpots: [ParkingSpot],
+        excludingBookingID: UUID? = nil
+    ) -> String {
+        let conflicts = getBookingsForSpotOnDate(spotLabel: spot.label, date: date)
+            .filter { $0.id != excludingBookingID }
+            .filter {
+                BookingPolicy.intervalsOverlap(
+                    startA: $0.fromTime,
+                    endA: $0.toTime,
+                    startB: timeFrom,
+                    endB: timeTo
+                )
+            }
+
+        var parts: [String] = []
+        if conflicts.isEmpty {
+            parts.append("Spot \(spot.id) is not available for \(timeFrom)-\(timeTo).")
+        } else {
+            let conflictText = conflicts.map {
+                "\($0.firstName) has it \($0.fromTime)-\($0.toTime)"
+            }
+            .joined(separator: ", ")
+            parts.append("Spot \(spot.id) conflicts: \(conflictText).")
+        }
+
+        let alternatives = bookingSuggestions(
+            on: date,
+            desiredFrom: timeFrom,
+            desiredTo: timeTo,
+            candidateSpots: candidateSpots.filter { $0.id != spot.id },
+            excludingBookingID: excludingBookingID,
+            limit: 3
+        )
+
+        if alternatives.isEmpty {
+            parts.append("No close alternatives are free for this time window.")
+        } else {
+            let exact = alternatives.filter(\.isExactTimeMatch)
+            let fallback = exact.isEmpty ? alternatives : exact
+            let text = fallback.map { suggestion in
+                "P\(suggestion.spot.id) \(suggestion.fromTime)-\(suggestion.toTime)"
+            }
+            .joined(separator: ", ")
+            parts.append("Try \(text).")
+        }
+
+        return parts.joined(separator: " ")
+    }
+
     func getBookingsForDate(_ date: Date) -> [Booking] {
         let calendar = Calendar.current
         return bookings.filter { calendar.isDate($0.date, inSameDayAs: date) }.sorted { $0.spot < $1.spot }
@@ -1297,50 +1354,69 @@ class BookingManager: ObservableObject {
         defaults.set(max(0, totalSpots - blockedCount - todayBookedCount), forKey: "widgetAvailableCount")
         defaults.set(totalSpots - blockedCount,                             forKey: "widgetTotalCount")
 
-        renderAndSaveVehicleMiniature()
         WidgetCenter.shared.reloadAllTimelines()
+
+        let vehicleCarType = carType
+        let vehicleDescription = carDescription
+        let vehicleColor = carColor
+        let vehiclePresetID = vehicleMiniaturePresetID
+        Task {
+            let didUpdateMiniature = await renderAndSaveVehicleMiniature(
+                carType: vehicleCarType,
+                carDescription: vehicleDescription,
+                carColor: vehicleColor,
+                vehicleMiniaturePresetID: vehiclePresetID
+            )
+            if didUpdateMiniature {
+                WidgetCenter.shared.reloadAllTimelines()
+            }
+        }
     }
 
-    private func renderAndSaveVehicleMiniature() {
+    private func renderAndSaveVehicleMiniature(
+        carType: String,
+        carDescription: String,
+        carColor: String,
+        vehicleMiniaturePresetID: String
+    ) async -> Bool {
         guard let containerURL = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: "group.com.StivMalakjan.EL-PARKING-APP"
-        ) else { return }
+        ) else { return false }
 
         let fileURL = containerURL.appendingPathComponent("vehicleMiniature.png")
 
         guard !carType.isEmpty || !carDescription.isEmpty else {
             try? FileManager.default.removeItem(at: fileURL)
             lastVehicleRenderHash = 0
-            return
+            return true
         }
+
+        await VehicleCatalogStore.shared.loadIfNeeded()
 
         var hasher = Hasher()
         hasher.combine(carType)
         hasher.combine(carDescription)
         hasher.combine(carColor)
         hasher.combine(vehicleMiniaturePresetID)
+        hasher.combine(VehicleCatalogStore.shared.revision)
         let hash = hasher.finalize()
-        guard hash != lastVehicleRenderHash else { return }
+        guard hash != lastVehicleRenderHash else { return false }
 
-        let miniature = VehicleMiniatureView(
+        #if canImport(UIKit)
+        guard let image = await VehicleMiniatureView.resolvedUIImageForRendering(
             carType: carType,
-            colorHex: carColor,
             description: carDescription,
             presetID: vehicleMiniaturePresetID.isEmpty ? nil : vehicleMiniaturePresetID
-        )
-        .frame(width: 280, height: 156)
-        .background(Color.clear)
-
-        let renderer = ImageRenderer(content: miniature)
-        renderer.scale = 3.0
-        renderer.isOpaque = false
-
-        guard let image = renderer.uiImage,
-              let data = image.pngData()
-        else { return }
+        ), let data = image.pngData() else {
+            return false
+        }
 
         try? data.write(to: fileURL)
         lastVehicleRenderHash = hash
+        return true
+        #else
+        return false
+        #endif
     }
 
     private func bookingDateTime(for time: String, on date: Date) -> Date {

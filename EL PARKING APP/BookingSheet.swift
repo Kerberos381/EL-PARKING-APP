@@ -204,13 +204,13 @@ struct BookingSheet: View {
             } message: {
                 Text(errorMessage)
             }
-            .confirmationDialog("Share booking", isPresented: $showShareOptions, titleVisibility: .visible) {
-                Button("Share card") { shareRenderedCard() }
-                Button("Share text only") { shareTextOnly() }
+            .confirmationDialog(L10n.shareBooking, isPresented: $showShareOptions, titleVisibility: .visible) {
+                Button(L10n.shareCard) { shareRenderedCard() }
+                Button(L10n.shareTextOnly) { shareTextOnly() }
                 Button(L10n.sendViaEmail) { openDelegationMailTo() }
                 Button(L10n.done, role: .cancel) {}
             } message: {
-                Text("Choose how you want to share the reservation details.")
+                Text(L10n.chooseShareMethod)
             }
             .overlay {
                 if showSuccess { successOverlay }
@@ -445,6 +445,10 @@ struct BookingSheet: View {
                 }
 
                 if shouldShowSuggestionSection && !alternativeSuggestions.isEmpty {
+                    if let spot = selectedSpot, !isSelectedSpotValid {
+                        conflictExplanationCard(for: spot)
+                    }
+
                     VStack(alignment: .leading, spacing: 10) {
                         HStack(spacing: 6) {
                             Image(systemName: "lightbulb")
@@ -495,6 +499,33 @@ struct BookingSheet: View {
                 }
             }
         }
+    }
+
+    private func conflictExplanationCard(for spot: ParkingSpot) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppConfig.warning)
+                .frame(width: 22)
+
+            Text(
+                bookingManager.bookingConflictExplanation(
+                    spot: spot,
+                    on: bookingDate,
+                    timeFrom: timeFrom,
+                    timeTo: timeTo,
+                    candidateSpots: bookableSpots,
+                    excludingBookingID: editingBooking?.id
+                )
+            )
+            .font(.caption)
+            .foregroundStyle(AppConfig.darkText)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .background(AppConfig.warning.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Date Section
@@ -787,7 +818,7 @@ struct BookingSheet: View {
                             Image(systemName: "clock.badge.exclamationmark")
                                 .font(.caption)
                                 .foregroundStyle(AppConfig.subtleGray)
-                            Text("Occupied: \(occupiedRanges)")
+                            Text(L10n.occupiedRanges(occupiedRanges))
                                 .font(.caption)
                                 .foregroundStyle(AppConfig.subtleGray)
                                 .lineLimit(2)
@@ -798,7 +829,7 @@ struct BookingSheet: View {
                             Image(systemName: "sparkles")
                                 .font(.caption2)
                                 .foregroundStyle(AppConfig.subtleGray)
-                            Text("Free windows are still bookable. Pick From/To to reserve remaining time.")
+                            Text(L10n.freeWindowsBookable)
                                 .font(.caption2)
                                 .foregroundStyle(AppConfig.subtleGray)
                                 .lineLimit(2)
@@ -961,60 +992,87 @@ struct BookingSheet: View {
         return Button {
             Task { await submitBooking() }
         } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(confirmButtonBackground(noSpot: noSpot))
-                    .overlay {
-                        if confirmVisualState == .loading && !reduceMotion {
-                            NativeSystemShimmerView()
+            VStack(spacing: 8) {
+                if let selectedSpot {
+                    HStack(spacing: 10) {
+                        Image(systemName: isSelectedSpotValid ? "parkingsign.circle.fill" : "exclamationmark.triangle.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(isSelectedSpotValid ? AppConfig.activeGreen : AppConfig.warning)
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("P\(selectedSpot.id) · \(timeFrom)-\(timeTo)")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(AppConfig.darkText)
+                                .lineLimit(1)
+                            Text(bookingDate.formatNaturalShort())
+                                .font(.caption2)
+                                .foregroundStyle(AppConfig.subtleGray)
+                                .lineLimit(1)
                         }
+
+                        Spacer(minLength: 0)
                     }
+                    .padding(.horizontal, 4)
+                    .accessibilityElement(children: .combine)
+                }
 
                 ZStack {
-                    HStack(spacing: 8) {
-                        Image(systemName: confirmButtonIcon(noSpot: noSpot))
-                            .font(.body.weight(.bold))
-                        Text(confirmTitle(for: .idle, noSpot: noSpot))
-                            .font(.body)
-                            .fontWeight(.bold)
-                    }
-                    .opacity(confirmVisualState == .idle ? 1.0 : 0.0)
-                    .scaleEffect(confirmVisualState == .idle ? 1.0 : 0.93)
-                    .animation(globalSystemSpring, value: confirmVisualState)
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(confirmButtonBackground(noSpot: noSpot))
+                        .overlay {
+                            if confirmVisualState == .loading && !reduceMotion {
+                                NativeSystemShimmerView()
+                            }
+                        }
 
-                    ProgressView()
-                        .tint(confirmButtonForeground(noSpot: noSpot))
-                        .opacity(confirmVisualState == .loading ? 1.0 : 0.0)
-                        .scaleEffect(confirmVisualState == .loading ? 1.0 : 0.7)
+                    ZStack {
+                        HStack(spacing: 8) {
+                            Image(systemName: confirmButtonIcon(noSpot: noSpot))
+                                .font(.body.weight(.bold))
+                            Text(confirmTitle(for: .idle, noSpot: noSpot))
+                                .font(.body)
+                                .fontWeight(.bold)
+                        }
+                        .opacity(confirmVisualState == .idle ? 1.0 : 0.0)
+                        .scaleEffect(confirmVisualState == .idle ? 1.0 : 0.93)
                         .animation(globalSystemSpring, value: confirmVisualState)
 
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.title3.weight(.bold))
-                        Text(confirmTitle(for: .success, noSpot: noSpot))
-                            .font(.body)
-                            .fontWeight(.bold)
-                    }
-                    .opacity(confirmVisualState == .success ? 1.0 : 0.0)
-                    .scaleEffect(confirmVisualState == .success ? 1.0 : 0.85)
-                    .animation(successSnapSpring, value: confirmVisualState)
+                        ProgressView()
+                            .tint(confirmButtonForeground(noSpot: noSpot))
+                            .opacity(confirmVisualState == .loading ? 1.0 : 0.0)
+                            .scaleEffect(confirmVisualState == .loading ? 1.0 : 0.7)
+                            .animation(globalSystemSpring, value: confirmVisualState)
 
-                    HStack(spacing: 8) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3.weight(.bold))
-                        Text(confirmTitle(for: .failure, noSpot: noSpot))
-                            .font(.body)
-                            .fontWeight(.bold)
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.title3.weight(.bold))
+                            Text(confirmTitle(for: .success, noSpot: noSpot))
+                                .font(.body)
+                                .fontWeight(.bold)
+                        }
+                        .opacity(confirmVisualState == .success ? 1.0 : 0.0)
+                        .scaleEffect(confirmVisualState == .success ? 1.0 : 0.85)
+                        .animation(successSnapSpring, value: confirmVisualState)
+
+                        HStack(spacing: 8) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title3.weight(.bold))
+                            Text(confirmTitle(for: .failure, noSpot: noSpot))
+                                .font(.body)
+                                .fontWeight(.bold)
+                        }
+                        .opacity(confirmVisualState == .failure ? 1.0 : 0.0)
+                        .scaleEffect(confirmVisualState == .failure ? 1.0 : 0.85)
+                        .animation(successSnapSpring, value: confirmVisualState)
                     }
-                    .opacity(confirmVisualState == .failure ? 1.0 : 0.0)
-                    .scaleEffect(confirmVisualState == .failure ? 1.0 : 0.85)
-                    .animation(successSnapSpring, value: confirmVisualState)
+                    .foregroundStyle(confirmButtonForeground(noSpot: noSpot))
+                    .padding(.horizontal, 24)
                 }
-                .foregroundStyle(confirmButtonForeground(noSpot: noSpot))
-                .padding(.horizontal, 24)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 50)
+            .padding(8)
+            .glassEffect(.frosted.interactive(), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
         .buttonStyle(SystemMicroButtonStyle())
         .disabled(!canSubmit)
@@ -1210,6 +1268,20 @@ struct BookingSheet: View {
             return
         }
 
+        if !isSelectedSpotValid {
+            errorMessage = bookingManager.bookingConflictExplanation(
+                spot: spot,
+                on: bookingDate,
+                timeFrom: timeFrom,
+                timeTo: timeTo,
+                candidateSpots: bookableSpots,
+                excludingBookingID: editingBooking?.id
+            )
+            showingError = true
+            await showFailureState()
+            return
+        }
+
         do {
             if let editing = editingBooking {
                 try await bookingManager.updateBooking(
@@ -1249,7 +1321,19 @@ struct BookingSheet: View {
 
             // Stay on success overlay — user must tap "Got it!" to dismiss.
         } catch {
-            let msg = error.localizedDescription
+            let msg: String
+            if case BookingError.conflict = error, let selectedSpot {
+                msg = bookingManager.bookingConflictExplanation(
+                    spot: selectedSpot,
+                    on: bookingDate,
+                    timeFrom: timeFrom,
+                    timeTo: timeTo,
+                    candidateSpots: bookableSpots,
+                    excludingBookingID: editingBooking?.id
+                )
+            } else {
+                msg = error.localizedDescription
+            }
             errorMessage = msg
             showingError = true
             ToastManager.shared.show(msg, style: .error)
@@ -1460,7 +1544,7 @@ struct BookingSheet: View {
                 // Date / Time row
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("DATE")
+                        Text(L10n.dateUpper)
                             .font(.caption2.weight(.bold))
                             .tracking(1.5)
                             .foregroundStyle(AppConfig.subtleGray)
@@ -1479,7 +1563,7 @@ struct BookingSheet: View {
                     Spacer()
 
                     VStack(alignment: .trailing, spacing: 3) {
-                        Text("TIME")
+                        Text(L10n.timeUpper)
                             .font(.caption2.weight(.bold))
                             .tracking(1.5)
                             .foregroundStyle(AppConfig.subtleGray)
@@ -1769,7 +1853,7 @@ struct CancelSuccessOverlay: View {
                 HStack(spacing: 6) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(AppConfig.spotOccupied)
-                    Text("Booking Cancelled")
+                    Text(L10n.bookingCancelled)
                         .font(.subheadline.bold())
                         .foregroundStyle(AppConfig.spotOccupied)
                 }
@@ -1808,7 +1892,7 @@ struct CancelSuccessOverlay: View {
                 // Date / Time — struck through
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("DATE")
+                        Text(L10n.dateUpper)
                             .font(.caption2.weight(.bold))
                             .tracking(1.5)
                             .foregroundStyle(AppConfig.subtleGray)
@@ -1819,7 +1903,7 @@ struct CancelSuccessOverlay: View {
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 3) {
-                        Text("TIME")
+                        Text(L10n.timeUpper)
                             .font(.caption2.weight(.bold))
                             .tracking(1.5)
                             .foregroundStyle(AppConfig.subtleGray)

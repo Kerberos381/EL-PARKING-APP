@@ -14,6 +14,9 @@ struct CarMakerLogoBadge: View {
     let make: String
     var size: CGFloat = 18
 
+    // Observed so a badge re-resolves once the hosted catalog index loads.
+    @ObservedObject private var catalog = VehicleCatalogStore.shared
+
     private var canonicalMake: String {
         CarData.canonicalMake(from: make) ?? make.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -100,43 +103,88 @@ struct CarMakerLogoBadge: View {
     }
 
     var body: some View {
-        if let logoAssetName, hasLogoAsset {
-            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-                .fill(AppConfig.surfaceLow)
-                .overlay(
-                    Image(logoAssetName)
-                        .resizable()
-                        .scaledToFit()
-                        .padding(size * 0.14)
-                )
-                .frame(width: size * 1.5, height: size)
-                .overlay(
-                    RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-                        .stroke(Color.white.opacity(0.18), lineWidth: 0.8)
-                )
-                .accessibilityHidden(true)
-        } else {
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(hex: "#4B5563"), Color(hex: "#6B7280")],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                Text(initials)
-                    .font(.system(size: max(7, size * 0.40), weight: .bold))
-                    .foregroundStyle(.white)
-                    .minimumScaleFactor(0.65)
-                    .lineLimit(1)
+        Group {
+            if let logoAssetName, hasLogoAsset {
+                MakerLogoFrame(size: size) { Image(logoAssetName).resizable().scaledToFit() }
+            } else if let logoId = catalog.makerLogoId(for: canonicalMake) {
+                // Gap-fill: no bundled logo → hosted logo added on the fly via the tool.
+                CatalogMakerLogo(logoImageId: logoId, size: size, initials: initials)
+            } else {
+                MakerInitialsBadge(initials: initials, size: size)
             }
-            .frame(width: size, height: size)
+        }
+        .onAppear { catalog.ensureLoaded() }
+    }
+}
+
+/// Shared rounded-rect frame used for both bundled and hosted maker logos.
+private struct MakerLogoFrame<Content: View>: View {
+    let size: CGFloat
+    let content: Content
+
+    init(size: CGFloat, @ViewBuilder content: () -> Content) {
+        self.size = size
+        self.content = content()
+    }
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+            .fill(AppConfig.surfaceLow)
+            .overlay(content.padding(size * 0.14))
+            .frame(width: size * 1.5, height: size)
             .overlay(
-                Circle()
-                    .stroke(Color.white.opacity(0.16), lineWidth: 0.8)
+                RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                    .stroke(Color.white.opacity(0.18), lineWidth: 0.8)
             )
             .accessibilityHidden(true)
+    }
+}
+
+/// Initials-circle fallback when no logo (bundled or hosted) is available.
+private struct MakerInitialsBadge: View {
+    let initials: String
+    let size: CGFloat
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color(hex: "#4B5563"), Color(hex: "#6B7280")],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            Text(initials)
+                .font(.system(size: max(7, size * 0.40), weight: .bold))
+                .foregroundStyle(.white)
+                .minimumScaleFactor(0.65)
+                .lineLimit(1)
+        }
+        .frame(width: size, height: size)
+        .overlay(Circle().stroke(Color.white.opacity(0.16), lineWidth: 0.8))
+        .accessibilityHidden(true)
+    }
+}
+
+/// Loads a hosted maker logo lazily, showing the initials badge until it arrives.
+private struct CatalogMakerLogo: View {
+    let logoImageId: String
+    let size: CGFloat
+    let initials: String
+
+    @State private var uiImage: UIImage?
+
+    var body: some View {
+        Group {
+            if let uiImage {
+                MakerLogoFrame(size: size) { Image(uiImage: uiImage).resizable().scaledToFit() }
+            } else {
+                MakerInitialsBadge(initials: initials, size: size)
+            }
+        }
+        .task(id: logoImageId) {
+            uiImage = await VehicleCatalogStore.shared.makerLogoImage(logoImageId: logoImageId)
         }
     }
 }

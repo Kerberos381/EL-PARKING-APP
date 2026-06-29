@@ -16,8 +16,9 @@ struct OnboardingView: View {
     @State private var photoIndex = 0
     // Local preview choices — applied when onboarding closes so the palette
     // rebuild doesn't tear the sheet down mid-flow.
-    @State private var previewCalm = UserDefaults.standard.integer(forKey: "appPalette") == 1
-    @State private var previewCompact = UserDefaults.standard.string(forKey: "homeStyle") == "compact"
+    @State private var previewCalm = UserDefaults.standard.object(forKey: "appPalette") == nil
+        ? true
+        : UserDefaults.standard.integer(forKey: "appPalette") == 1
     @ObservedObject private var lang = LanguageManager.shared
 
     private static let garagePhotos = ["ParkingGarage1", "ParkingGarage2", "ParkingGarage3", "ParkingGarage4"]
@@ -267,7 +268,7 @@ struct OnboardingView: View {
 
     private func applySelections() {
         UserDefaults.standard.set(previewCalm ? 1 : 0, forKey: "appPalette")
-        UserDefaults.standard.set(previewCompact ? "compact" : "roomy", forKey: "homeStyle")
+        UserDefaults.standard.set("compact", forKey: "homeStyle")
     }
 
     private func personalizePage(title: String) -> some View {
@@ -293,17 +294,6 @@ struct OnboardingView: View {
                         .pickerStyle(.segmented)
                     }
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(L10n.homeLayout)
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(AppConfig.subtleGray)
-                        Picker(L10n.homeLayout, selection: $previewCompact) {
-                            Text(L10n.homeRoomy).tag(false)
-                            Text(L10n.homeCompact).tag(true)
-                        }
-                        .pickerStyle(.segmented)
-                    }
-
                     Text(L10n.changeAnytimeHint)
                         .font(.caption)
                         .foregroundStyle(AppConfig.subtleGray)
@@ -316,7 +306,6 @@ struct OnboardingView: View {
             .padding(.bottom, 100)
         }
         .onChange(of: previewCalm) { _, _ in Haptics.selection() }
-        .onChange(of: previewCompact) { _, _ in Haptics.selection() }
     }
 
     // Preview palette colors (local — independent of the live app palette).
@@ -334,49 +323,30 @@ struct OnboardingView: View {
     /// Schematic mini home — re-renders as the toggles change.
     private var homePreview: some View {
         VStack(alignment: .leading, spacing: 7) {
-            if previewCompact {
-                // Two-line greeting
-                RoundedRectangle(cornerRadius: 3).fill(AppConfig.darkText.opacity(0.35)).frame(width: 46, height: 9)
-                RoundedRectangle(cornerRadius: 3).fill(AppConfig.darkText.opacity(0.8)).frame(width: 34, height: 9)
-                // Hero
-                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(pHero).frame(height: 44)
-                    .overlay(alignment: .leading) {
-                        Text("75").font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundStyle(pAccent.opacity(0.9)).padding(.leading, 10)
-                    }
-                // Tile row
-                HStack(spacing: 7) {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous).fill(pAccent)
-                        .frame(height: 52)
-                    VStack(spacing: 7) {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous).fill(pCard).frame(height: 22)
-                        RoundedRectangle(cornerRadius: 10, style: .continuous).fill(pCard).frame(height: 22)
-                    }
+            // Two-line greeting
+            RoundedRectangle(cornerRadius: 3).fill(AppConfig.darkText.opacity(0.35)).frame(width: 46, height: 9)
+            RoundedRectangle(cornerRadius: 3).fill(AppConfig.darkText.opacity(0.8)).frame(width: 34, height: 9)
+            // Hero
+            RoundedRectangle(cornerRadius: 10, style: .continuous).fill(pHero).frame(height: 44)
+                .overlay(alignment: .leading) {
+                    Text("75").font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundStyle(pAccent.opacity(0.9)).padding(.leading, 10)
                 }
-                // Vehicle bar
-                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(pHero).frame(height: 30)
-                    .overlay(alignment: .leading) {
-                        Image(systemName: "car.side.fill").font(.caption)
-                            .foregroundStyle(.white.opacity(0.8)).padding(.leading, 10)
-                    }
-            } else {
-                // Roomy: big greeting + hero + two pills + vehicle bar
-                RoundedRectangle(cornerRadius: 4).fill(AppConfig.darkText.opacity(0.8)).frame(width: 84, height: 14)
-                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(pHero).frame(height: 58)
-                    .overlay(alignment: .leading) {
-                        Text("75").font(.system(size: 22, weight: .bold, design: .rounded))
-                            .foregroundStyle(pAccent.opacity(0.9)).padding(.leading, 10)
-                    }
-                HStack(spacing: 7) {
-                    Capsule().fill(pCard).frame(height: 22)
-                    Capsule().fill(pAccent).frame(height: 22)
+            // Tile row
+            HStack(spacing: 7) {
+                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(pAccent)
+                    .frame(height: 52)
+                VStack(spacing: 7) {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous).fill(pCard).frame(height: 22)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous).fill(pCard).frame(height: 22)
                 }
-                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(pHero).frame(height: 30)
-                    .overlay(alignment: .leading) {
-                        Image(systemName: "car.side.fill").font(.caption)
-                            .foregroundStyle(.white.opacity(0.8)).padding(.leading, 10)
-                    }
             }
+            // Vehicle bar
+            RoundedRectangle(cornerRadius: 10, style: .continuous).fill(pHero).frame(height: 30)
+                .overlay(alignment: .leading) {
+                    Image(systemName: "car.side.fill").font(.caption)
+                        .foregroundStyle(.white.opacity(0.8)).padding(.leading, 10)
+                }
         }
         .padding(12)
         .frame(width: 210)
@@ -386,7 +356,6 @@ struct OnboardingView: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(AppConfig.subtleGray.opacity(0.25), lineWidth: 1)
         )
-        .animation(.motionStandard, value: previewCompact)
         .animation(.motionStandard, value: previewCalm)
         .accessibilityHidden(true)
     }

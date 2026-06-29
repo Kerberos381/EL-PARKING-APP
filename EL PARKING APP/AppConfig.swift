@@ -188,8 +188,40 @@ struct AppConfig {
     static let proximityReminderHoursAfterStart: Int = 2
     static let appTitle = "EL Parking"
     /// Production release date shown in Settings. Update on each store release.
-    static let releaseDate = "10. 6. 2026"
+    static let releaseDate = "29. 6. 2026"
     static let companyName = "EssilorLuxottica"
+
+    /// Optional build timestamp shown in Settings. File modification dates can be
+    /// normalized by packaging/TestFlight, so reject epoch or otherwise impossible dates.
+    static let buildTimestamp: String = {
+        var minimum = DateComponents()
+        minimum.calendar = Calendar(identifier: .gregorian)
+        minimum.timeZone = TimeZone(secondsFromGMT: 0)
+        minimum.year = 2026
+        minimum.month = 1
+        minimum.day = 1
+        let minimumValidDate = minimum.date ?? Date(timeIntervalSince1970: 1_767_225_600)
+
+        let candidates = [
+            Bundle.main.executableURL?.path,
+            Bundle.main.bundleURL.path,
+            Bundle.main.url(forResource: "Info", withExtension: "plist")?.path,
+        ].compactMap { $0 }
+
+        for path in candidates {
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+               let date = attrs[.modificationDate] as? Date,
+               date >= minimumValidDate,
+               date <= Date().addingTimeInterval(86_400) {
+                let formatter = DateFormatter()
+                formatter.locale = .autoupdatingCurrent
+                formatter.timeZone = .autoupdatingCurrent
+                formatter.dateFormat = "yyyy-MM-dd HH:mm"
+                return formatter.string(from: date)
+            }
+        }
+        return ""
+    }()
 
     // MARK: - Car Colors
     static let carColors: [(name: String, hex: String)] = [
@@ -253,7 +285,8 @@ struct AppConfig {
     }
 
     static var isCalmPalette: Bool {
-        UserDefaults.standard.integer(forKey: "appPalette") == AppPalette.calm.rawValue
+        guard UserDefaults.standard.object(forKey: "appPalette") != nil else { return true }
+        return UserDefaults.standard.integer(forKey: "appPalette") == AppPalette.calm.rawValue
     }
 
     // MARK: - Design System Colors (Kinetic Sanctuary — Adaptive Light/Dark)

@@ -22,7 +22,7 @@ struct ParkingMapView: View {
     let selectedDate: Date
 
     // Map mode: which status to highlight
-    @State private var highlightStatus: SpotMapFilter = .all
+    @State private var highlightStatus: SpotMapFilter = .free
 
     private var spots: [ParkingSpot] { bookingManager.parkingSpots }
 
@@ -54,19 +54,36 @@ struct ParkingMapView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(SpotMapFilter.allCases, id: \.self) { filter in
+                    let count = filterCount(filter)
                     Button {
                         guard highlightStatus != filter else { return }
                         Haptics.selection()
                         withAnimation(.standard) { highlightStatus = filter }
                     } label: {
-                        Text(filter.label)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(highlightStatus == filter ? AppConfig.onAccent : AppConfig.subtleGray)
-                            .padding(.horizontal, 14).padding(.vertical, 8)
-                            .background(highlightStatus == filter ? AppConfig.accent : AppConfig.cardBg)
-                            .clipShape(Capsule())
+                        HStack(spacing: 6) {
+                            Image(systemName: filter.icon)
+                                .font(.caption.weight(.bold))
+                                .accessibilityHidden(true)
+                            Text(filter.label)
+                            Text("\(count)")
+                                .font(.caption2.weight(.bold).monospacedDigit())
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(
+                                    (highlightStatus == filter ? AppConfig.onAccent : AppConfig.surfaceLow)
+                                        .opacity(highlightStatus == filter ? 0.22 : 1.0)
+                                )
+                                .clipShape(Capsule())
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(highlightStatus == filter ? AppConfig.onAccent : AppConfig.subtleGray)
+                        .padding(.horizontal, 13)
+                        .padding(.vertical, 8)
+                        .background(highlightStatus == filter ? AppConfig.accent : AppConfig.cardBg)
+                        .clipShape(Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel(L10n.mapFilterAccessibility(label: filter.label, count: count))
                 }
             }
         }
@@ -86,10 +103,10 @@ struct ParkingMapView: View {
                             Image(systemName: "map")
                                 .font(.system(size: 52))
                                 .foregroundStyle(AppConfig.subtleGray.opacity(0.25))
-                            Text("Parking Layout Map")
+                            Text(L10n.parkingLayoutMap)
                                 .font(.headline)
                                 .foregroundStyle(AppConfig.subtleGray.opacity(0.5))
-                            Text("Add a floor plan image in ParkingMapView.swift\nand position spots with .offset(x:y:)")
+                            Text(L10n.parkingLayoutMapHint)
                                 .font(.caption)
                                 .foregroundStyle(AppConfig.subtleGray.opacity(0.35))
                                 .multilineTextAlignment(.center)
@@ -122,7 +139,10 @@ struct ParkingMapView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
         }
-        .opacity(highlightStatus == .all || matchesFilter(status) ? 1.0 : 0.3)
+        .frame(width: 44, height: 44)
+        .contentShape(Rectangle())
+        .opacity(matchesFilter(status) ? 1.0 : 0.25)
+        .accessibilityLabel(accessibilityLabel(for: spot, status: status))
     }
 
     // MARK: - Legend
@@ -130,8 +150,8 @@ struct ParkingMapView: View {
     private var legendBar: some View {
         HStack(spacing: 16) {
             legendItem(color: AppConfig.activeGreen,   label: L10n.free)
-            legendItem(color: AppConfig.spotOccupied,  label: L10n.taken)
-            legendItem(color: AppConfig.accent,         label: "Mine")
+            legendItem(color: AppConfig.accent,         label: L10n.mine)
+            legendItem(color: AppConfig.spotOccupied,  label: L10n.visitors)
             legendItem(color: AppConfig.subtleGray,     label: L10n.blocked)
             Spacer()
         }
@@ -147,13 +167,13 @@ struct ParkingMapView: View {
     // MARK: - Helpers
 
     private enum MapSpotStatus {
-        case free, mine, taken, blocked
+        case free, mine, visitor, blocked
     }
 
     private func localSpotStatus(for spot: ParkingSpot) -> MapSpotStatus {
         if AppConfig.blockedSpotIDs.contains(spot.id) { return .blocked }
         if let booking = bookingManager.getBookingForSpotOnDate(spotLabel: spot.label, date: selectedDate) {
-            return booking.email == bookingManager.currentUserEmail ? .mine : .taken
+            return booking.email == bookingManager.currentUserEmail ? .mine : .visitor
         }
         return .free
     }
@@ -162,31 +182,69 @@ struct ParkingMapView: View {
         switch status {
         case .free:     return AppConfig.activeGreen
         case .mine:     return AppConfig.accent
-        case .taken:    return AppConfig.spotOccupied
+        case .visitor:  return AppConfig.spotOccupied
         case .blocked:  return AppConfig.subtleGray
         }
     }
 
     private func matchesFilter(_ status: MapSpotStatus) -> Bool {
         switch highlightStatus {
-        case .all:     return true
-        case .free:    return status == .free
-        case .taken:   return status == .taken || status == .mine
-        case .blocked: return status == .blocked
+        case .free:     return status == .free
+        case .mine:     return status == .mine
+        case .visitors: return status == .visitor
+        case .blocked:  return status == .blocked
         }
+    }
+
+    private func filterCount(_ filter: SpotMapFilter) -> Int {
+        spots.filter { matchesFilter(localSpotStatus(for: $0), filter: filter) }.count
+    }
+
+    private func matchesFilter(_ status: MapSpotStatus, filter: SpotMapFilter) -> Bool {
+        switch filter {
+        case .free:     return status == .free
+        case .mine:     return status == .mine
+        case .visitors: return status == .visitor
+        case .blocked:  return status == .blocked
+        }
+    }
+
+    private func accessibilityLabel(for spot: ParkingSpot, status: MapSpotStatus) -> String {
+        let label: String
+        switch status {
+        case .free:
+            label = L10n.mapStatusAvailable
+        case .mine:
+            label = L10n.mapStatusMine
+        case .visitor:
+            label = L10n.mapStatusVisitor
+        case .blocked:
+            label = L10n.mapStatusBlocked
+        }
+        return L10n.spotStatusAccessibility(spotID: spot.id, status: label)
     }
 }
 
 // MARK: - Filter Enum
 
 enum SpotMapFilter: CaseIterable {
-    case all, free, taken, blocked
+    case free, mine, visitors, blocked
+
     var label: String {
         switch self {
-        case .all:     return "All"
-        case .free:    return L10n.free
-        case .taken:   return L10n.taken
-        case .blocked: return L10n.blocked
+        case .free:     return L10n.free
+        case .mine:     return L10n.mine
+        case .visitors: return L10n.visitors
+        case .blocked:  return L10n.blocked
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .free:     return "checkmark.circle.fill"
+        case .mine:     return "car.fill"
+        case .visitors: return "person.2.fill"
+        case .blocked:  return "slash.circle.fill"
         }
     }
 }

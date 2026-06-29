@@ -21,6 +21,7 @@ struct AdminStatsView: View {
     @State private var isDeletingExpired = false
     @State private var backfillStatusMessage: String?
     @State private var showDeleteExpiredConfirmation = false
+    @State private var availabilityDate = Calendar.current.startOfDay(for: Date())
 
     private let db = Firestore.firestore()
 
@@ -78,6 +79,28 @@ struct AdminStatsView: View {
     private var currentlySuspended: Int { authManager.allUsers.filter { $0.isSuspended && $0.suspendedAt != nil }.count }
     private var lifetimeSuspensions: Int { authManager.allUsers.reduce(0) { $0 + $1.suspensionCount } }
 
+    private var availabilityBookings: [Booking] {
+        let calendar = Calendar.current
+        return statsBookings.filter { calendar.isDate($0.date, inSameDayAs: availabilityDate) }
+    }
+
+    private var availabilityWeekDays: [Date] {
+        let calendar = Calendar.current
+        let start = calendar.dateInterval(of: .weekOfYear, for: availabilityDate)?.start
+            ?? calendar.startOfDay(for: availabilityDate)
+        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
+    }
+
+    private var timelineStartMinutes: Int { minutes(from: AppConfig.defaultTimeFrom) }
+    private var timelineEndMinutes: Int { minutes(from: AppConfig.defaultTimeTo) }
+    private var timelineDurationMinutes: Int { max(60, timelineEndMinutes - timelineStartMinutes) }
+    private var timelineWidth: CGFloat { 640 }
+    private var timelineHourTicks: [Int] {
+        let startHour = timelineStartMinutes / 60
+        let endHour = Int(ceil(Double(timelineEndMinutes) / 60.0))
+        return Array(startHour...max(startHour, endHour))
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -97,6 +120,7 @@ struct AdminStatsView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         summaryCards
+                        availabilityTimelineSection
                         dayOfWeekChart
                         topSpotsChart
                         suspensionStatsSection
@@ -114,14 +138,14 @@ struct AdminStatsView: View {
         .navigationTitle(L10n.bookingStatistics)
         .navigationBarTitleDisplayMode(.large)
         .task { await loadStats() }
-        .alert("Delete old bookings?", isPresented: $showDeleteExpiredConfirmation) {
-            Button("Delete", role: .destructive) {
+        .alert(L10n.deleteOldBookingsQuestion, isPresented: $showDeleteExpiredConfirmation) {
+            Button(L10n.delete, role: .destructive) {
                 Haptics.destructive()
                 Task { await runExpiredCleanup() }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(L10n.cancel, role: .cancel) {}
         } message: {
-            Text("This will permanently delete bookings older than \(AppConfig.bookingRetentionDays) days.")
+            Text(L10n.deleteExpiredBookingsMessage(AppConfig.bookingRetentionDays))
         }
     }
 
@@ -257,7 +281,7 @@ struct AdminStatsView: View {
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .disabled(isDeletingExpired || isBackfillingTTL)
-                .accessibilityLabel("Delete bookings older than \(AppConfig.bookingRetentionDays) days")
+                .accessibilityLabel(L10n.deleteExpiredBookingsAccessibility(AppConfig.bookingRetentionDays))
 
                 Button {
                     Task { await runTTLBackfill() }
@@ -279,8 +303,8 @@ struct AdminStatsView: View {
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .disabled(isBackfillingTTL || isDeletingExpired)
-                .accessibilityLabel("Backfill booking TTL")
-                .accessibilityHint("Recomputes retention metadata for existing bookings.")
+                .accessibilityLabel(L10n.backfillBookingTTL)
+                .accessibilityHint(L10n.backfillBookingTTLHint)
             }
         }
         .padding(.top, 8)
@@ -292,7 +316,7 @@ struct AdminStatsView: View {
         isBackfillingTTL = true
         Haptics.selection()
         let result = await bookingManager.backfillMissingBookingTTL()
-        backfillStatusMessage = "TTL backfill: scanned \(result.scanned), updated \(result.updated), skipped \(result.skipped)."
+        backfillStatusMessage = L10n.ttlBackfillStatus(scanned: result.scanned, updated: result.updated, skipped: result.skipped)
         if result.updated > 0 {
             Haptics.notify(.success)
         } else {
@@ -307,7 +331,7 @@ struct AdminStatsView: View {
         isDeletingExpired = true
         Haptics.selection()
         let result = await bookingManager.hardDeleteExpiredBookings()
-        backfillStatusMessage = "Cleanup: scanned \(result.scanned), deleted \(result.deleted), skipped \(result.skipped)."
+        backfillStatusMessage = L10n.cleanupStatus(scanned: result.scanned, deleted: result.deleted, skipped: result.skipped)
         if result.deleted > 0 {
             Haptics.notify(.success)
         } else {
@@ -371,6 +395,218 @@ struct AdminStatsView: View {
         .background(AppConfig.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
         .cardShadow()
+    }
+
+    // MARK: - Availability Timeline
+
+    private var availabilityTimelineSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: "calendar.day.timeline.left")
+                    .foregroundStyle(AppConfig.darkText)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(L10n.weekAvailability)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(AppConfig.darkText)
+                    Text(availabilityDate.formatNaturalShort())
+                        .font(.caption)
+                        .foregroundStyle(AppConfig.subtleGray)
+                }
+                Spacer()
+                HStack(spacing: 6) {
+                    Button {
+                        shiftAvailabilityDate(by: -1)
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .frame(width: 32, height: 32)
+                    }
+                    Button {
+                        availabilityDate = Calendar.current.startOfDay(for: Date())
+                    } label: {
+                        Image(systemName: "calendar")
+                            .frame(width: 32, height: 32)
+                    }
+                    Button {
+                        shiftAvailabilityDate(by: 1)
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .frame(width: 32, height: 32)
+                    }
+                }
+                .font(.caption.weight(.bold))
+                .foregroundStyle(AppConfig.darkText)
+                .buttonStyle(ScaleButtonStyle())
+            }
+
+            weekPicker
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        Text(L10n.spot)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(AppConfig.subtleGray)
+                            .frame(width: 52, alignment: .leading)
+                        timelineHeader
+                    }
+
+                    ForEach(bookingManager.parkingSpots) { spot in
+                        HStack(spacing: 10) {
+                            Text("P\(spot.id)")
+                                .font(.caption.weight(.bold).monospacedDigit())
+                                .foregroundStyle(AppConfig.darkText)
+                                .frame(width: 52, alignment: .leading)
+
+                            timelineRow(for: spot)
+                        }
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+        .padding(16)
+        .background(AppConfig.cardBg)
+        .clipShape(RoundedRectangle(cornerRadius: AppConfig.radius16))
+        .cardShadow()
+    }
+
+    private var weekPicker: some View {
+        HStack(spacing: 8) {
+            ForEach(availabilityWeekDays, id: \.self) { date in
+                let selected = Calendar.current.isDate(date, inSameDayAs: availabilityDate)
+                let dayBookings = statsBookings.filter { Calendar.current.isDate($0.date, inSameDayAs: date) }.count
+                Button {
+                    availabilityDate = Calendar.current.startOfDay(for: date)
+                    Haptics.selection()
+                } label: {
+                    VStack(spacing: 3) {
+                        Text(weekdaySymbol(for: date))
+                            .font(.caption2.weight(.bold))
+                        Text("\(Calendar.current.component(.day, from: date))")
+                            .font(.system(.subheadline, design: .rounded, weight: .black))
+                        Text("\(dayBookings)")
+                            .font(.caption2.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(selected ? AppConfig.onAccent.opacity(0.75) : AppConfig.subtleGray)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .foregroundStyle(selected ? AppConfig.onAccent : AppConfig.darkText)
+                    .background(selected ? AppConfig.accent : AppConfig.surfaceLow)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(L10n.dayBookingsAccessibility(date: date.formatNaturalShort(), count: dayBookings))
+            }
+        }
+    }
+
+    private var timelineHeader: some View {
+        ZStack(alignment: .leading) {
+            ForEach(timelineHourTicks, id: \.self) { hour in
+                let x = position(for: hour * 60)
+                Text(String(format: "%02d", hour))
+                    .font(.caption2.weight(.bold).monospacedDigit())
+                    .foregroundStyle(AppConfig.subtleGray)
+                    .frame(width: 32, alignment: .leading)
+                    .offset(x: min(max(0, x - 2), timelineWidth - 32))
+            }
+        }
+        .frame(width: timelineWidth, height: 18, alignment: .leading)
+    }
+
+    private func shiftAvailabilityDate(by days: Int) {
+        availabilityDate = Calendar.current.date(byAdding: .day, value: days, to: availabilityDate) ?? availabilityDate
+        Haptics.selection()
+    }
+
+    private func timelineRow(for spot: ParkingSpot) -> some View {
+        let blocked = AppConfig.blockedSpotIDs.contains(spot.id)
+        let bookings = availabilityBookings.filter {
+            bookingManager.normalizedSpotKey($0.spot) == bookingManager.normalizedSpotKey(spot.label)
+        }
+
+        return ZStack(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(blocked ? AppConfig.surfaceHigh : AppConfig.activeGreen.opacity(0.12))
+                .frame(width: timelineWidth, height: 34)
+
+            ForEach(timelineHourTicks, id: \.self) { hour in
+                Rectangle()
+                    .fill(AppConfig.separatorSoft)
+                    .frame(width: 1, height: 34)
+                    .offset(x: position(for: hour * 60))
+            }
+
+            if blocked {
+                HStack(spacing: 6) {
+                    Image(systemName: "slash.circle.fill")
+                    Text(L10n.blocked)
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppConfig.subtleGray)
+                .padding(.horizontal, 10)
+            } else {
+                ForEach(bookings) { booking in
+                    bookingBar(booking)
+                }
+            }
+        }
+        .frame(width: timelineWidth, height: 34, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(timelineRowAccessibilityLabel(spot: spot, bookings: bookings, blocked: blocked))
+    }
+
+    private func bookingBar(_ booking: Booking) -> some View {
+        let start = max(timelineStartMinutes, minutes(from: booking.fromTime))
+        let end = min(timelineEndMinutes, minutes(from: booking.toTime))
+        let width = max(34, position(for: end) - position(for: start))
+        let isMine = booking.email == bookingManager.currentUserEmail
+
+        return HStack(spacing: 5) {
+            Text(booking.firstName)
+                .font(.caption2.weight(.bold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text("\(booking.fromTime)-\(booking.toTime)")
+                .font(.caption2.weight(.semibold).monospacedDigit())
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+        }
+        .foregroundStyle(isMine ? AppConfig.onAccent : .white)
+        .padding(.horizontal, 8)
+        .frame(width: width, height: 28, alignment: .leading)
+        .background(isMine ? AppConfig.accent : AppConfig.spotOccupied)
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .offset(x: position(for: start), y: 0)
+        .accessibilityLabel(L10n.bookingTimeAccessibility(name: booking.firstName, from: booking.fromTime, to: booking.toTime))
+    }
+
+    private func position(for minutes: Int) -> CGFloat {
+        let clamped = min(max(minutes, timelineStartMinutes), timelineEndMinutes)
+        return CGFloat(clamped - timelineStartMinutes) / CGFloat(timelineDurationMinutes) * timelineWidth
+    }
+
+    private func minutes(from time: String) -> Int {
+        let parts = time.split(separator: ":")
+        let hour = Int(parts.first ?? "") ?? 0
+        let minute = Int(parts.dropFirst().first ?? "") ?? 0
+        return hour * 60 + minute
+    }
+
+    private func weekdaySymbol(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.dateFormat = "EEE"
+        return formatter.string(from: date).uppercased()
+    }
+
+    private func timelineRowAccessibilityLabel(spot: ParkingSpot, bookings: [Booking], blocked: Bool) -> String {
+        if blocked { return L10n.spotStatusAccessibility(spotID: spot.id, status: L10n.mapStatusBlocked) }
+        guard !bookings.isEmpty else { return L10n.spotStatusAccessibility(spotID: spot.id, status: L10n.availableAllDay) }
+        let bookingText = bookings
+            .map { L10n.bookingTimeAccessibility(name: $0.firstName, from: $0.fromTime, to: $0.toTime) }
+            .joined(separator: ", ")
+        return L10n.spotStatusAccessibility(spotID: spot.id, status: bookingText)
     }
 
     // MARK: - Day of Week Chart
@@ -492,7 +728,7 @@ struct AdminStatsView: View {
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(AppConfig.warning)
-                Text("Warning Tracker")
+                Text(L10n.warningTracker)
                     .textCase(nil)
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(AppConfig.darkText)
@@ -500,15 +736,15 @@ struct AdminStatsView: View {
 
             // Quick summary pills
             HStack(spacing: 10) {
-                suspensionPill(value: totalActiveStrikes,  label: "Active\nWarnings", color: AppConfig.warning)
-                suspensionPill(value: currentlySuspended,  label: "Suspended\nNow",   color: AppConfig.spotOccupied)
-                suspensionPill(value: lifetimeSuspensions, label: "Total\nBans",       color: AppConfig.subtleGray)
+                suspensionPill(value: totalActiveStrikes,  label: L10n.activeWarnings, color: AppConfig.warning)
+                suspensionPill(value: currentlySuspended,  label: L10n.suspendedNow,   color: AppConfig.spotOccupied)
+                suspensionPill(value: lifetimeSuspensions, label: L10n.totalBans,      color: AppConfig.subtleGray)
             }
 
             if usersWithStrikeHistory.isEmpty {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.seal.fill").foregroundStyle(AppConfig.activeGreen)
-                    Text("No warnings issued. All clean.")
+                    Text(L10n.noWarningsIssued)
                         .font(.subheadline).foregroundStyle(AppConfig.subtleGray)
                 }
                 .padding(.vertical, 4)
@@ -543,7 +779,7 @@ struct AdminStatsView: View {
                                     }
                                 }
                                 if user.suspensionCount > 0 {
-                                    Text("\(user.suspensionCount)× suspended")
+                                    Text(L10n.suspendedTimes(user.suspensionCount))
                                         .font(.caption2.weight(.semibold))
                                         .foregroundStyle(AppConfig.spotOccupied)
                                 }

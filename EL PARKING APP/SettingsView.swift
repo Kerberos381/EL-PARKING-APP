@@ -13,9 +13,9 @@ struct SettingsView: View {
     @EnvironmentObject var bookingManager: BookingManager
     @EnvironmentObject var authManager:   AuthManager
     @ObservedObject private var langManager = LanguageManager.shared
+    @ObservedObject private var vehicleCatalog = VehicleCatalogStore.shared
     @AppStorage("appTheme") private var themeRaw: Int = 0
-    @AppStorage("appPalette") private var paletteRaw: Int = 0
-    @AppStorage("homeStyle") private var homeStyleRaw: String = "roomy"
+    @AppStorage("appPalette") private var paletteRaw: Int = AppConfig.AppPalette.calm.rawValue
     @State private var phoneField: String = ""
     @State private var phoneSaveTask: Task<Void, Never>?
     @AppStorage("dailyReminderEnabled")   private var reminderEnabled      = true
@@ -29,6 +29,7 @@ struct SettingsView: View {
     @State private var deleteConfirmText   = ""
     @State private var showChangePassword  = false
     @State private var showOnboarding      = false
+    @State private var showWhatsNew        = false
 
 
     // Advance-notice options shown as pills
@@ -85,6 +86,15 @@ struct SettingsView: View {
     }
 
     private var hasUnsavedSettingsChanges: Bool { vehicleIsDirty || profileIsDirty }
+
+    private var appVersionLine: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+        let buildText = build.isEmpty ? "" : " (\(build))"
+        let stamp = AppConfig.buildTimestamp
+        let stampText = stamp.isEmpty ? "" : " · \(L10n.builtLabel) \(stamp)"
+        return "v\(version)\(buildText) · \(L10n.releasedLabel) \(AppConfig.releaseDate)\(stampText)"
+    }
 
     private var theme: AppTheme {
         AppTheme(rawValue: themeRaw) ?? .system
@@ -211,7 +221,11 @@ struct SettingsView: View {
                 selectedCompanyBadge = authManager.currentUser?.companyBadge ?? .none
                 lastSavedCompanyBadge = selectedCompanyBadge
                 syncVehicleMakeModelFromDescription()
+                vehicleCatalog.ensureLoaded()
                 refreshBiometricState()
+            }
+            .onChange(of: vehicleCatalog.revision) {
+                syncVehicleMakeModelFromDescription()
             }
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
@@ -271,9 +285,14 @@ struct SettingsView: View {
                     .presentationDetents([.large])
                     .presentationDragIndicator(.hidden)
             }
+            .sheet(isPresented: $showWhatsNew) {
+                WhatsNewView(release: AppReleaseNotes.forCurrentVersion ?? AppReleaseNotes.firstLaunchIntro)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
             .sheet(isPresented: $showVehiclePresetSheet) {
                 VehicleMiniaturePresetPickerSheet(
-                    title: "Choose Vehicle Icon",
+                    title: L10n.chooseVehicleIcon,
                     selectedColorHex: selectedVehicleColorHex,
                     selectedPresetID: selectedVehiclePreset?.id,
                     selectedMake: selectedVehicleMake,
@@ -304,6 +323,7 @@ struct SettingsView: View {
                     rulesSection
                     statsSection
                     dataSection
+                    releaseNotesSection
                     signOutSection
                     footerSection
                 }
@@ -322,7 +342,7 @@ struct SettingsView: View {
                     .listRowBackground(Color.clear)
             }.listRowBackground(AppConfig.groupedCardBg)
 
-            Section("Appearance") {
+            Section(L10n.appearance) {
                 Menu {
                     ForEach(AppTheme.allCases, id: \.rawValue) { option in
                         Button {
@@ -364,36 +384,9 @@ struct SettingsView: View {
                 }
                 .tint(AppConfig.darkText)
 
-                Menu {
-                    Button {
-                        Haptics.selection()
-                        homeStyleRaw = "roomy"
-                    } label: {
-                        HStack {
-                            Label(L10n.homeRoomy, systemImage: "rectangle.grid.1x2")
-                            if homeStyleRaw == "roomy" { Image(systemName: "checkmark") }
-                        }
-                    }
-                    Button {
-                        Haptics.selection()
-                        homeStyleRaw = "compact"
-                    } label: {
-                        HStack {
-                            Label(L10n.homeCompact, systemImage: "square.grid.2x2")
-                            if homeStyleRaw == "compact" { Image(systemName: "checkmark") }
-                        }
-                    }
-                } label: {
-                    nativeValueRow(
-                        L10n.homeLayout,
-                        value: homeStyleRaw == "compact" ? L10n.homeCompact : L10n.homeRoomy,
-                        enabled: true
-                    )
-                }
-                .tint(AppConfig.darkText)
             }.listRowBackground(AppConfig.groupedCardBg)
 
-            Section("Language") {
+            Section(L10n.language) {
                 Menu {
                     ForEach(AppLanguage.allCases, id: \.rawValue) { lang in
                         Button {
@@ -413,7 +406,7 @@ struct SettingsView: View {
                 .tint(AppConfig.darkText)
             }.listRowBackground(AppConfig.groupedCardBg)
 
-            Section("Vehicle") {
+            Section(L10n.vehicle) {
                 Button {
                     Haptics.selection()
                     showVehiclePresetSheet = true
@@ -427,22 +420,27 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
 
                 Menu {
-                    ForEach(CarData.makes, id: \.self) { make in
-                        Button(make) {
+                    ForEach(vehicleCatalog.makes(merging: CarData.makes), id: \.self) { make in
+                        Button {
                             selectedVehicleMake = make
                             selectedVehicleModel = ""
                             bookingManager.carDescription = make
+                        } label: {
+                            HStack(spacing: 8) {
+                                CarMakerLogoBadge(make: make, size: 18)
+                                Text(make)
+                            }
                         }
                     }
                 } label: {
-                    nativeValueRow("Make", value: selectedVehicleMake.isEmpty ? "Choose make" : selectedVehicleMake, enabled: true)
+                    nativeValueRow(L10n.make, value: selectedVehicleMake.isEmpty ? L10n.chooseMake : selectedVehicleMake, enabled: true)
                 }
 
                 Menu {
                     if selectedVehicleMake.isEmpty {
-                        Button("Select make first") {}.disabled(true)
+                        Button(L10n.selectMakeFirst) {}.disabled(true)
                     } else {
-                        ForEach(CarData.models(for: selectedVehicleMake), id: \.self) { model in
+                        ForEach(vehicleCatalog.models(for: selectedVehicleMake, merging: CarData.models(for: selectedVehicleMake)), id: \.self) { model in
                             Button(model) {
                                 selectedVehicleModel = model
                                 bookingManager.carDescription = CarData.compose(make: selectedVehicleMake, model: model)
@@ -450,7 +448,7 @@ struct SettingsView: View {
                         }
                     }
                 } label: {
-                    nativeValueRow("Model", value: selectedVehicleModel.isEmpty ? "Choose model" : selectedVehicleModel, enabled: true)
+                    nativeValueRow(L10n.model, value: selectedVehicleModel.isEmpty ? L10n.chooseModel : selectedVehicleModel, enabled: true)
                 }
 
                 NavigationLink {
@@ -465,19 +463,19 @@ struct SettingsView: View {
             }.listRowBackground(AppConfig.groupedCardBg)
 
             if isShortcutsOwner {
-                Section("Shortcuts") {
-                    Text("Set favorite spot and default booking time for quick Siri or shortcut actions.")
+                Section(L10n.shortcuts) {
+                    Text(L10n.quickShortcutSettingsDescription)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
                     Menu {
-                        Button("None") { favoriteSpotID = "" }
+                        Button(L10n.noneLabel) { favoriteSpotID = "" }
                         ForEach(AppConfig.allParkingSpots, id: \.id) { spot in
                             Button(spot.label) { favoriteSpotID = spot.id }
                         }
                     } label: {
-                        nativeValueRow("Favorite Spot",
-                                       value: favoriteSpotID.isEmpty ? "None" : (AppConfig.allParkingSpots.first(where: { $0.id == favoriteSpotID })?.label ?? favoriteSpotID),
+                        nativeValueRow(L10n.favoriteSpot,
+                                       value: favoriteSpotID.isEmpty ? L10n.noneLabel : (AppConfig.allParkingSpots.first(where: { $0.id == favoriteSpotID })?.label ?? favoriteSpotID),
                                        enabled: true)
                     }
 
@@ -486,7 +484,7 @@ struct SettingsView: View {
                             Button(slot) { favoriteFromTime = slot }
                         }
                     } label: {
-                        nativeValueRow("From", value: favoriteFromTime, enabled: true)
+                        nativeValueRow(L10n.from, value: favoriteFromTime, enabled: true)
                     }
 
                     Menu {
@@ -494,12 +492,12 @@ struct SettingsView: View {
                             Button(slot) { favoriteToTime = slot }
                         }
                     } label: {
-                        nativeValueRow("To", value: favoriteToTime, enabled: true)
+                        nativeValueRow(L10n.to, value: favoriteToTime, enabled: true)
                     }
                 }
             }
 
-            Section("Notifications") {
+            Section(L10n.notifications) {
                 Toggle(isOn: $reminderEnabled.animation(.spring(response: 0.3, dampingFraction: 0.8))) {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
@@ -537,7 +535,7 @@ struct SettingsView: View {
                     } label: {
                         Label {
                             HStack {
-                                Text("Remind Me")
+                                Text(L10n.remindMe)
                                 Spacer()
                                 Text(nativeReminderIntervalDisplay)
                                     .font(.body.weight(.medium))
@@ -552,7 +550,7 @@ struct SettingsView: View {
                 }
             }.listRowBackground(AppConfig.groupedCardBg)
 
-            Section("Security") {
+            Section(L10n.security) {
                 if biometricsAvailable {
                     Toggle(L10n.faceIDAppLock, isOn: $biometricEnabled)
                         .tint(AppConfig.darkText.opacity(0.7))
@@ -569,7 +567,7 @@ struct SettingsView: View {
                 }
             }.listRowBackground(AppConfig.groupedCardBg)
 
-            Section("Account") {
+            Section(L10n.account) {
                 LabeledContent(L10n.name, value: bookingManager.currentUserName)
                 LabeledContent(L10n.email, value: bookingManager.currentUserEmail)
 
@@ -606,7 +604,7 @@ struct SettingsView: View {
 
                 if bookingManager.isAdmin {
                 Menu {
-                        ForEach(CompanyBadge.allCases, id: \.rawValue) { badge in
+                        ForEach(CompanyBadge.sortedCases, id: \.rawValue) { badge in
                             Button {
                                 selectedCompanyBadge = badge
                                 Task {
@@ -674,7 +672,7 @@ struct SettingsView: View {
                 }
             }.listRowBackground(AppConfig.groupedCardBg)
 
-            Section("Session") {
+            Section(L10n.session) {
                 Button {
                     authManager.signOut()
                 } label: {
@@ -688,6 +686,25 @@ struct SettingsView: View {
             }.listRowBackground(AppConfig.groupedCardBg)
 
             Section {
+                Button {
+                    showWhatsNew = true
+                } label: {
+                    HStack {
+                        Text(L10n.whatsNew)
+                            .foregroundStyle(AppConfig.darkText)
+                        Spacer()
+                        Text(appVersionLine)
+                            .font(.caption)
+                            .foregroundStyle(AppConfig.subtleGray)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppConfig.subtleGray)
+                    }
+                }
+                .buttonStyle(.plain)
+
                 Link(destination: AppConfig.privacyPolicyURL) {
                     HStack {
                         Text(L10n.privacyPolicy)
@@ -715,7 +732,7 @@ struct SettingsView: View {
                     Text("EL PARKING")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0") · \(L10n.releasedLabel) \(AppConfig.releaseDate)")
+                    Text(appVersionLine)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -1063,7 +1080,7 @@ struct SettingsView: View {
 
                 VStack(spacing: 10) {
                     Menu {
-                        ForEach(CarData.makes, id: \.self) { make in
+                        ForEach(vehicleCatalog.makes(merging: CarData.makes), id: \.self) { make in
                             Button {
                                 selectedVehicleMake = make
                                 selectedVehicleModel = ""
@@ -1078,8 +1095,8 @@ struct SettingsView: View {
                     } label: {
                         makeModelPickerRow(
                             icon: "building.2.crop.circle",
-                            title: langManager.language == .czech ? "Značka" : "Make",
-                            value: selectedVehicleMake.isEmpty ? (langManager.language == .czech ? "Vyberte značku" : "Choose make") : selectedVehicleMake,
+                            title: L10n.make,
+                            value: selectedVehicleMake.isEmpty ? L10n.chooseMake : selectedVehicleMake,
                             isPlaceholder: selectedVehicleMake.isEmpty,
                             makerLogo: selectedVehicleMake.isEmpty ? nil : selectedVehicleMake
                         )
@@ -1088,10 +1105,10 @@ struct SettingsView: View {
 
                     Menu {
                         if selectedVehicleMake.isEmpty {
-                            Button(langManager.language == .czech ? "Nejprve vyberte značku" : "Select make first") {}
+                            Button(L10n.selectMakeFirst) {}
                                 .disabled(true)
                         } else {
-                            ForEach(CarData.models(for: selectedVehicleMake), id: \.self) { model in
+                            ForEach(vehicleCatalog.models(for: selectedVehicleMake, merging: CarData.models(for: selectedVehicleMake)), id: \.self) { model in
                                 Button(model) {
                                     selectedVehicleModel = model
                                     bookingManager.carDescription = CarData.compose(make: selectedVehicleMake, model: model)
@@ -1101,8 +1118,8 @@ struct SettingsView: View {
                     } label: {
                         makeModelPickerRow(
                             icon: "car.side",
-                            title: langManager.language == .czech ? "Model" : "Model",
-                            value: selectedVehicleModel.isEmpty ? (langManager.language == .czech ? "Vyberte model" : "Choose model") : selectedVehicleModel,
+                            title: L10n.model,
+                            value: selectedVehicleModel.isEmpty ? L10n.chooseModel : selectedVehicleModel,
                             isPlaceholder: selectedVehicleModel.isEmpty
                         )
                     }
@@ -1183,14 +1200,14 @@ struct SettingsView: View {
     // MARK: - Shortcuts & Favorite Section
 
     private var shortcutsSection: some View {
-        settingsSection(title: "Shortcuts & Favorite", icon: "wand.and.stars", iconTint: AppConfig.warning) {
+        settingsSection(title: L10n.shortcutsFavorite, icon: "wand.and.stars", iconTint: AppConfig.warning) {
             VStack(spacing: 14) {
                 // Explanation
                 HStack(spacing: 10) {
                     Image(systemName: "info.circle")
                         .font(.footnote)
                         .foregroundStyle(AppConfig.subtleGray)
-                    Text("Set a favourite spot and preferred time. Then say \"Book a spot in EL Parking\" to Siri — it books for tomorrow by default, or you can pick today.")
+                    Text(L10n.siriShortcutSetupDescription)
                         .font(.caption)
                         .foregroundStyle(AppConfig.subtleGray)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1203,12 +1220,12 @@ struct SettingsView: View {
 
                 // Favorite spot picker
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Favorite spot")
+                    Text(L10n.favoriteSpot)
                         .font(.caption2.weight(.bold))
                                                 .foregroundStyle(AppConfig.subtleGray)
 
                     Menu {
-                        Button("None") { favoriteSpotID = "" }
+                        Button(L10n.noneLabel) { favoriteSpotID = "" }
                         ForEach(AppConfig.allParkingSpots, id: \.id) { spot in
                             Button(spot.label) { favoriteSpotID = spot.id }
                         }
@@ -1218,7 +1235,7 @@ struct SettingsView: View {
                                 .foregroundStyle(AppConfig.subtleGray)
                                 .frame(width: 20)
                             Text(favoriteSpotID.isEmpty
-                                 ? "Select a spot…"
+                                 ? L10n.selectSpotEllipsis
                                  : AppConfig.allParkingSpots.first(where: { $0.id == favoriteSpotID })?.label ?? favoriteSpotID)
                                 .font(.subheadline)
                                 .foregroundStyle(favoriteSpotID.isEmpty ? AppConfig.subtleGray : AppConfig.darkText)
@@ -1237,7 +1254,7 @@ struct SettingsView: View {
                 // Time window pickers
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("From")
+                        Text(L10n.from)
                             .font(.caption2.weight(.bold))
                                                         .foregroundStyle(AppConfig.subtleGray)
 
@@ -1267,7 +1284,7 @@ struct SettingsView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("To")
+                        Text(L10n.to)
                             .font(.caption2.weight(.bold))
                             .foregroundStyle(AppConfig.subtleGray)
 
@@ -1303,7 +1320,7 @@ struct SettingsView: View {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(AppConfig.darkText)
                             .font(.caption)
-                        Text("Ready — say \"Book a spot in EL Parking\" to Siri")
+                        Text(L10n.siriReadyHint)
                             .font(.caption)
                             .foregroundStyle(AppConfig.subtleGray)
                     }
@@ -1336,7 +1353,7 @@ struct SettingsView: View {
                 Divider().overlay(AppConfig.separatorSoft)
 
                 Menu {
-                    ForEach(CompanyBadge.allCases, id: \.rawValue) { badge in
+                    ForEach(CompanyBadge.sortedCases, id: \.rawValue) { badge in
                         Button {
                             selectedCompanyBadge = badge
                         } label: {
@@ -1435,7 +1452,7 @@ struct SettingsView: View {
                 Divider().overlay(AppConfig.separatorSoft)
                 Button { showOnboarding = true } label: {
                     settingsActionRow(
-                        title: "App Tutorial",
+                        title: L10n.appTutorial,
                         icon: "graduationcap.fill",
                         tint: AppConfig.darkText,
                         showsChevron: false
@@ -1568,13 +1585,51 @@ struct SettingsView: View {
 
     // MARK: - Footer
 
+    private var releaseNotesSection: some View {
+        settingsSection(title: L10n.whatsNew, icon: "sparkles", iconTint: AppConfig.accent) {
+            Button {
+                showWhatsNew = true
+            } label: {
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(AppConfig.accent.opacity(0.14))
+                        Image(systemName: "sparkles")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(AppConfig.accent)
+                    }
+                    .frame(width: 34, height: 34)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L10n.whatsNew)
+                            .font(SettingsType.rowTitle)
+                            .foregroundStyle(AppConfig.darkText)
+                        Text(appVersionLine)
+                            .font(SettingsType.rowMeta)
+                            .foregroundStyle(AppConfig.subtleGray)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(SettingsType.rowChevron.weight(.semibold))
+                        .foregroundStyle(AppConfig.subtleGray.opacity(0.6))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(ScaleButtonStyle())
+        }
+    }
+
     private var footerSection: some View {
         VStack(spacing: 6) {
             Text(AppConfig.companyName)
                 .font(SettingsType.footerBrand)
                 .tracking(2)
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.4))
-            Text("EL Parking v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")")
+            Text("EL Parking \(appVersionLine)")
                 .font(SettingsType.footerVersion)
                 .foregroundStyle(AppConfig.subtleGray.opacity(0.3))
         }
@@ -1738,7 +1793,8 @@ struct SettingsView: View {
     }
 
     private func syncVehicleMakeModelFromDescription() {
-        let parsed = CarData.splitMakeModel(bookingManager.carDescription)
+        let localParsed = CarData.splitMakeModel(bookingManager.carDescription)
+        let parsed = localParsed.make.isEmpty ? vehicleCatalog.splitMakeModel(bookingManager.carDescription) : localParsed
         selectedVehicleMake = parsed.make
         selectedVehicleModel = parsed.model
     }
@@ -2052,7 +2108,7 @@ private struct ReminderIntervalPickerView: View {
         .scrollContentBackground(.hidden)
         .background(AppConfig.groupedPageBg.ignoresSafeArea())
         .tint(AppConfig.darkText)
-        .navigationTitle("Remind Me")
+        .navigationTitle(L10n.remindMe)
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -2076,8 +2132,8 @@ private struct TextEditDetailView: View {
 
     var body: some View {
         Form {
-            Section(header: Text("Edit \(title)")) {
-                TextField("Enter \(title.lowercased())", text: $inputBuffer)
+            Section(header: Text(L10n.editValue(title))) {
+                TextField("\(L10n.enterValuePrefix) \(title.lowercased())", text: $inputBuffer)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(capitalization)
                     .keyboardType(keyboardType)

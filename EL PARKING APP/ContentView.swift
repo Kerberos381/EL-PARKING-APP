@@ -15,6 +15,7 @@ struct ContentView: View {
     @EnvironmentObject var deepLinkManager: DeepLinkManager
     @EnvironmentObject var langManager:   LanguageManager
     @ObservedObject private var lang = LanguageManager.shared
+    @ObservedObject private var vehicleCatalog = VehicleCatalogStore.shared
 
     @AppStorage("biometricLockEnabled")  private var biometricEnabled     = false
     @AppStorage("hasAskedBiometrics")    private var hasAskedBiometrics   = false
@@ -39,6 +40,7 @@ struct ContentView: View {
     }
 
     var body: some View {
+        let _ = vehicleCatalog.revision
         ZStack {
             authContent(for: stageState)
                 .scaleEffect(authManager.authState == .loading ? 0.96 : 1.0)
@@ -79,6 +81,7 @@ struct ContentView: View {
                 lastNonLoadingState = newState
             }
             if case .authenticated = newState {
+                vehicleCatalog.ensureLoaded()
                 guard !didRunPostLoginFlow else { return }
                 didRunPostLoginFlow = true
                 // Avoid showing a confusing biometric lock screen immediately after
@@ -227,6 +230,9 @@ struct ContentView: View {
             default:
                 selectedTab = .home
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToParkingTab)) { _ in
+            selectedTab = .parking
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSettingsTab)) { _ in
             selectedTab = .settings

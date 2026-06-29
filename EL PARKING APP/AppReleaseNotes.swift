@@ -37,6 +37,52 @@ struct AppReleaseNotes {
     static var all: [AppRelease] {[
 
         AppRelease(
+            version: "6.0",
+            features: [
+                ReleaseFeature(
+                    icon: "leaf.fill",
+                    color: "green",
+                    title: L10n.lang == .czech ? "Klidný režim pro všechny" : "Calm Mode for Everyone",
+                    description: L10n.lang == .czech
+                        ? "Nová klidná barevná paleta je teď zapnutá jako výchozí pro všechny uživatele."
+                        : "The new calmer color palette is now activated by default for every user."
+                ),
+                ReleaseFeature(
+                    icon: "sparkles.rectangle.stack.fill",
+                    color: "accent",
+                    title: L10n.lang == .czech ? "Plynulejší rezervace" : "Sharper Booking Flow",
+                    description: L10n.lang == .czech
+                        ? "Rezervační akce mají nový Liquid Glass panel s jasným souhrnem místa, času a dne."
+                        : "Booking actions now use a focused Liquid Glass panel with the selected spot, time, and day always visible."
+                ),
+                ReleaseFeature(
+                    icon: "exclamationmark.triangle.fill",
+                    color: "orange",
+                    title: L10n.lang == .czech ? "Chytřejší konflikty" : "Smarter Conflict Help",
+                    description: L10n.lang == .czech
+                        ? "Když je místo obsazené, aplikace vysvětlí proč a nabídne nejbližší volné alternativy."
+                        : "When a spot is unavailable, the app explains the conflict and suggests nearby available alternatives."
+                ),
+                ReleaseFeature(
+                    icon: "calendar.day.timeline.left",
+                    color: "blue",
+                    title: L10n.lang == .czech ? "Přehled dostupnosti" : "Availability Timeline",
+                    description: L10n.lang == .czech
+                        ? "Správci vidí denní časovou osu míst, obsazenosti a blokací přímo ve statistikách."
+                        : "Admins can now scan a daily spot-by-hour availability timeline directly from statistics."
+                ),
+                ReleaseFeature(
+                    icon: "chart.bar.fill",
+                    color: "green",
+                    title: L10n.lang == .czech ? "Lepší správa parkování" : "Better Admin Overview",
+                    description: L10n.lang == .czech
+                        ? "Dashboard nově ukazuje obsazenost dne, volná místa, počet rezervací a špičkový čas."
+                        : "The dashboard now highlights today’s occupancy, free spots, booking count, and peak start time."
+                )
+            ]
+        ),
+
+        AppRelease(
             version: "4.0",
             features: [
                 ReleaseFeature(

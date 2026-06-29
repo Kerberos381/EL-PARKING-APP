@@ -53,6 +53,13 @@ enum CompanyBadge: String, Codable, CaseIterable {
         }
     }
 
+    static var sortedCases: [CompanyBadge] {
+        let companies = allCases
+            .filter { $0 != .none }
+            .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+        return companies + [.none]
+    }
+
     static func infer(from email: String) -> CompanyBadge {
         let domainPart = email
             .trimmingCharacters(in: .whitespacesAndNewlines)

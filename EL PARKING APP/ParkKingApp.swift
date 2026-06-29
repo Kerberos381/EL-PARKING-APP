@@ -302,7 +302,7 @@ struct ParkKingApp: App {
     @StateObject private var pushManager: PushNotificationManager
     @StateObject private var deepLinkManager: DeepLinkManager
     @AppStorage("appTheme") private var themeRaw: Int = 0
-    @AppStorage("appPalette") private var paletteRaw: Int = 0
+    @AppStorage("appPalette") private var paletteRaw: Int = AppConfig.AppPalette.calm.rawValue
     private let proximityReminderManager = ProximityReminderManager.shared
 
     /// Booking to open in edit sheet via notification/deep link
@@ -318,6 +318,11 @@ struct ParkKingApp: App {
 
     init() {
         FirebaseBootstrap.configureIfNeeded()
+        UserDefaults.standard.register(defaults: [
+            "appPalette": AppConfig.AppPalette.calm.rawValue,
+            "homeStyle": "compact"
+        ])
+        UserDefaults.standard.set("compact", forKey: "homeStyle")
         _bookingManager = StateObject(wrappedValue: BookingManager())
         _authManager = StateObject(wrappedValue: AuthManager())
         _announcementsManager = StateObject(wrappedValue: AnnouncementsManager())
@@ -347,6 +352,7 @@ struct ParkKingApp: App {
                 .onAppear {
                     UserDefaults.appGroup.set(paletteRaw, forKey: "appPalette")
                     NotificationHandler.shared.registerCategories()
+                    VehicleCatalogStore.shared.ensureLoaded()
                     bookingManager.scheduleDailyReminders()
                     if authManager.currentUser?.isActive == true {
                         proximityReminderManager.configure(with: bookingManager)
@@ -466,7 +472,9 @@ struct ParkKingApp: App {
 
 extension Notification.Name {
     static let appQuickActionTriggered = Notification.Name("appQuickActionTriggered")
-    /// Posted by home cards (e.g. Your Vehicle) to hop to the Settings tab.
+    /// Posted by home cards to hop directly to a main app tab.
+    static let navigateToParkingTab = Notification.Name("navigateToParkingTab")
+    static let filterParkingToFreeSpots = Notification.Name("filterParkingToFreeSpots")
     static let navigateToSettingsTab = Notification.Name("navigateToSettingsTab")
 }
 

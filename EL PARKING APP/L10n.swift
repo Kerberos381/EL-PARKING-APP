@@ -54,7 +54,13 @@ class LanguageManager: ObservableObject {
 
     private init() {
         let saved = UserDefaults.standard.string(forKey: "appLanguage") ?? ""
-        self.language = AppLanguage(rawValue: saved) ?? .english
+        if let savedLanguage = AppLanguage(rawValue: saved) {
+            self.language = savedLanguage
+        } else {
+            let preferredLanguage = Locale.preferredLanguages.first?.lowercased() ?? ""
+            let currentLanguageCode = Locale.current.language.languageCode?.identifier.lowercased() ?? ""
+            self.language = preferredLanguage.hasPrefix("cs") || currentLanguageCode == "cs" ? .czech : .english
+        }
     }
 }
 
@@ -108,6 +114,9 @@ struct L10n {
     static var saving:      String { isCzech ? "Ukládám…"  : "Saving…" }
     static var saved:       String { isCzech ? "Uloženo!"  : "Saved!" }
     static var tryAgain:    String { isCzech ? "Zkusit znovu" : "Try again" }
+    static var delete:      String { isCzech ? "Smazat" : "Delete" }
+    static var purge:       String { isCzech ? "Vyčistit" : "Purge" }
+    static var deleting:    String { isCzech ? "Mažu…" : "Deleting…" }
 
     // ─────────────────────────────────────────────────────────────────────────
     // MARK: Home Screen
@@ -163,6 +172,8 @@ struct L10n {
     static var free:              String { isCzech ? "Volné"             : "Free" }
     static var booked:            String { isCzech ? "Rezervováno"       : "Booked" }
     static var blocked:           String { isCzech ? "Blokováno"         : "Blocked" }
+    static var mine:              String { isCzech ? "Moje"              : "Mine" }
+    static var visitors:          String { isCzech ? "Návštěvy"          : "Visitors" }
     static var allBookings:       String { isCzech ? "Všechny rezervace" : "All Bookings" }
     static var bookings:          String { isCzech ? "Rezervace"         : "Bookings" }
     static var noBookingsDay:     String { isCzech ? "Žádné rezervace pro tento den" : "No bookings for this day" }
@@ -171,6 +182,22 @@ struct L10n {
     static var accessible:        String { isCzech ? "Bezbariérové"      : "Accessible" }
     static var you:               String { isCzech ? "VY"                : "YOU" }
     static var forLabel:          String { isCzech ? "Pro"               : "For" }
+    static var parkingLayoutMap:  String { isCzech ? "Mapa parkoviště"   : "Parking Layout Map" }
+    static var parkingLayoutMapHint: String {
+        isCzech
+            ? "Přidejte obrázek půdorysu v ParkingMapView.swift\na umístěte místa pomocí .offset(x:y:)"
+            : "Add a floor plan image in ParkingMapView.swift\nand position spots with .offset(x:y:)"
+    }
+    static func mapFilterAccessibility(label: String, count: Int) -> String {
+        isCzech ? "\(label), počet \(count)" : "\(label), \(count)"
+    }
+    static var mapStatusAvailable: String { isCzech ? "volné" : "available" }
+    static var mapStatusMine: String { isCzech ? "vaše rezervace" : "your booking" }
+    static var mapStatusVisitor: String { isCzech ? "rezervace návštěvy" : "visitor booking" }
+    static var mapStatusBlocked: String { isCzech ? "blokováno" : "blocked" }
+    static func spotStatusAccessibility(spotID: String, status: String) -> String {
+        isCzech ? "Místo \(spotID), \(status)" : "Spot \(spotID), \(status)"
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // MARK: Booking Sheet
@@ -206,6 +233,24 @@ struct L10n {
     static var suggestedAlternatives: String { isCzech ? "Doporučené alternativy" : "Suggested alternatives" }
     static var sameTime: String { isCzech ? "Stejný čas" : "Same time" }
     static var closestMatch: String { isCzech ? "Nejbližší shoda" : "Closest match" }
+    static var shareCard: String { isCzech ? "Sdílet kartu" : "Share card" }
+    static var shareTextOnly: String { isCzech ? "Sdílet jen text" : "Share text only" }
+    static var chooseShareMethod: String {
+        isCzech
+            ? "Vyberte, jak chcete sdílet detaily rezervace."
+            : "Choose how you want to share the reservation details."
+    }
+    static var freeWindowsBookable: String {
+        isCzech
+            ? "Volná okna lze stále rezervovat. Vyberte Od/Do pro rezervaci zbývajícího času."
+            : "Free windows are still bookable. Pick From/To to reserve remaining time."
+    }
+    static var dateUpper: String { isCzech ? "DATUM" : "DATE" }
+    static var timeUpper: String { isCzech ? "ČAS" : "TIME" }
+    static var bookingCancelled: String { isCzech ? "Rezervace zrušena" : "Booking Cancelled" }
+    static func occupiedRanges(_ ranges: String) -> String {
+        isCzech ? "Obsazeno: \(ranges)" : "Occupied: \(ranges)"
+    }
     static var smartBookingTipTitle: String { isCzech ? "Chytré doporučení" : "Smart suggestion" }
     static var smartBookingTipBody: String {
         isCzech
@@ -375,6 +420,8 @@ struct L10n {
     static var notifications:    String { isCzech ? "Oznámení"          : "Notifications" }
     static var vehicle:          String { isCzech ? "Vozidlo"           : "My Vehicle" }
     static var account:          String { isCzech ? "Účet"              : "Account" }
+    static var security:         String { isCzech ? "Zabezpečení"       : "Security" }
+    static var session:          String { isCzech ? "Relace"            : "Session" }
     static var greetingName:     String { isCzech ? "Oslovení"          : "Greeting name" }
     static var greetingNameHint: String { isCzech ? "např. Katko, Jane" : "e.g. Kate, John" }
     static var greetingNameHelp: String {
@@ -411,6 +458,7 @@ struct L10n {
     static var bookingReminders:    String { isCzech ? "Připomenutí rezervací"              : "Booking Reminders" }
     static var notifyBeforeBooking: String { isCzech ? "Upozornit před zahájením rezervace" : "Notify me before my booking starts" }
     static var notifyMe:            String { isCzech ? "UPOZORNIT MĚ"                       : "NOTIFY ME" }
+    static var remindMe:            String { isCzech ? "Připomenout"                        : "Remind Me" }
     static var custom:              String { isCzech ? "Vlastní"                             : "Custom" }
     static var setCustomTime:       String { isCzech ? "Nastavit vlastní čas…"              : "Set custom time…" }
     static var howFarInAdvance:     String { isCzech ? "Jak daleko dopředu?"                : "How far in advance?" }
@@ -457,6 +505,36 @@ struct L10n {
     static var unsavedChanges:   String { isCzech ? "Neuložené změny"    : "Unsaved changes" }
     static var namePlaceholder:  String { isCzech ? "Celé jméno"         : "Full Name" }
     static var emailPlaceholder: String { isCzech ? "E-mail"             : "Email" }
+    static var chooseVehicleIcon: String { isCzech ? "Vybrat ikonu vozidla" : "Choose Vehicle Icon" }
+    static var selectMakeFirst: String { isCzech ? "Nejdříve vyberte značku" : "Select make first" }
+    static var make: String { isCzech ? "Značka" : "Make" }
+    static var chooseMake: String { isCzech ? "Vyberte značku" : "Choose make" }
+    static var model: String { isCzech ? "Model" : "Model" }
+    static var chooseModel: String { isCzech ? "Vyberte model" : "Choose model" }
+    static var shortcutsFavorite: String { isCzech ? "Zkratky a oblíbené" : "Shortcuts & Favorite" }
+    static var shortcuts: String { isCzech ? "Zkratky" : "Shortcuts" }
+    static var favoriteSpot: String { isCzech ? "Oblíbené místo" : "Favorite spot" }
+    static var selectSpotEllipsis: String { isCzech ? "Vyberte místo…" : "Select a spot…" }
+    static var enterValuePrefix: String { isCzech ? "Zadejte" : "Enter" }
+    static var appTutorial: String { isCzech ? "Návod k aplikaci" : "App Tutorial" }
+    static var quickShortcutSettingsDescription: String {
+        isCzech
+            ? "Nastavte oblíbené místo a výchozí čas rezervace pro rychlé akce přes Siri nebo zkratky."
+            : "Set favorite spot and default booking time for quick Siri or shortcut actions."
+    }
+    static var siriShortcutSetupDescription: String {
+        isCzech
+            ? "Nastavte oblíbené místo a preferovaný čas. Pak řekněte Siri „Book a spot in EL Parking“ – rezervace se ve výchozím nastavení vytvoří na zítřek, případně můžete vybrat dnešek."
+            : "Set a favourite spot and preferred time. Then say \"Book a spot in EL Parking\" to Siri — it books for tomorrow by default, or you can pick today."
+    }
+    static var siriReadyHint: String {
+        isCzech
+            ? "Připraveno — řekněte Siri „Book a spot in EL Parking“"
+            : "Ready — say \"Book a spot in EL Parking\" to Siri"
+    }
+    static func editValue(_ title: String) -> String {
+        isCzech ? "Upravit \(title)" : "Edit \(title)"
+    }
 
     // Rules labels
     static var personalAdvance:    String { isCzech ? "Osobní předstih"          : "Personal advance" }
@@ -608,6 +686,7 @@ struct L10n {
     static var whatsNew: String { isCzech ? "Co je nového" : "What's New" }
     static var versionLabel: String { isCzech ? "Verze" : "Version" }
     static var releasedLabel: String { isCzech ? "Vydáno" : "Released" }
+    static var builtLabel: String { isCzech ? "Sestaveno" : "Built" }
 
     // Onboarding page titles (3-page Apple-style walkthrough)
     static var onboardingPage2Title: String { isCzech ? "Zůstaňte v obraze" : "Stay in the Loop" }
@@ -772,6 +851,30 @@ struct L10n {
     static var adminRowTrends:          String { isCzech ? "Trendy"        : "Trends" }
     static var adminRowCleanup:         String { isCzech ? "Čištění"       : "Cleanup" }
     static var adminPurgeDeleting:      String { isCzech ? "Mažu…"         : "Deleting…" }
+    static func totalUsersCount(_ count: Int) -> String {
+        isCzech ? "\(count) celkem" : "\(count) total"
+    }
+    static var purgeOrphanedBookings: String { isCzech ? "Vyčistit poškozené rezervace" : "Purge Orphaned Bookings" }
+    static var cleanUpOldBookings: String { isCzech ? "Vyčistit staré rezervace" : "Clean Up Old Bookings" }
+    static func deleteBookingsOlderThanDays(_ days: Int) -> String {
+        isCzech ? "Smazat rezervace starší než \(days) dny" : "Delete bookings older than \(days) days"
+    }
+    static var purgeOrphanedBookingsMessage: String {
+        isCzech
+            ? "Tímto trvale smažete dokumenty rezervací, které nelze načíst (prázdný e-mail, chybějící pole apod.)."
+            : "This will permanently delete all booking documents that fail to parse (empty email, missing fields, etc.)."
+    }
+    static func cleanUpOldBookingsMessage(days: Int) -> String {
+        isCzech
+            ? "Trvale smaže rezervace, jejichž datum je více než \(days) dny v minulosti, aby databáze zůstala malá. Dnešní a budoucí rezervace zůstanou."
+            : "Permanently deletes bookings whose date is more than \(days) days in the past, to keep the database small. Today and future bookings are kept."
+    }
+    static func openFilteredUsersHint(_ status: String) -> String {
+        isCzech ? "Otevře uživatele filtrované podle stavu \(status.lowercased())." : "Opens users filtered by \(status.lowercased()) status."
+    }
+    static var openPendingApprovalsHint: String {
+        isCzech ? "Otevře čekající schválení uživatelů." : "Opens pending user approvals."
+    }
 
     static var all:             String { isCzech ? "Vše"               : "All" }
     static var pending:         String { isCzech ? "Čekající"          : "Pending" }
@@ -856,6 +959,43 @@ struct L10n {
     static var bookingsByDay:         String { isCzech ? "Rezervace podle dne v týdnu" : "Bookings by Day of Week" }
     static var mostBookedSpots:       String { isCzech ? "Nejrezervovanější místa"  : "Most Booked Spots" }
     static var noBookingData:         String { isCzech ? "Pro toto období nejsou k dispozici žádná data o rezervacích." : "No booking data available for this period." }
+    static var deleteOldBookingsQuestion: String { isCzech ? "Smazat staré rezervace?" : "Delete old bookings?" }
+    static func deleteExpiredBookingsMessage(_ days: Int) -> String {
+        isCzech ? "Tímto trvale smažete rezervace starší než \(days) dny." : "This will permanently delete bookings older than \(days) days."
+    }
+    static func deleteExpiredBookingsAccessibility(_ days: Int) -> String {
+        isCzech ? "Smazat rezervace starší než \(days) dny" : "Delete bookings older than \(days) days"
+    }
+    static var backfillBookingTTL: String { isCzech ? "Doplnit TTL rezervací" : "Backfill booking TTL" }
+    static var backfillBookingTTLHint: String {
+        isCzech ? "Přepočítá metadata retence pro existující rezervace." : "Recomputes retention metadata for existing bookings."
+    }
+    static func ttlBackfillStatus(scanned: Int, updated: Int, skipped: Int) -> String {
+        isCzech
+            ? "TTL doplnění: zkontrolováno \(scanned), aktualizováno \(updated), přeskočeno \(skipped)."
+            : "TTL backfill: scanned \(scanned), updated \(updated), skipped \(skipped)."
+    }
+    static func cleanupStatus(scanned: Int, deleted: Int, skipped: Int) -> String {
+        isCzech
+            ? "Čištění: zkontrolováno \(scanned), smazáno \(deleted), přeskočeno \(skipped)."
+            : "Cleanup: scanned \(scanned), deleted \(deleted), skipped \(skipped)."
+    }
+    static var weekAvailability: String { isCzech ? "Týdenní dostupnost" : "Week Availability" }
+    static var warningTracker: String { isCzech ? "Sledování varování" : "Warning Tracker" }
+    static var activeWarnings: String { isCzech ? "Aktivní\nvarování" : "Active\nWarnings" }
+    static var suspendedNow: String { isCzech ? "Pozastavení\nnyní" : "Suspended\nNow" }
+    static var totalBans: String { isCzech ? "Zákazů\ncelkem" : "Total\nBans" }
+    static var noWarningsIssued: String { isCzech ? "Žádná varování. Vše čisté." : "No warnings issued. All clean." }
+    static var availableAllDay: String { isCzech ? "volné celý den" : "available all day" }
+    static func suspendedTimes(_ count: Int) -> String {
+        isCzech ? "\(count)× pozastaveno" : "\(count)× suspended"
+    }
+    static func dayBookingsAccessibility(date: String, count: Int) -> String {
+        isCzech ? "\(date), rezervací: \(count)" : "\(date), \(count) bookings"
+    }
+    static func bookingTimeAccessibility(name: String, from: String, to: String) -> String {
+        isCzech ? "\(name), od \(from) do \(to)" : "\(name), \(from) to \(to)"
+    }
 
     static var weekDays: [String] {
         isCzech

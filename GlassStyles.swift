@@ -7,6 +7,7 @@ extension Glass {
 }
 
 struct AppGlassFieldModifier: ViewModifier {
+    @ViewBuilder
     func body(content: Content) -> some View {
         content.glassEffect(
             .frosted,

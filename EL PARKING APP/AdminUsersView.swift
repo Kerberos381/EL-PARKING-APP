@@ -12,6 +12,7 @@ struct AdminUsersView: View {
     @EnvironmentObject var authManager:   AuthManager
     @EnvironmentObject var bookingManager: BookingManager
     @ObservedObject private var lang = LanguageManager.shared
+    @ObservedObject private var vehicleCatalog = VehicleCatalogStore.shared
 
     @AppStorage("adminUsersLayoutGrid") private var useGridLayout = false
     @State private var selectedFilter: UserStatus? = nil
@@ -84,7 +85,9 @@ struct AdminUsersView: View {
                 $0.carType.lowercased().contains(normalizedSearchQuery)
             }
         }
-        return users.sorted { $0.displayName < $1.displayName }
+        return users.sorted {
+            $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+        }
     }
 
     private var userCounts: (pending: Int, active: Int, suspended: Int) {
@@ -234,7 +237,13 @@ struct AdminUsersView: View {
             } message: {
                 Text(resetPasswordResultMessage)
             }
-            .task { await refresh() }
+            .task {
+                vehicleCatalog.ensureLoaded()
+                await refresh()
+            }
+            .onChange(of: vehicleCatalog.revision) {
+                syncEditVehicleMakeModelFromDescription()
+            }
             .onChange(of: selectedFilter) {
                 isSelecting = false
                 selectedUIDs.removeAll()
@@ -316,41 +325,17 @@ struct AdminUsersView: View {
                 }
             }
 
-            Button {
-                Haptics.selection()
-                withAnimation(.standard) { selectedCompanyFilter = .omega }
-            } label: {
-                HStack {
-                    Text(L10n.omegaLabel)
-                    if selectedCompanyFilter == .omega {
-                        Spacer()
-                        Image(systemName: "checkmark")
-                    }
-                }
-            }
-
-            Button {
-                Haptics.selection()
-                withAnimation(.standard) { selectedCompanyFilter = .essilorLuxottica }
-            } label: {
-                HStack {
-                    Text(L10n.essilorLuxotticaLabel)
-                    if selectedCompanyFilter == .essilorLuxottica {
-                        Spacer()
-                        Image(systemName: "checkmark")
-                    }
-                }
-            }
-
-            Button {
-                Haptics.selection()
-                withAnimation(.standard) { selectedCompanyFilter = .grandVision }
-            } label: {
-                HStack {
-                    Text(L10n.grandVisionLabel)
-                    if selectedCompanyFilter == .grandVision {
-                        Spacer()
-                        Image(systemName: "checkmark")
+            ForEach(CompanyBadge.sortedCases.filter { $0 != .none }, id: \.rawValue) { badge in
+                Button {
+                    Haptics.selection()
+                    withAnimation(.standard) { selectedCompanyFilter = badge }
+                } label: {
+                    HStack {
+                        Text(companyBadgeLabel(badge))
+                        if selectedCompanyFilter == badge {
+                            Spacer()
+                            Image(systemName: "checkmark")
+                        }
                     }
                 }
             }
@@ -1421,7 +1406,7 @@ struct AdminUsersView: View {
                             .buttonStyle(ScaleButtonStyle())
 
                             Menu {
-                                ForEach(CompanyBadge.allCases, id: \.rawValue) { badge in
+                                ForEach(CompanyBadge.sortedCases, id: \.rawValue) { badge in
                                     Button {
                                         Task { await authManager.adminUpdateUserCompanyBadge(liveUser, companyBadge: badge) }
                                     } label: {
@@ -2127,7 +2112,7 @@ struct AdminUsersView: View {
                             .foregroundStyle(AppConfig.subtleGray)
                         VStack(spacing: 8) {
                             Menu {
-                                ForEach(CarData.makes, id: \.self) { make in
+                                ForEach(vehicleCatalog.makes(merging: CarData.makes), id: \.self) { make in
                                     Button {
                                         editSelectedMake = make
                                         editSelectedModel = ""
@@ -2155,7 +2140,7 @@ struct AdminUsersView: View {
                                     Button(lang.language == .czech ? "Nejprve vyberte značku" : "Select make first") {}
                                         .disabled(true)
                                 } else {
-                                    ForEach(CarData.models(for: editSelectedMake), id: \.self) { model in
+                                    ForEach(vehicleCatalog.models(for: editSelectedMake, merging: CarData.models(for: editSelectedMake)), id: \.self) { model in
                                         Button(model) {
                                             editSelectedModel = model
                                             editCar = CarData.compose(make: editSelectedMake, model: model)
@@ -2388,7 +2373,8 @@ struct AdminUsersView: View {
     }
 
     private func syncEditVehicleMakeModelFromDescription() {
-        let parsed = CarData.splitMakeModel(editCar)
+        let localParsed = CarData.splitMakeModel(editCar)
+        let parsed = localParsed.make.isEmpty ? vehicleCatalog.splitMakeModel(editCar) : localParsed
         editSelectedMake = parsed.make
         editSelectedModel = parsed.model
     }

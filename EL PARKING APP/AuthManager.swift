@@ -294,7 +294,9 @@ class AuthManager: ObservableObject {
                 #endif
                 let users = snapshot.documents
                     .compactMap { AppUser.fromFirestore($0.data()) }
-                    .sorted { $0.displayName < $1.displayName }
+                    .sorted {
+                        $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+                    }
                 Task { @MainActor in
                     let signature = self.usersSignature(users)
                     guard signature != self.lastAllUsersSignature else { return }

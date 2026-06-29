@@ -14,6 +14,7 @@ struct AdminDashboardView: View {
     @EnvironmentObject var announcementsManager:  AnnouncementsManager
     @EnvironmentObject var infoManager:           InfoManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var lang = LanguageManager.shared
 
     @State private var showCreateUser      = false
@@ -174,7 +175,7 @@ struct AdminDashboardView: View {
                             } label: {
                                 rowLabel(icon: "trash.slash.fill",
                                          iconColor: tileColor(AppConfig.warning),
-                                         title: "Purge Orphaned Bookings",
+                                         title: L10n.purgeOrphanedBookings,
                                          subtitle: isPurging ? L10n.adminPurgeDeleting : L10n.adminRowCleanup,
                                          badge: 0)
                             }
@@ -186,8 +187,8 @@ struct AdminDashboardView: View {
                             } label: {
                                 rowLabel(icon: "calendar.badge.minus",
                                          iconColor: tileColor(AppConfig.warning),
-                                         title: "Clean Up Old Bookings",
-                                         subtitle: isCleaningOld ? "Deleting\u{2026}" : "Delete bookings older than 2 days",
+                                         title: L10n.cleanUpOldBookings,
+                                         subtitle: isCleaningOld ? L10n.deleting : L10n.deleteBookingsOlderThanDays(2),
                                          badge: 0)
                             }
                             .buttonStyle(ScaleButtonStyle())
@@ -225,8 +226,8 @@ struct AdminDashboardView: View {
                     .environmentObject(authManager)
                     .environmentObject(bookingManager)
             }
-            .alert("Purge Orphaned Bookings", isPresented: $showPurgeConfirm) {
-                Button("Purge", role: .destructive) {
+            .alert(L10n.purgeOrphanedBookings, isPresented: $showPurgeConfirm) {
+                Button(L10n.purge, role: .destructive) {
                     isPurging = true
                     purgeResult = nil
                     Task {
@@ -235,12 +236,12 @@ struct AdminDashboardView: View {
                         purgeResult = count
                     }
                 }
-                Button("Cancel", role: .cancel) {}
+                Button(L10n.cancel, role: .cancel) {}
             } message: {
-                Text("This will permanently delete all booking documents that fail to parse (empty email, missing fields, etc.).")
+                Text(L10n.purgeOrphanedBookingsMessage)
             }
-            .alert("Clean Up Old Bookings", isPresented: $showOldCleanupConfirm) {
-                Button("Delete", role: .destructive) {
+            .alert(L10n.cleanUpOldBookings, isPresented: $showOldCleanupConfirm) {
+                Button(L10n.delete, role: .destructive) {
                     isCleaningOld = true
                     oldCleanupResult = nil
                     Task {
@@ -249,9 +250,9 @@ struct AdminDashboardView: View {
                         oldCleanupResult = count
                     }
                 }
-                Button("Cancel", role: .cancel) {}
+                Button(L10n.cancel, role: .cancel) {}
             } message: {
-                Text("Permanently deletes bookings whose date is more than 2 days in the past, to keep the database small. Today and future bookings are kept.")
+                Text(L10n.cleanUpOldBookingsMessage(days: 2))
             }
         }
         .onAppear {
@@ -403,25 +404,43 @@ struct AdminDashboardView: View {
                 .foregroundStyle(AppConfig.subtleGray)
                 .padding(.horizontal, 4)
 
-            // Equal-width glass stat cards, matching the Overview screen's
-            // filter pills. One tap goes straight to the filtered user list.
-            GlassEffectContainer {
-                HStack(spacing: 8) {
-                    quickStatCard(value: userCounts.pending,
-                                  label: L10n.pending,
-                                  color: AppConfig.warning,
-                                  filter: .pending)
-                    quickStatCard(value: userCounts.active,
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    totalStatPill
+                    quickStatPill(value: userCounts.active,
                                   label: L10n.activeFilter,
-                                  color: AppConfig.activeGreen,
                                   filter: .active)
-                    quickStatCard(value: userCounts.suspended,
+                    quickStatPill(value: userCounts.pending,
+                                  label: L10n.pending,
+                                  filter: .pending,
+                                  isEmphasized: userCounts.pending > 0)
+                    quickStatPill(value: userCounts.suspended,
                                   label: L10n.suspended,
-                                  color: AppConfig.spotOccupied,
-                                  filter: .suspended)
+                                  filter: .suspended,
+                                  isEmphasized: userCounts.suspended > 0)
                 }
+                .padding(.vertical, 2)
             }
         }
+    }
+
+    private var totalStatPill: some View {
+        let isDark = colorScheme == .dark
+
+        return HStack(spacing: 8) {
+            Text(L10n.totalUsersCount(userCounts.total))
+                .font(.subheadline.weight(.semibold))
+        }
+        .foregroundStyle(isDark ? Color.white.opacity(0.92) : AppConfig.darkText)
+        .padding(.horizontal, 18)
+        .frame(height: 52)
+        .background(Color.clear)
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .stroke(isDark ? Color.white.opacity(0.26) : Color.black.opacity(0.18), lineWidth: 1)
+        )
+        .accessibilityLabel(L10n.totalUsersCount(userCounts.total))
     }
 
     private func routeForFilter(_ filter: UserStatus) -> QuickFilterRoute {
@@ -432,35 +451,45 @@ struct AdminDashboardView: View {
         }
     }
 
-    private func quickStatCard(
+    private func quickStatPill(
         value: Int,
         label: String,
-        color: Color,
-        filter: UserStatus
+        filter: UserStatus,
+        isEmphasized: Bool = false
     ) -> some View {
-        Button {
+        let isDark = colorScheme == .dark
+        let textColor = isEmphasized && !isDark ? AppConfig.warning : AppConfig.darkText
+        let strokeColor = isDark ? Color.white.opacity(0.18) : Color.black.opacity(0.14)
+        let countFill = isDark ? Color.white.opacity(0.06) : Color.black.opacity(0.05)
+
+        return Button {
             Haptics.selection()
             quickFilterRoute = routeForFilter(filter)
         } label: {
-            VStack(spacing: 3) {
-                Text("\(value)")
-                    .font(.system(.title3, design: .rounded, weight: .bold))
-                    .foregroundStyle(color)
-                    .contentTransition(.numericText())
+            HStack(spacing: 8) {
                 Text(label)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(AppConfig.subtleGray)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .font(.subheadline.weight(.semibold))
+                Text("\(value)")
+                    .font(.caption.weight(.bold).monospacedDigit())
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(countFill)
+                    .clipShape(Capsule())
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .glassEffect(.frosted.interactive(), in: RoundedRectangle(cornerRadius: 24))
+            .foregroundStyle(textColor)
+            .padding(.horizontal, 18)
+            .frame(height: 52)
+            .background(Color.clear)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(strokeColor, lineWidth: 1)
+            )
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(label)
         .accessibilityValue("\(value)")
-        .accessibilityHint("Opens users filtered by \(label.lowercased()) status")
+        .accessibilityHint(L10n.openFilteredUsersHint(label))
     }
 
     // MARK: - Pending Alert Banner
@@ -507,7 +536,7 @@ struct AdminDashboardView: View {
             )
         }
         .buttonStyle(ScaleButtonStyle())
-        .accessibilityHint("Opens pending user approvals")
+        .accessibilityHint(L10n.openPendingApprovalsHint)
     }
 
     // MARK: - Grouped Section

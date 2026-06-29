@@ -54,11 +54,10 @@ enum CarBodyType: String, CaseIterable, Identifiable {
 struct CarData {
     // CZ-focused set based on recent SDA registration trends.
     static let makes: [String] = [
-        "Škoda", "Hyundai", "Toyota", "Volkswagen", "Kia", "Dacia",
-        "Ford", "Mercedes-Benz", "Renault", "BMW", "Audi", "Volvo",
-        "Tesla", "MG", "Nissan", "Peugeot", "MINI", "Subaru", "Porsche", "Honda",
-        "Alfa Romeo",
-        "Opel", "Mazda", "Citroën", "Seat"
+        "Alfa Romeo", "Audi", "BMW", "Citroën", "Dacia", "Ford",
+        "Honda", "Hyundai", "Kia", "Mazda", "Mercedes-Benz", "MG",
+        "MINI", "Nissan", "Opel", "Peugeot", "Porsche", "Renault",
+        "Seat", "Škoda", "Subaru", "Tesla", "Toyota", "Volkswagen", "Volvo"
     ]
 
     static let modelsByMake: [String: [String]] = [
@@ -91,13 +90,14 @@ struct CarData {
 
     static var suggestions: [String] {
         makes.flatMap { make in
-            (modelsByMake[make] ?? []).map { "\(make) \($0)" }
+            models(for: make).map { "\(make) \($0)" }
         }
     }
 
     static func models(for make: String) -> [String] {
         guard let canonical = canonicalMake(from: make) else { return [] }
-        return modelsByMake[canonical] ?? []
+        return (modelsByMake[canonical] ?? [])
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
     static func compose(make: String, model: String) -> String {

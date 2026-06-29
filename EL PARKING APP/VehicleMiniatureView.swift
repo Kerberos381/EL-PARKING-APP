@@ -257,6 +257,9 @@ struct VehicleMiniatureView: View {
     var presetID: String? = nil
     var useFastRendering: Bool = false
 
+    // Observed so a miniature re-resolves once the hosted catalog index loads.
+    @ObservedObject private var catalog = VehicleCatalogStore.shared
+
     private var kind: VehicleMiniatureKind {
         VehicleMiniatureKind.resolve(carType: carType, description: description)
     }
@@ -272,6 +275,14 @@ struct VehicleMiniatureView: View {
                 description: description
             ), let imageName = VehicleMiniatureAsset.availableImageName(for: assetName) {
                 vehicleAssetImage(imageName)
+            } else if let catalogEntry = catalog.match(carType: carType, description: description) {
+                // Gap-fill: no bundled miniature resolved → use the hosted catalog
+                // (a make/model added on the fly). Shows the generic while loading.
+                CatalogMiniatureImage(
+                    entry: catalogEntry,
+                    fallbackGenericName: VehicleMiniatureAsset.genericName(for: kind),
+                    useFastRendering: useFastRendering
+                )
             } else if let genericAssetName = VehicleMiniatureAsset.genericName(for: kind),
                       VehicleMiniatureAsset.imageExists(genericAssetName) {
                 vehicleAssetImage(genericAssetName)
@@ -285,6 +296,7 @@ struct VehicleMiniatureView: View {
         }
         .aspectRatio(1.8, contentMode: .fit)
         .accessibilityHidden(true)
+        .onAppear { catalog.ensureLoaded() }
     }
 
     @ViewBuilder
@@ -325,7 +337,77 @@ struct VehicleMiniatureView: View {
             return true
         }
 
+        if VehicleCatalogStore.shared.match(carType: carType, description: description) != nil {
+            return true
+        }
+
         return false
+    }
+
+    @MainActor
+    static func resolvedUIImageForRendering(
+        carType: String,
+        description: String,
+        presetID: String? = nil
+    ) async -> UIImage? {
+        #if canImport(UIKit)
+        let kind = VehicleMiniatureKind.resolve(carType: carType, description: description)
+
+        if let presetID,
+           let presetAssetName = VehicleMiniatureAsset.assetName(forPresetID: presetID),
+           let imageName = VehicleMiniatureAsset.availableImageName(for: presetAssetName) {
+            return VehicleMiniatureAsset.normalizedUIImage(named: imageName) ?? UIImage(named: imageName)
+        }
+
+        if let assetName = VehicleMiniatureAsset.resolve(carType: carType, description: description),
+           let imageName = VehicleMiniatureAsset.availableImageName(for: assetName) {
+            return VehicleMiniatureAsset.normalizedUIImage(named: imageName) ?? UIImage(named: imageName)
+        }
+
+        if let catalogEntry = VehicleCatalogStore.shared.match(carType: carType, description: description),
+           let image = await VehicleCatalogStore.shared.image(for: catalogEntry) {
+            return VehicleMiniatureAsset.normalizedUIImage(from: image)
+        }
+
+        if let genericAssetName = VehicleMiniatureAsset.genericName(for: kind),
+           VehicleMiniatureAsset.imageExists(genericAssetName) {
+            return VehicleMiniatureAsset.normalizedUIImage(named: genericAssetName) ?? UIImage(named: genericAssetName)
+        }
+
+        return nil
+        #else
+        return nil
+        #endif
+    }
+}
+
+/// Renders a hosted-catalog miniature, loading the blob lazily and showing the
+/// bundled generic placeholder until it arrives. Used only as a gap-fill.
+private struct CatalogMiniatureImage: View {
+    let entry: VehicleCatalogStore.Entry
+    let fallbackGenericName: String?
+    var useFastRendering: Bool = false
+
+    @State private var uiImage: UIImage?
+
+    var body: some View {
+        Group {
+            if let uiImage {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .interpolation(useFastRendering ? .medium : .high)
+                    .scaledToFit()
+            } else if let fallbackGenericName, UIImage(named: fallbackGenericName) != nil {
+                Image(fallbackGenericName)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                Color.clear
+            }
+        }
+        .task(id: entry.imageId) {
+            uiImage = await VehicleCatalogStore.shared.image(for: entry)
+        }
     }
 }
 
@@ -542,6 +624,10 @@ private enum VehicleMiniatureAsset {
         normalizedImageCache[name] = normalized
         imageCacheLock.unlock()
         return normalized
+    }
+
+    static func normalizedUIImage(from image: UIImage) -> UIImage {
+        normalizedCanvasImage(from: image)
     }
 
     private static func normalizedCanvasImage(from image: UIImage) -> UIImage {

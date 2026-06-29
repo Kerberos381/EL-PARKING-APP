@@ -12,6 +12,7 @@ struct FinishRegistrationView: View {
     let user: AppUser
     @EnvironmentObject var authManager: AuthManager
     @ObservedObject private var lang = LanguageManager.shared
+    @ObservedObject private var vehicleCatalog = VehicleCatalogStore.shared
 
     @State private var plate          = ""
     @State private var car            = ""
@@ -83,7 +84,7 @@ struct FinishRegistrationView: View {
                             // Car make + model
                             VStack(spacing: 8) {
                                 Menu {
-                                    ForEach(CarData.makes, id: \.self) { make in
+                                    ForEach(vehicleCatalog.makes(merging: CarData.makes), id: \.self) { make in
                                         Button {
                                             selectedMake = make
                                             selectedModel = ""
@@ -111,7 +112,7 @@ struct FinishRegistrationView: View {
                                         Button(lang.language == .czech ? "Nejprve vyberte značku" : "Select make first") {}
                                             .disabled(true)
                                     } else {
-                                        ForEach(CarData.models(for: selectedMake), id: \.self) { model in
+                                        ForEach(vehicleCatalog.models(for: selectedMake, merging: CarData.models(for: selectedMake)), id: \.self) { model in
                                             Button(model) {
                                                 selectedModel = model
                                                 car = CarData.compose(make: selectedMake, model: model)
@@ -277,6 +278,10 @@ struct FinishRegistrationView: View {
                     selectedColor = user.carColor
                 }
                 syncMakeModelFromCar()
+                vehicleCatalog.ensureLoaded()
+            }
+            .onChange(of: vehicleCatalog.revision) {
+                syncMakeModelFromCar()
             }
         }
     }
@@ -417,7 +422,8 @@ struct FinishRegistrationView: View {
     }
 
     private func syncMakeModelFromCar() {
-        let parsed = CarData.splitMakeModel(car)
+        let localParsed = CarData.splitMakeModel(car)
+        let parsed = localParsed.make.isEmpty ? vehicleCatalog.splitMakeModel(car) : localParsed
         selectedMake = parsed.make
         selectedModel = parsed.model
     }

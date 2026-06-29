@@ -151,7 +151,12 @@ service cloud.firestore {
 
     function validBookingUpdate(bookingId) {
       return validBookingDocument(bookingId)
-        && (request.resource.data.spot == resource.data.spot
+        // Re-validate the company spot policy when EITHER the spot OR the date
+        // changes. (Checking only the spot let a GrandVision user book a non-GV
+        // spot same-day — allowed after 08:00 — then edit the date forward to
+        // keep a non-GV spot in advance.)
+        && ((request.resource.data.spot == resource.data.spot
+              && request.resource.data.bookingDate == resource.data.bookingDate)
             || companySpotPolicyAllows())
         && (bookingDateAllowedForActor()
             || request.resource.data.bookingDate == resource.data.bookingDate)
@@ -250,8 +255,11 @@ service cloud.firestore {
       );
 
       // ── Read ────────────────────────────────────────────────────────────────
-      // Any signed-in user can read any profile (needed for booking name display)
-      allow get:  if signedIn();
+      // Own profile is always readable (needed during pending/approval, before the
+      // account is active). Other profiles: only active app users (for booking-name
+      // display) — this excludes pending/suspended/non-invited accounts from
+      // harvesting every user's PII (email, plate, phone, role, strikes).
+      allow get:  if request.auth.uid == uid || hasAppAccess();
       allow list: if isAdmin();
 
       // ── Update ──────────────────────────────────────────────────────────────
@@ -398,8 +406,14 @@ service cloud.firestore {
     match /direct_notifications/{notifId} {
       allow read:   if signedIn() && resource.data.toEmail == userData().email;
       allow create: if hasAppAccess()
+                    && request.resource.data.keys().hasOnly(['toEmail', 'title', 'body', 'delivered', 'createdAt'])
                     && request.resource.data.toEmail is string
-                    && request.resource.data.delivered == false;
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() <= 200
+                    && request.resource.data.body is string
+                    && request.resource.data.body.size() <= 1000
+                    && request.resource.data.delivered == false
+                    && request.resource.data.createdAt is timestamp;
       allow update: if signedIn()
                     && resource.data.toEmail == userData().email
                     && request.resource.data.delivered == true
@@ -422,6 +436,43 @@ service cloud.firestore {
 
     match /appConfig/{configId} {
       allow read:                    if hasAppAccess();
+      allow create, update, delete:  if isAdmin();
+    }
+
+    // ── Vehicle catalog (hosted miniatures + maker logos) ────────────────────
+    // Single source of truth for vehicle artwork, editable on the fly from the
+    // web admin "Vehicles" tool. Images are stored as base64 in /vehicleImages
+    // (kept separate so the lightweight metadata in /vehicleCatalog & /vehicleMakers
+    // loads cheaply and blobs are fetched once, then cached on-device).
+    // Read: any signed-in user (artwork is non-sensitive and the car picker must
+    // work during onboarding, before hasAppAccess() is true). Write: admin only.
+
+    function validCatalogImage() {
+      // base64 PNG/WebP, capped well under Firestore's 1 MiB document limit.
+      return request.resource.data.keys().hasOnly(['data', 'format', 'w', 'h', 'updatedAt'])
+        && request.resource.data.data is string
+        && request.resource.data.data.size() <= 900000
+        && request.resource.data.format in ['png', 'webp', 'jpeg'];
+    }
+
+    match /vehicleMakers/{makerId} {
+      allow read:                    if signedIn();
+      allow create, update, delete:  if isAdmin();
+    }
+
+    match /vehicleCatalog/{entryId} {
+      allow read:                    if signedIn();
+      allow create, update, delete:  if isAdmin();
+    }
+
+    match /vehicleImages/{imageId} {
+      allow read:            if signedIn();
+      allow create, update:  if isAdmin() && validCatalogImage();
+      allow delete:          if isAdmin();
+    }
+
+    match /vehicleCatalogMeta/{docId} {
+      allow read:                    if signedIn();
       allow create, update, delete:  if isAdmin();
     }
 

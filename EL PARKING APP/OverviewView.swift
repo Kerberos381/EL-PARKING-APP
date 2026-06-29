@@ -172,6 +172,12 @@ struct OverviewView: View {
                 }
             }
             .navigationBarHidden(true)
+            .onReceive(NotificationCenter.default.publisher(for: .filterParkingToFreeSpots)) { _ in
+                withAnimation(.standard) {
+                    selectedDate = Calendar.current.startOfDay(for: Date())
+                    activeFilter = .available
+                }
+            }
             .sheet(item: $spotBookingDetail) { booking in
                 SpotDetailSheet(booking: booking)
                     .environmentObject(bookingManager)

@@ -29,6 +29,7 @@ struct HomeView: View {
     @EnvironmentObject var deepLinkManager:      DeepLinkManager
     @EnvironmentObject var infoManager:          InfoManager
     @Environment(\.openURL) private var openURL
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var lang = LanguageManager.shared
     @State private var showingBookingSheet  = false
     @Namespace private var homeZoomNS
@@ -47,7 +48,6 @@ struct HomeView: View {
     @State private var selectedHomeFeedFilter: HomeFeedFilter = .all
     @State private var lastAnnouncementsRefreshAt = Date()
     @AppStorage("readAnnouncementIDs") private var readAnnouncementIDsRaw = ""
-    @AppStorage("homeStyle") private var homeStyleRaw: String = "roomy"
     @AppStorage("favouriteSpotIDs") private var favouriteSpotIDsStr: String = ""
     @State private var favoriteSpotForBooking: ParkingSpot?
     @State private var tilesVisible = false
@@ -113,19 +113,7 @@ struct HomeView: View {
                                     .offset(y: heroVisible ? 0 : 28)
                                     .opacity(heroVisible ? 1 : 0)
 
-                                if homeStyleRaw == "compact" {
-                                    compactTileRow
-                                } else {
-                                    HStack(spacing: 10) {
-                                        myBookingsQuickButton
-                                            .id("home_my_bookings")
-                                        if hasUpcomingOrActiveBooking {
-                                            bookSpotQuickButton
-                                                .id("home_book")
-                                        }
-                                    }
-                                    .padding(.horizontal)
-                                }
+                                compactTileRow
 
                                 vehicleCard
 
@@ -364,7 +352,8 @@ struct HomeView: View {
 
             Button {
                 Haptics.selection()
-                showingBookingSheet = true
+                NotificationCenter.default.post(name: .navigateToParkingTab, object: nil)
+                NotificationCenter.default.post(name: .filterParkingToFreeSpots, object: nil)
             } label: {
                 Text(L10n.bookASpot)
                     .font(.body.weight(.semibold))
@@ -595,7 +584,8 @@ struct HomeView: View {
             // Big accent tile — Book a Spot (n free)
             Button {
                 Haptics.selection()
-                showingBookingSheet = true
+                NotificationCenter.default.post(name: .navigateToParkingTab, object: nil)
+                NotificationCenter.default.post(name: .filterParkingToFreeSpots, object: nil)
             } label: {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L10n.bookASpot)
@@ -615,7 +605,20 @@ struct HomeView: View {
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity, minHeight: 132, alignment: .leading)
-                .background(AppConfig.accent)
+                .background {
+                    ZStack {
+                        AppConfig.accent
+                        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                            let phase = timeline.date.timeIntervalSinceReferenceDate.remainder(dividingBy: 4) / 4
+                            HomeInsightWaveFill(
+                                progress: todaysBookingFillProgress,
+                                phase: CGFloat(phase * .pi * 2),
+                                amplitude: 5
+                            )
+                            .fill(AppConfig.onAccent.opacity(colorScheme == .dark ? 0.13 : 0.16))
+                        }
+                    }
+                }
                 .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
             }
             .buttonStyle(BouncyTileStyle())
@@ -686,6 +689,16 @@ struct HomeView: View {
             .frame(width: 30, height: 30)
             .background(background)
             .clipShape(Circle())
+    }
+
+    // MARK: - Home occupancy
+
+    private var todaysBookingCount: Int {
+        bookingManager.getBookingsForDate(Date()).count
+    }
+
+    private var todaysBookingFillProgress: CGFloat {
+        min(max(CGFloat(todaysBookingCount) / 16, 0), 1)
     }
 
     // MARK: - Your Vehicle card
@@ -2520,5 +2533,61 @@ private struct CascadeIn: ViewModifier {
                     : .spring(duration: 0.45, bounce: 0.24).delay(0.15 + Double(index) * 0.04),
                 value: visible
             )
+    }
+}
+
+private struct HomeInsightWaveFill: Shape {
+    let progress: CGFloat
+    var phase: CGFloat = 0
+    var amplitude: CGFloat? = nil
+
+    func path(in rect: CGRect) -> Path {
+        let clamped = min(max(progress, 0), 1)
+        let top = rect.maxY - rect.height * clamped
+        let waveHeight = amplitude ?? min(rect.height * 0.035, 7)
+        let wavelength = max(rect.width * 0.92, 1)
+
+        var path = Path()
+        path.move(to: CGPoint(x: 0, y: rect.maxY))
+        path.addLine(to: CGPoint(x: 0, y: top + sin(phase) * waveHeight))
+
+        let steps = max(Int(rect.width / 8), 1)
+        for step in 1...steps {
+            let x = rect.width * CGFloat(step) / CGFloat(steps)
+            let y = top + sin((x / wavelength * .pi * 2) + phase) * waveHeight
+            path.addLine(to: CGPoint(x: x, y: y))
+        }
+
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+private struct HomeInsightGridOverlay: View {
+    let color: Color
+
+    var body: some View {
+        GeometryReader { proxy in
+            Path { path in
+                let spacing: CGFloat = 18
+
+                var x: CGFloat = 0
+                while x <= proxy.size.width {
+                    path.move(to: CGPoint(x: x, y: 0))
+                    path.addLine(to: CGPoint(x: x, y: proxy.size.height))
+                    x += spacing
+                }
+
+                var y: CGFloat = 0
+                while y <= proxy.size.height {
+                    path.move(to: CGPoint(x: 0, y: y))
+                    path.addLine(to: CGPoint(x: proxy.size.width, y: y))
+                    y += spacing
+                }
+            }
+            .stroke(color, lineWidth: 0.6)
+        }
+        .allowsHitTesting(false)
     }
 }

@@ -44,7 +44,7 @@ private enum FirebaseBootstrap {
 // MARK: - AppDelegate (configures Firebase before any StateObjects are created)
 
 /// Shared store for a quick action that arrived before the UI was ready
-/// (cold launch). Written by didFinishLaunchingWithOptions, consumed once in onAppear.
+/// (cold launch). Written by the scene delegate, consumed once in onAppear.
 enum QuickActionStore {
     static var pendingType: String?
 }
@@ -61,23 +61,26 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate {
         application.shortcutItems = AppQuickAction.shortcutItems
         Messaging.messaging().delegate = self
         registerForRemoteNotificationsIfAuthorized(application)
-        // Cold launch via a Home Screen quick action.
-        if let shortcutItem = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem {
-            QuickActionStore.pendingType = shortcutItem.type
-        }
         return true
     }
 
-    // Warm launch: app was already running when the quick action was tapped.
+    func application(
+        _ application: UIApplication,
+        configurationForConnecting connectingSceneSession: UISceneSession,
+        options: UIScene.ConnectionOptions
+    ) -> UISceneConfiguration {
+        let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        configuration.delegateClass = QuickActionSceneDelegate.self
+        return configuration
+    }
+
+    // Warm launch fallback for app-delegate quick action delivery.
     func application(
         _ application: UIApplication,
         performActionFor shortcutItem: UIApplicationShortcutItem,
         completionHandler: @escaping (Bool) -> Void
     ) {
-        NotificationCenter.default.post(
-            name: .appQuickActionTriggered,
-            object: shortcutItem.type
-        )
+        QuickActionSceneDelegate.handle(shortcutItem)
         completionHandler(true)
     }
 
@@ -139,6 +142,34 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate {
                 print("FCM token sync failed: \(error.localizedDescription)")
             }
         }
+    }
+}
+
+private final class QuickActionSceneDelegate: NSObject, UIWindowSceneDelegate {
+    func scene(
+        _ scene: UIScene,
+        willConnectTo session: UISceneSession,
+        options connectionOptions: UIScene.ConnectionOptions
+    ) {
+        if let shortcutItem = connectionOptions.shortcutItem {
+            QuickActionStore.pendingType = shortcutItem.type
+        }
+    }
+
+    func windowScene(
+        _ windowScene: UIWindowScene,
+        performActionFor shortcutItem: UIApplicationShortcutItem,
+        completionHandler: @escaping (Bool) -> Void
+    ) {
+        Self.handle(shortcutItem)
+        completionHandler(true)
+    }
+
+    static func handle(_ shortcutItem: UIApplicationShortcutItem) {
+        NotificationCenter.default.post(
+            name: .appQuickActionTriggered,
+            object: shortcutItem.type
+        )
     }
 }
 

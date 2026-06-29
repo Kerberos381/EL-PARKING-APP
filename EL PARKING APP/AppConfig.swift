@@ -216,6 +216,7 @@ struct AppConfig {
         "24ca550ae0c87d8eb8f8d784ec8deb57312af4de6823c1635a509bf69a2b25f4", // essilor.cz
         "3b25ad563a5aa9aa91a73c606016fe635e2c26470da3fa789af7f4d853e244a0", // ext.essilor.com
         "a2fbd416f3c3a7e71506bc88890fe1bb2853afa0e7348395d1ad0da75732e1f8", // luxottica.com
+        "57f9855ddf062787288df0dd3428118baedd2a843ff6c38a981be77b5fa9a540", // hu.luxottica.com
         "1c0d91e0243bd27642ba27cdf1e15f0596e1daefe498a193e5c5ce14e293c476", // essilorluxottica.id
         "e3eadea231b5f76178f350deb37c8b6a1af02fb9786887ad15b9a8d60a18ea07", // omega-optix.cz
     ]

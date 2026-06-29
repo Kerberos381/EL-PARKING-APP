@@ -803,7 +803,7 @@
 				INFOPLIST_FILE = ParkingWidgetInfo.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = ParkingWidget;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
@@ -834,7 +834,7 @@
 				INFOPLIST_FILE = ParkingWidgetInfo.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = ParkingWidget;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",

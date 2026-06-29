@@ -279,31 +279,15 @@ class AuthManager: ObservableObject {
 
     // MARK: - Live Users Listener (admin only)
 
+    // All-users data is loaded ON-DEMAND by the admin screens themselves
+    // (AuthManager.fetchAllUsers(), already called from AdminDashboardView and
+    // AdminUsersView .task / pull-to-refresh). The previous LIVE listener on the
+    // whole users collection streamed every user doc + every change + re-read on
+    // each reconnect for the entire admin session — a major Firestore read
+    // amplifier. Removed. Kept as a no-op so existing call sites stay valid.
     private func startUsersListener() {
         usersListener?.remove()
-        usersListener = db.collection("users")
-            .addSnapshotListener { [weak self] snapshot, error in
-                guard let self, let snapshot, error == nil else { return }
-                #if DEBUG
-                let warnings = snapshot.documents.flatMap {
-                    FirestoreSchemaValidator.userWarnings(data: $0.data(), docID: $0.documentID)
-                }
-                if !warnings.isEmpty {
-                    print("AuthManager users listener schema warnings (\(warnings.count)):\n- \(warnings.prefix(10).joined(separator: "\n- "))")
-                }
-                #endif
-                let users = snapshot.documents
-                    .compactMap { AppUser.fromFirestore($0.data()) }
-                    .sorted {
-                        $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
-                    }
-                Task { @MainActor in
-                    let signature = self.usersSignature(users)
-                    guard signature != self.lastAllUsersSignature else { return }
-                    self.lastAllUsersSignature = signature
-                    self.allUsers = users
-                }
-            }
+        usersListener = nil
     }
 
     // MARK: - Register (Email / Password)

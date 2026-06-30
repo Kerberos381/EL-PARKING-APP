@@ -255,8 +255,13 @@ class BookingManager: ObservableObject {
     }
 
     func refreshData() async {
-        await refreshBookings()
-        await refreshSpots()
+        // The live listeners already keep bookings/spots current in real time, so an
+        // explicit getDocuments() here — called from many views' .task/.onAppear and
+        // pull-to-refresh — was re-reading the WHOLE collections on every screen
+        // appear/navigation. During the 18:00 rush that multiplied into a major read
+        // amplifier. Only fetch when a listener isn't actually running.
+        if bookingsListener == nil { await refreshBookings() }
+        if spotsListener == nil { await refreshSpots() }
     }
 
     private func refreshBookings() async {

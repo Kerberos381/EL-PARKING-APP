@@ -109,7 +109,7 @@ struct BookingSheet: View {
     private var maxAdvanceDays: Int {
         if bookingManager.isAdmin { return AppConfig.adminBookingMaxAdvanceDays }
         if bookingManager.isPrivileged { return AppConfig.othersBookingMaxAdvanceDays }
-        return Calendar.current.component(.hour, from: Date()) >= 18 ? 1 : 0
+        return Calendar.current.component(.hour, from: Date()) >= 17 ? 1 : 0
     }
 
     private var maxDate: Date {

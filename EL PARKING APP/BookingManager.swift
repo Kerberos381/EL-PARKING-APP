@@ -664,7 +664,7 @@ class BookingManager: ObservableObject {
         } else if isPrivileged {
             maxAdvanceDays = AppConfig.othersBookingMaxAdvanceDays
         } else {
-            maxAdvanceDays = Calendar.current.component(.hour, from: Date()) >= 18 ? 1 : 0
+            maxAdvanceDays = Calendar.current.component(.hour, from: Date()) >= 17 ? 1 : 0
         }
 
         if !isBookingForSelf && !isAdmin && daysDiff + 1 > AppConfig.othersBookingMaxDurationDays {

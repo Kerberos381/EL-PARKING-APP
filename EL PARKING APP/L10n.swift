@@ -289,8 +289,8 @@ struct L10n {
     }
     static var bookingWindowStandardError: String {
         isCzech
-            ? "Můžete rezervovat pouze na dnes, nebo na zítra po 18:00."
-            : "You can only book for today, or tomorrow after 18:00."
+            ? "Můžete rezervovat pouze na dnes, nebo na zítra po 17:00."
+            : "You can only book for today, or tomorrow after 17:00."
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -540,7 +540,7 @@ struct L10n {
     static var personalAdvance:    String { isCzech ? "Osobní předstih"          : "Personal advance" }
     static var forOthersAdvance:   String { isCzech ? "Předstih pro ostatní"     : "For others advance" }
     // Accurate booking-window descriptions per role (match firestore.rules bookingDateAllowedForActor)
-    static var advanceWindowStandard:   String { isCzech ? "Dnes / zítra po 18:00" : "Today / tomorrow after 18:00" }
+    static var advanceWindowStandard:   String { isCzech ? "Dnes / zítra po 17:00" : "Today / tomorrow after 17:00" }
     static var advanceWindowPrivileged: String { isCzech ? "Až 3 dny dopředu"      : "Up to 3 days ahead" }
     static var advanceWindowAdmin:      String { isCzech ? "Bez omezení data"      : "No date limit" }
     static var maxPerDay:          String { isCzech ? "Max. za den (osobní)"     : "Max per day (personal)" }
@@ -757,13 +757,13 @@ struct L10n {
     static var onboardingWindowsSub:      String { isCzech ? "Okna dle vaší role"  : "Booking windows by role" }
     static var onboardingWindowsDesc:     String {
         isCzech
-            ? "Standardní uživatelé rezervují na dnes nebo zítřek (po 18:00). Privilegovaní mohou rezervovat až 3 dny dopředu. Admini bez omezení."
-            : "Standard users book for today or tomorrow (after 18:00). Privileged users book up to 3 days ahead. Admins have no date restrictions."
+            ? "Standardní uživatelé rezervují na dnes nebo zítřek (po 17:00). Privilegovaní mohou rezervovat až 3 dny dopředu. Admini bez omezení."
+            : "Standard users book for today or tomorrow (after 17:00). Privileged users book up to 3 days ahead. Admins have no date restrictions."
     }
     static var onboardingWindowsTip:      String {
         isCzech
-            ? "Zítřejší slot se odemkne dnes ve 18:00."
-            : "Tomorrow's slot unlocks at 18:00 today."
+            ? "Zítřejší slot se odemkne dnes v 17:00."
+            : "Tomorrow's slot unlocks at 17:00 today."
     }
     static var onboardingWarningsTitle:   String { isCzech ? "Férové hraní"        : "Fair Play" }
     static var onboardingWarningsSub:     String { isCzech ? "Systém varování"     : "The warning system" }

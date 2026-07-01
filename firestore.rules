@@ -54,12 +54,13 @@ service cloud.firestore {
       return hasAppAccess() && userData().role == 'privileged';
     }
 
-    // Returns true if the server clock has passed 18:00 Prague local time.
+    // Returns true if the server clock has passed 17:00 Prague local time.
+    // (Booking window moved 18:00 → 17:00; function name kept to avoid churn.)
     // Prague = CET (UTC+1) in winter, CEST (UTC+2) in summer.
-    // 18:00 CEST = 16:00 UTC  →  threshold: 16 * 3600 * 1000 ms into the UTC day.
-    // In CET this evaluates to 17:00 local (1 h early) — acceptable approximation.
+    // 17:00 CEST = 15:00 UTC  →  threshold: 15 * 3600 * 1000 ms into the UTC day.
+    // In CET this evaluates to 16:00 local (1 h early) — acceptable approximation.
     function isAfter18LocalTime() {
-      return (request.time.toMillis() % 86400000) >= (16 * 3600 * 1000);
+      return (request.time.toMillis() % 86400000) >= (15 * 3600 * 1000);
     }
 
     // Local "today" midnight stored as UTC Timestamp:
@@ -274,7 +275,8 @@ service cloud.firestore {
           && request.resource.data.get('inviteAccepted', false)          == true
           && !request.resource.data.diff(resource.data).affectedKeys()
               .hasAny(['role', 'status', 'email', 'uid', 'createdAt', 'companyBadge',
-                       'strikes', 'suspendedAt', 'suspensionCount', 'strikeHistory']))
+                       'strikes', 'suspendedAt', 'suspensionCount', 'strikeHistory',
+                       'fcmTokens', 'lastFCMToken', 'fcmTokenUpdatedAt']))
 
         // Normal self-edit: cannot change role, status, email, or strike/suspension fields.
         // EMERGENCY 2026-07-01: also block the FCM token fields. An un-updated client wrote
@@ -302,7 +304,8 @@ service cloud.firestore {
           && request.resource.data.strikes == 0
           && !request.resource.data.diff(resource.data).affectedKeys()
               .hasAny(['role', 'email', 'uid', 'createdAt', 'companyBadge',
-                       'strikeHistory', 'suspensionCount', 'suspendedAt', 'inviteAccepted']))
+                       'strikeHistory', 'suspensionCount', 'suspendedAt', 'inviteAccepted',
+                       'fcmTokens', 'lastFCMToken', 'fcmTokenUpdatedAt']))
 
         // Strike decay: user can self-reduce strike count once 30+ days have passed
         // since their last warning. Only strikes and lastStrikeAt may change.
@@ -316,7 +319,8 @@ service cloud.firestore {
           && request.resource.data.get('inviteAccepted', true) == resource.data.get('inviteAccepted', true)
           && !request.resource.data.diff(resource.data).affectedKeys()
               .hasAny(['role', 'status', 'email', 'uid', 'createdAt', 'companyBadge',
-                       'strikeHistory', 'suspensionCount', 'suspendedAt', 'inviteAccepted']))
+                       'strikeHistory', 'suspensionCount', 'suspendedAt', 'inviteAccepted',
+                       'fcmTokens', 'lastFCMToken', 'fcmTokenUpdatedAt']))
 
         // Admin can update any field
         || isAdmin()

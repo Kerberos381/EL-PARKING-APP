@@ -2,7 +2,7 @@
 //  AnnouncementsManager.swift
 //  EL PARKING APP
 //
-//  Real-time Firestore listener for announcements.
+//  One-shot Firestore fetch for announcements (on launch + pull-to-refresh).
 //  Admins: full CRUD. All users: read active announcements.
 //
 
@@ -35,31 +35,19 @@ class AnnouncementsManager: ObservableObject {
 
     private lazy var db = Firestore.firestore()
     private lazy var storage = Storage.storage()
-    private var listener: ListenerRegistration?
 
     init() {
-        startListener()
+        Task { await refresh() }
         Task { await cleanupExpired() }
     }
 
-    deinit { listener?.remove() }
-
-    // MARK: - Listener
-
-    private func startListener() {
-        listener?.remove()
-        listener = db.collection("announcements")
-            .order(by: "createdAt", descending: true)
-            .addSnapshotListener { [weak self] snapshot, error in
-                guard let self, let snapshot, error == nil else { return }
-                let items = snapshot.documents.compactMap {
-                    Announcement.fromFirestore($0.data(), id: $0.documentID)
-                }
-                Task { @MainActor in
-                    self.announcements = items
-                }
-            }
-    }
+    // Announcements change on a weeks/months cadence (admin-authored bulletin board), so a
+    // permanently-open listener bought almost nothing — it stayed live for a signed-in user's
+    // ENTIRE session regardless of screen. One-shot refresh() on launch + pull-to-refresh
+    // (already wired in AdminAnnouncementsView/HomeView) covers it; new announcements also get
+    // a separate push via PushNotificationManager.broadcast() in create(), so users aren't
+    // relying on this fetch alone to learn about a new one. CRUD methods below call refresh()
+    // after writing so the admin's own screen updates immediately without a listener.
 
     func refresh() async {
         do {
@@ -92,6 +80,7 @@ class AnnouncementsManager: ObservableObject {
         do {
             try await db.collection("announcements").document(id).setData(item.toFirestore())
             PushNotificationManager.broadcast(title: "\(emoji) \(title)", body: body)
+            await refresh()
         } catch {
             print("AnnouncementsManager create error: \(error.localizedDescription)")
         }
@@ -100,6 +89,7 @@ class AnnouncementsManager: ObservableObject {
     func save(_ item: Announcement) async {
         do {
             try await db.collection("announcements").document(item.id).setData(item.toFirestore())
+            await refresh()
         } catch {
             print("AnnouncementsManager save error: \(error.localizedDescription)")
         }
@@ -111,6 +101,7 @@ class AnnouncementsManager: ObservableObject {
                 await deleteImage(for: item.id)
             }
             try await db.collection("announcements").document(item.id).delete()
+            await refresh()
         } catch {
             print("AnnouncementsManager delete error: \(error.localizedDescription)")
         }

@@ -2,7 +2,7 @@
 //  InfoManager.swift
 //  EL PARKING APP
 //
-//  Real-time Firestore listener for /info_items.
+//  One-shot Firestore fetch for /info_items (on launch + pull-to-refresh).
 //  Admins: full CRUD.  All users: read.
 //
 
@@ -17,35 +17,14 @@ class InfoManager: ObservableObject {
     @Published var errorMessage: String?
 
     private lazy var db = Firestore.firestore()
-    private var listener: ListenerRegistration?
 
-    init() { startListener() }
-    deinit { listener?.remove() }
+    init() { Task { await refresh() } }
 
-    // MARK: - Listener
-
-    private func startListener() {
-        listener?.remove()
-        listener = db.collection("info_items")
-            .order(by: "sortOrder")
-            .addSnapshotListener { [weak self] snapshot, error in
-                guard let self else { return }
-                if let error {
-                    Task { @MainActor in
-                        self.errorMessage = error.localizedDescription
-                    }
-                    return
-                }
-                guard let snapshot else { return }
-                let loaded = snapshot.documents.compactMap {
-                    InfoItem.fromFirestore($0.data(), id: $0.documentID)
-                }
-                Task { @MainActor in
-                    self.items = loaded
-                    self.errorMessage = nil
-                }
-            }
-    }
+    // info_items is static reference content (contact cards, building/parking rules) that an
+    // admin edits on a weeks/months cadence, so a permanently-open listener bought almost
+    // nothing — it stayed live for a signed-in user's ENTIRE session regardless of screen.
+    // One-shot refresh() on launch + pull-to-refresh covers it; CRUD methods below call
+    // refresh() after writing so the admin's own screen updates immediately without a listener.
 
     func refresh() async {
         do {
@@ -97,6 +76,7 @@ class InfoManager: ObservableObject {
             if sendPush {
                 PushNotificationManager.broadcast(title: item.title, body: item.body)
             }
+            await refresh()
         } catch {
             errorMessage = "Could not save: \(error.localizedDescription)"
         }
@@ -109,6 +89,7 @@ class InfoManager: ObservableObject {
             if sendPush {
                 PushNotificationManager.broadcast(title: item.title, body: item.body)
             }
+            await refresh()
         } catch {
             errorMessage = "Could not update: \(error.localizedDescription)"
         }
@@ -118,6 +99,7 @@ class InfoManager: ObservableObject {
         errorMessage = nil
         do {
             try await db.collection("info_items").document(item.id).delete()
+            await refresh()
         } catch {
             errorMessage = "Could not delete: \(error.localizedDescription)"
         }

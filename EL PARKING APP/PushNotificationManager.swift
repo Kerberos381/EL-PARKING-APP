@@ -3,8 +3,9 @@
 //  EL PARKING APP
 //
 //  Firestore-based push notification inbox.
-//  Listens to /users/{uid}/notifications + /broadcast_notifications for new items
-//  and converts them into local UNNotifications — works when app is open or backgrounded.
+//  Listens to user-addressed /direct_notifications for new items and converts
+//  them into local UNNotifications. Broadcasts are handled by one-shot catch-up
+//  sync instead of an always-on listener to keep Firestore reads bounded.
 //
 //  For true killed-app push, add the FirebaseMessaging SDK and upload an APNs key
 //  to Firebase Console → Project Settings → Cloud Messaging. The Firestore inbox
@@ -26,25 +27,17 @@ class PushNotificationManager: ObservableObject {
 
     private lazy var db = Firestore.firestore()
     private var inboxListener:     ListenerRegistration?
-    private var broadcastListener: ListenerRegistration?
-    /// Only broadcast notifications created AFTER the app launched are delivered
-    /// (prevents re-showing old announcements every time the listener fires).
-    private var sessionStart = Date()
 
     // MARK: - Start / Stop
 
     func startListening(for uid: String) {
         stopListening()
-        sessionStart = Date()
         listenInbox(uid: uid)
-        listenBroadcast()
     }
 
     func stopListening() {
         inboxListener?.remove()
-        broadcastListener?.remove()
-        inboxListener     = nil
-        broadcastListener = nil
+        inboxListener = nil
     }
 
     // MARK: - Per-user inbox  (/direct_notifications, addressed by email)
@@ -67,27 +60,6 @@ class PushNotificationManager: ObservableObject {
                         await Self.scheduleLocal(id: doc.documentID, title: title, body: body)
                         // Mark delivered so re-opening the app doesn't repeat it
                         try? await doc.reference.updateData(["delivered": true])
-                    }
-                }
-            }
-    }
-
-    // MARK: - Broadcast  (/broadcast_notifications)
-
-    private func listenBroadcast() {
-        broadcastListener = db
-            .collection("broadcast_notifications")
-            .whereField("createdAt", isGreaterThan: Timestamp(date: sessionStart))
-            .addSnapshotListener { snapshot, _ in
-                guard let snapshot else { return }
-                for change in snapshot.documentChanges where change.type == .added {
-                    let doc  = change.document
-                    let data = doc.data()
-                    guard let title = data["title"] as? String,
-                          let body  = data["body"]  as? String else { continue }
-
-                    Task { @MainActor in
-                        await Self.scheduleLocal(id: "bc_\(doc.documentID)", title: title, body: body)
                     }
                 }
             }
@@ -204,7 +176,8 @@ class PushNotificationManager: ObservableObject {
     }
 
     /// Broadcast a notification to all users.
-    /// Every running instance picks this up via the broadcast_notifications listener.
+    /// Delivery is picked up by FCM/Cloud Functions when available, or by the
+    /// foreground/background one-shot sync paths. No realtime listener is attached.
     static func broadcast(title: String, body: String) {
         Firestore.firestore()
             .collection("broadcast_notifications")

@@ -132,6 +132,13 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate {
 
     private func upsertFCMToken(_ token: String) {
         guard let uid = Auth.auth().currentUser?.uid else { return }
+        // Only write when the token actually changed. upsertFCMToken is called on
+        // every appear/foreground/auth change; without this guard each call rewrote
+        // fcmTokenUpdatedAt (serverTimestamp = always new) → a redundant write plus a
+        // re-read on any /users/{uid} listener, every single foreground. Cache the
+        // last-synced token locally and skip when unchanged.
+        let defaultsKey = "lastSyncedFCMToken_\(uid)"
+        if UserDefaults.standard.string(forKey: defaultsKey) == token { return }
         let payload: [String: Any] = [
             "fcmTokens": FieldValue.arrayUnion([token]),
             "lastFCMToken": token,
@@ -140,6 +147,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate {
         Firestore.firestore().collection("users").document(uid).setData(payload, merge: true) { error in
             if let error {
                 print("FCM token sync failed: \(error.localizedDescription)")
+            } else {
+                UserDefaults.standard.set(token, forKey: defaultsKey)
             }
         }
     }

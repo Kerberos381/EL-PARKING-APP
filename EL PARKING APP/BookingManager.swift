@@ -1672,12 +1672,21 @@ class BookingManager: ObservableObject {
     }
 
     private func recentBookingsQuery() -> Query {
-        // Intentionally no server-side bookingDate filter:
-        // Firestore comparisons are type-strict and can exclude legacy/imported
-        // docs where bookingDate is a "yyyy-MM-dd" string instead of Timestamp.
-        // We parse both shapes in Booking.fromFirestore and filter locally via
-        // shouldKeepBookingLocally(_:) to keep iOS/Android occupancy in sync.
-        db.collection("bookings")
+        // P0: scope the listener with a LOWER-BOUND date filter so every user no
+        // longer streams the entire bookings collection. Keeps today + ALL future
+        // (admins book far ahead → no upper bound) but stops streaming old docs, so
+        // the listener stays bounded even if cleanup lags.
+        //
+        // REQUIRES every bookingDate to be a Firestore Timestamp — a Timestamp
+        // comparison silently drops string-typed ("yyyy-MM-dd") legacy docs. Run
+        // admin-tools/migrate-booking-dates.js (and confirm 0 string docs remain)
+        // BEFORE shipping this. Local shouldKeepBookingLocally(_:) still refines.
+        let cutoff = Calendar.current.date(
+            byAdding: .day, value: -(AppConfig.bookingRetentionDays + 1),
+            to: Calendar.current.startOfDay(for: Date())
+        ) ?? Date()
+        return db.collection("bookings")
+            .whereField("bookingDate", isGreaterThanOrEqualTo: Timestamp(date: cutoff))
     }
 
     private func applyBookingsSnapshot(_ loaded: [Booking]) {

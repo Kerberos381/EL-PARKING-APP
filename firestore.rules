@@ -276,12 +276,20 @@ service cloud.firestore {
               .hasAny(['role', 'status', 'email', 'uid', 'createdAt', 'companyBadge',
                        'strikes', 'suspendedAt', 'suspensionCount', 'strikeHistory']))
 
-        // Normal self-edit: cannot change role, status, email, or strike/suspension fields
+        // Normal self-edit: cannot change role, status, email, or strike/suspension fields.
+        // EMERGENCY 2026-07-01: also block the FCM token fields. An un-updated client wrote
+        // fcmTokenUpdatedAt on every /users/{uid} snapshot, re-firing its own listener in an
+        // infinite write→read loop (thousands of ops from a few clients — quota blowout).
+        // Mobile writes these 3 fields in isolation and web never writes them, so denying
+        // them kills the loop with zero collateral. NOTE: admins bypass via isAdmin() below
+        // (few, controlled). REVERT this once fixed clients (Android vc28 / iOS 6.6) roll out
+        // if FCM-token collection is wanted again.
         || (request.auth.uid == uid
           && !request.resource.data.diff(resource.data).affectedKeys()
               .hasAny(['role', 'status', 'email', 'companyBadge',
                        'strikes', 'suspendedAt', 'suspensionCount', 'strikeHistory',
-                       'inviteAccepted']))
+                       'inviteAccepted',
+                       'fcmTokens', 'lastFCMToken', 'fcmTokenUpdatedAt']))
 
         // Auto-lift: user can flip own suspension → active after the 14-day window.
         // Firestore enforces the time gate server-side; client logic is just an optimisation.
